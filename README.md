@@ -6,6 +6,8 @@ A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed
 
 ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
 
+**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — the clause highlighter on the exported policies and the Sepolia deployment (static build; the live gateway is a local or Coolify run).
+
 ## Run it
 
 Node 18+ and [Foundry](https://getfoundry.sh) (`anvil`). Everything runs locally.
@@ -69,7 +71,7 @@ Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right g
 
 ## Deploy
 
-`deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`): [docs/deploy.md](docs/deploy.md).
+`deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`): [docs/deploy.md](docs/deploy.md). `.github/workflows/pages.yml` publishes the static dashboard to GitHub Pages on every push.
 
 ### Sepolia
 

@@ -4,6 +4,7 @@ import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { astSchema } from '../src/policy/schema.js';
+import { buybackTermsFrom } from '../src/policy/programs.js';
 
 const args = process.argv.slice(2);
 const demo = args.includes('--demo');
@@ -32,6 +33,10 @@ const files = {
   'clause-table.json': JSON.stringify(result.clauseTable, null, 2),
 };
 if (result.solidity) files['CompiledMirrorToken.sol'] = result.solidity;
+if (result.policy.ast.terms.some((term) => term.name === 'buybackPrice')) {
+  const terms = buybackTermsFrom(result.policy);
+  files['buyback-terms.json'] = JSON.stringify({ policyHash: result.policy.hash, ...terms, capPosition: String(terms.capPosition), capAsset: String(terms.capAsset) }, null, 2);
+}
 for (const [name, body] of Object.entries(files)) await writeFile(`generated/${name}`, `${body}\n`);
 
 console.log(`Compiled ${envelope.ast.rules.length} rules from ${document.name} (${result.policy.profile})`);

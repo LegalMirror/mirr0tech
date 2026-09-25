@@ -1,6 +1,6 @@
 # 1inch SwapVM integration — specification
 
-Appendix to [PRD.md](PRD.md) §7.4. Status: **to build** (Sat). Everything it depends on — `PolicyEval`, `CompiledPolicy`, `PolicyAttestor` — exists.
+Appendix to [PRD.md](PRD.md) §7.4. Status: **built and tested on anvil** (`test/chain/swapvm.test.js`). Sources: `contracts/swapvm/`, `src/policy/programs.js`.
 
 ## 1. What we are building
 
@@ -8,11 +8,13 @@ A SwapVM **instruction** that evaluates the compiled agreement, a **router** tha
 
 ```
 Deadline(addendum.expiry)
-PolicyGuard(policyHash, ACTION_TRANSFER)     ← the MLA
-StaticBalances(cap in USDC, cap in position tokens at price)
-LimitSwap(USDC → positionToken)              ← borrower pays USDC, receives its own debt
-InvalidateTokenIn                            ← cumulative fill cap, partial fills allowed
+PolicyGuard(policyHash, ACTION_TRANSFER)        ← the MLA, as an opcode
+FixedRateBalances(position, cap, USDC, cap×price) ← the price is a term, not a curve
+LimitSwap(positionToken → USDC)                 ← lender pays its position, borrower pays USDC
+InvalidateTokenIn                               ← cumulative fill cap, partial fills allowed
 ```
+
+Two instructions are ours, appended after the official `LimitOpcodes` set so every existing opcode keeps its number: `PolicyGuard` (opcode = size of the official set) and `FixedRateBalances` (the next one). The official `StaticBalances` refuses to run over balances Aqua has preloaded, and with Aqua balances alone `LimitSwap` would reprice after every fill; the addendum promises "not less than 0.96", so the rate is pinned from the program and the Aqua balances serve as the settlement allowance and cap.
 
 **Mode: Aqua (P0).** The 1inch track is "Build an Aqua App", so the borrower *ships* the strategy to Aqua (`useAquaInsteadOfSignature: true`) rather than signing an order. Balances come from Aqua's virtual balances, so the program drops `StaticBalances`; settlement goes through `aqua.pull`/`push`. Signature mode (EIP-712, no registry) is the P1 fallback and uses the same bytecode with `StaticBalances` added.
 
@@ -53,6 +55,10 @@ Decisions:
 - **View-only.** No storage writes, so it is legal in `isStaticContext` and `quote()` runs it.
 - **Policy bound at compile time.** The guard checks the embedded `policyHash` equals the router's `CompiledPolicy.POLICY_HASH`. One router per policy is acceptable for the hackathon; multi-policy routers would look the attestor up by hash instead.
 - **Fact assembly.** `IPolicyOracle.facts()` returns the attestor's words OR observable bits (sanctions oracle). Implement as a small view contract so the same assembly is used by the role provider and the guard.
+
+## 2b. Sizes and instruction set
+
+`MirrortechRouter is Simulator, SwapVM, LimitOpcodes, PolicyGuard, FixedRateBalances` — the full `Opcodes` set with our additions compiles to ~27.5 KB, over EIP-170; `LimitOpcodes` (deadline, static balances, limit swap, Dutch auction, invalidators, min-rate, fees, extruction) lands at ~23.0 KB. The decision itself lives in `PolicyOracle.decide(subject, action)` so the router carries neither the compiled programs nor the evaluator. Opcode numbers in JavaScript are parsed from the vendored `LimitOpcodes.sol` (`loadOpcodes()`), never hard-coded, and the router reports its appended opcodes (`policyGuardOpcode()`, `fixedRateBalancesOpcode()`).
 
 ## 3. `MirrortechRouter`
 

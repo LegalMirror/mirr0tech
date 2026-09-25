@@ -119,9 +119,9 @@ Implements `IRoleProvider` from `wildcat-finance/v2-protocol` verbatim (`contrac
 
 A borrower registers it with `addRoleProvider(provider, timeToLive)` on their hooks contract. No fork, no market change. On Sepolia a `MockWildcatMarket` stands in for the market and calls the real provider interface.
 
-### 5.2 1inch SwapVM — `MirrortechRouter` + `PolicyGuard` (to build)
+### 5.2 1inch SwapVM — `MirrortechRouter` + `PolicyGuard` + `FixedRateBalances` (exists)
 
-Specified in [SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md). Summary: a guard instruction carrying `policyHash ‖ action` evaluates maker and taker at fill *and* at quote time; a router dispatches it; the compiler fills a fixed program template from the addendum's terms.
+Specified in [SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md). Summary: a guard instruction carrying `policyHash ‖ action` evaluates maker and taker at fill *and* at quote time through `PolicyOracle.decide`; a fixed-rate instruction pins the addendum's price over Aqua's preloaded balances; a `LimitOpcodes` router dispatches both; `src/policy/programs.js` fills the template from `generated/buyback-terms.json`. The strategy ships to an unmodified Aqua registry; the router is a modified SwapVM redeploy, which the track allows.
 
 Hash chain, none of it built by us:
 
@@ -185,7 +185,13 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `src/policy/dnf.js` | NNF/DNF, mask evaluation, `buildProgram` |
 | `src/policy/onchain.js` | ABI-encode programs, emit `CompiledPolicy.sol`, clause table hash |
 | `src/policy/compile.js` | profiles, equivalence proof, `policyHash`, artifact emission |
-| `src/policy/mla-fixture.js` | hand-authored fixture for the **synthetic** MLA (to be replaced, see PRD §7.1) |
+| `src/policy/mla-fixture.js` | hand-authored fixture quoting the Wildcat template MLA, the Lender Check Policy and the addendum |
+| `src/policy/programs.js` | SwapVM opcode table (parsed from vendored `LimitOpcodes.sol`), instruction encoders, buyback template, order and taker packing |
+| `contracts/PolicyOracle.sol` | fact assembly (attested ∪ derived ∪ observable) and the decision every venue calls |
+| `contracts/MockSanctionsOracle.sol`, `contracts/MockWildcatMarket.sol` | Sepolia stand-ins for the Chainalysis oracle and a V2 market |
+| `contracts/swapvm/PolicyGuard.sol`, `FixedRateBalances.sol`, `MirrortechRouter.sol` | 1inch venue |
+| `test/chain/swapvm.test.js` | ship → quote → fill → refusals → cap/deadline → dock on anvil |
+| `scripts/vendor.sh` | clones the source-available SwapVM/Aqua sources into `vendor/` (gitignored) |
 | `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
 | `contracts/PolicyEval.sol` | three-valued evaluator |
 | `contracts/PolicyAttestor.sol` | facts, expiry, revocation, EIP-712 relay |
@@ -196,17 +202,12 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `scripts/compile.js --mla`, `scripts/build-contracts.js`, `scripts/demo-credit.js` | build + demo |
 | `examples/wildcat-config.json` | credit profile config |
 | `test/dnf.test.js`, `test/chain/{anvil,credit,hook}.test.js` | proofs and chain tests |
-| `test/human_contracts/sample-mla.md` | **synthetic** MLA (to be replaced) |
+| `test/human_contracts/wildcat-mla.md`, `lender-check-policy.md`, `buyback-addendum.md` | source documents: Wildcat template MLA with an illustrative Term Sheet, the borrower's policy, the addendum |
 
 **To build (PRD §7)**
 
 | Path | Role |
 | --- | --- |
-| `test/human_contracts/wildcat-mla.md`, `lender-check-policy.md`, `buyback-addendum.md` | real source documents |
-| `src/policy/terms.js` | `terms[]` schema + validation |
-| `src/policy/programs.js` | SwapVM program templates, filled from terms |
-| `contracts/swapvm/PolicyGuard.sol`, `contracts/MirrortechRouter.sol` | 1inch venue |
-| `contracts/MockSanctionsOracle.sol`, `MockWildcatMarket.sol`, `MockUSDC.sol` | Sepolia stand-ins |
 | `scripts/deploy-sepolia.js` | deployment + verification |
 | `src/orders.js`, gateway routes for lenders/orders/audit | API |
 | `dashboard/` | UI |

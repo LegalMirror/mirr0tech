@@ -21,6 +21,8 @@ contract MockWildcatMarket is ERC20 {
     IPolicyRoleProvider public immutable roleProvider;
     address public immutable borrower;
     bool public openTerm = true;
+    /// @dev Contracts that may hold the token in transit for an admitted party, e.g. a settlement router.
+    mapping(address => bool) public venues;
 
     error NoDepositCredential(address lender);
     error WithdrawalRefused(address lender, uint16 clauseId);
@@ -29,6 +31,7 @@ contract MockWildcatMarket is ERC20 {
 
     event Deposited(address indexed lender, uint256 amount);
     event Withdrawn(address indexed lender, uint256 amount);
+    event VenueSet(address indexed venue, bool allowed);
 
     constructor(IERC20 asset_, IPolicyRoleProvider roleProvider_, address borrower_)
         ERC20("Demo MM Ltd Market Token", "mDEMO")
@@ -49,6 +52,12 @@ contract MockWildcatMarket is ERC20 {
     function setOpenTerm(bool value) external {
         if (msg.sender != borrower) revert NotBorrower();
         openTerm = value;
+    }
+
+    function setVenue(address venue, bool allowed) external {
+        if (msg.sender != borrower) revert NotBorrower();
+        venues[venue] = allowed;
+        emit VenueSet(venue, allowed);
     }
 
     /// @dev Wildcat grants a credential when a registered role provider returns a non-zero timestamp.
@@ -80,7 +89,7 @@ contract MockWildcatMarket is ERC20 {
 
     /// @dev Transferability level (ii): only to a wallet holding a valid credential.
     function _update(address from, address to, uint256 value) internal override {
-        if (from != address(0) && to != address(0)) {
+        if (from != address(0) && to != address(0) && !venues[to]) {
             (bool allowed, uint16 clauseId) = roleProvider.mayTransfer(to);
             if (!allowed) revert TransferRefused(to, clauseId);
         }

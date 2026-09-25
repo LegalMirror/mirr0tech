@@ -125,6 +125,7 @@ await (await sanctions.setSanctioned(lender, true)).wait();
 await report('Immediately after the oracle designates the wallet:');
 
 step('The lender is owed interest — is the borrower allowed to pay?');
+await (await sanctions.setSanctioned(lender, false)).wait();
 await attest(ADMITTED);
 let [mayPay] = await roleProvider.mayWithdraw(lender);
 say(`  With screening current:      ${mayPay ? 'payment permitted' : 'payment blocked'}`);

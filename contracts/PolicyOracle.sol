@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {PolicyAttestor} from "./PolicyAttestor.sol";
+import {PolicyEval} from "./PolicyEval.sol";
 import {CompiledPolicy} from "../generated/CompiledPolicy.sol";
 
 interface ISanctionsOracle {
@@ -67,5 +68,12 @@ contract PolicyOracle {
             known |= CompiledPolicy.FACT_OPEN_TERM_STATE;
             if (market.isOpenTerm()) value |= CompiledPolicy.FACT_OPEN_TERM_STATE;
         }
+    }
+
+    /// @notice The decision itself, so venues that must stay small (a SwapVM router is near the
+    /// contract size limit) do not carry the compiled programs or the evaluator.
+    function decide(address subject, uint8 action) external view returns (bool allowed, uint16 clauseId) {
+        (uint256 known, uint256 value,) = facts(subject);
+        return PolicyEval.decide(CompiledPolicy.program(action), known, value);
     }
 }

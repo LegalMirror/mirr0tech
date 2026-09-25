@@ -91,6 +91,15 @@ Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json
 | MirrortechRouter (SwapVM + PolicyGuard) | [`0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C`](https://sepolia.etherscan.io/address/0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C) |
 | 1inch Aqua (canonical) | [`0x1111113ccf1426a8e30e2bff5e005d929bf6a90a`](https://sepolia.etherscan.io/address/0x1111113ccf1426a8e30e2bff5e005d929bf6a90a) |
 
+Golden path on Sepolia, as the audit records it:
+[hooked pool created](https://sepolia.etherscan.io/tx/0xa22610f0ae976bf538ce0ba0396084910ccdcc9fb6bd417d8ba69e0ed3ab850a) on the canonical PoolManager ·
+[liquidity through the hook](https://sepolia.etherscan.io/tx/0xf87a0b8f25294007698a160a6553661637557cb3b29c3fdd5baa4a108f03c15b) ·
+[swap](https://sepolia.etherscan.io/tx/0x9a2cbc65c98d65e2a12a2f19e3e09ed3e3e09a41f158401167bfa6b1fc524210) ·
+[Lender A admitted and deposits](https://sepolia.etherscan.io/tx/0x3a3074b0f8634c65d5be398965fdfb5cb6c44b55540488687e24d0de47dbf2b7) ·
+[buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0x604a19d5dacbb37ded2937eece8d0fbc7d39a8806b22c3fc27ac1dab0c746cb8) ·
+[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0xd42e703d2f20eaccbd0387c1257786340720172054c70dfc759f6d4fd37de82d).
+The refusals (stranger release, hookless pool, stranger liquidity, Lender C deposit, stranger quote) never became transactions.
+
 ## Limits
 
 Screening, countersignature, AML/KYC and solvency are attested, not proved; a policy hash is no evidence that anyone was screened correctly. The sanctions oracle and the Wildcat market are mocks with the real interfaces (the real market is mainnet-only). Fact bitmaps are readable per wallet. The fund token is non-rebasing because Uniswap v4 does not support rebasing balances. Not legal advice; no real counterparty.

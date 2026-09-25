@@ -108,13 +108,13 @@ export function ClauseTableBadge({ policy }: { policy: PolicyData }) {
       live = false;
     };
   }, [policy]);
-  if (ok === null) return <span className="chip">clause table · checking</span>;
+  if (ok === null) return <span className="chip">verifying…</span>;
   return (
     <span
       className={`chip ${ok ? "chip-ok" : "chip-bad"}`}
       title="sha256(canonical(clauseTable)) recomputed in this browser"
     >
-      {ok ? "✓ clause table matches CLAUSE_TABLE_HASH" : "✗ clause table does not match its hash"}
+      {ok ? "✓ sentence verified against the chain" : "✗ sentence differs from the chain"}
     </span>
   );
 }

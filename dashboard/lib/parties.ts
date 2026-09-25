@@ -17,9 +17,9 @@ export function effectiveFacts(policy: PolicyData, party: Party): Facts {
   return facts;
 }
 
-/** The action whose decision is a party's status: admission for a lender, issuance for an investor. */
+/** The action whose decision is a party's status: admission for a lender, issuance under custody, the pool door on Uniswap. */
 export const statusAction = (policy: PolicyData) =>
-  policy.profile === "wildcat-credit" ? "deposit" : "mint";
+  policy.profile === "wildcat-credit" ? "deposit" : policy.profile === "rwa-secondary" ? "transfer" : "mint";
 
 /** When the attestation behind a credential lapses, in unix seconds. */
 export function credentialExpiry(policy: PolicyData, party: Party): number | null {

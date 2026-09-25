@@ -31,5 +31,12 @@ export function fromMicro(units: string, decimals = 6): string {
 export function fmtTime(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "—";
-  return d.toISOString().slice(0, 16).replace("T", " ") + "Z";
+  const day = d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const time = d.toISOString().slice(11, 16);
+  return `${day}, ${time} UTC`;
 }

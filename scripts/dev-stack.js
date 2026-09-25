@@ -1,8 +1,9 @@
-// Local development stack: starts anvil (unless RPC_URL is set), deploys both acts, writes
-// generated/deployment.json and serves the operator API with the venue routes at /v1/stack.
+// Local development stack: starts anvil (unless RPC_URL is set), deploys both acts (or reuses the
+// record at DEPLOYMENT_PATH when it is on this chain), writes generated/deployment.json and serves
+// the operator API with the venue routes at /v1/stack.
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { VenueService } from '../src/venues.js';
@@ -26,7 +27,8 @@ const key = process.env.DEPLOYER_PRIVATE_KEY ?? (chainId === 31337n ? ANVIL_DEV_
 if (!key) throw new Error(`Set DEPLOYER_PRIVATE_KEY for chain ${chainId}`);
 const signer = new Wallet(key, provider);
 const canonical = { poolManager: process.env.POOL_MANAGER, aqua: process.env.AQUA, weth: process.env.WETH };
-const { record } = await deployStack(signer, { borrower: process.env.BORROWER_ADDRESS, canonical, log: console.log });
+const saved = process.env.DEPLOYMENT_PATH ? JSON.parse(await readFile(process.env.DEPLOYMENT_PATH, 'utf8')) : null;
+const record = saved?.chainId === Number(chainId) ? saved : (await deployStack(signer, { borrower: process.env.BORROWER_ADDRESS, canonical, log: console.log })).record;
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaasClient() : null;

@@ -34,6 +34,7 @@ services:
       API_KEY: ${API_KEY:-local-dev-stack-operator-key-only}
       SEED: ${SEED:-true}
       DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
+      DEPLOYMENT_PATH: ${DEPLOYMENT_PATH:-}
       BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}
       AQUA: ${AQUA:-}
       POOL_MANAGER: ${POOL_MANAGER:-}

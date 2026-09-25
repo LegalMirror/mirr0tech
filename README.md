@@ -130,6 +130,28 @@ The original MVP's REST gateway (`npm start`, bearer token, `Idempotency-Key`, r
 
 `deploy/` holds a Coolify-shaped Docker Compose stack — `anvil` + `api` (deploys and seeds on boot) + `dashboard` — with a local override for trying it here; see [docs/deploy.md](docs/deploy.md).
 
+### Sepolia
+
+Both acts are deployed on Sepolia against the canonical venues; the record is `deployments/sepolia.json`
+(`DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack` serves it without redeploying). Policy hashes
+are the same bytes as the local build: fund `0x957fb39669…`, credit `0x259211145a…`.
+
+| Contract | Address |
+| --- | --- |
+| PolicyAttestor | [`0xAE7C29817d1d38C873097b5b0FBB16b81B02D079`](https://sepolia.etherscan.io/address/0xAE7C29817d1d38C873097b5b0FBB16b81B02D079) |
+| MockSanctionsOracle | [`0xC422CEFE3041Aa161128DdD1345051cBF8E8D5cD`](https://sepolia.etherscan.io/address/0xC422CEFE3041Aa161128DdD1345051cBF8E8D5cD) |
+| mUSDC | [`0x96E131fb063Db27D7f9077C24DD953054beD19A0`](https://sepolia.etherscan.io/address/0x96E131fb063Db27D7f9077C24DD953054beD19A0) |
+| PolicyOracle (fund) | [`0xc9301248cB175C3B1978d559C15153841C749FfB`](https://sepolia.etherscan.io/address/0xc9301248cB175C3B1978d559C15153841C749FfB) |
+| CompiledMirrorToken | [`0x7B7e2db76b862e77f1910c73F3FE22987B56AFE0`](https://sepolia.etherscan.io/address/0x7B7e2db76b862e77f1910c73F3FE22987B56AFE0) |
+| MirrorPolicyHook | [`0x008505d4ce3c99f52BB8dA311E66ec1aF8F24A80`](https://sepolia.etherscan.io/address/0x008505d4ce3c99f52BB8dA311E66ec1aF8F24A80) |
+| MirrorLiquidityRouter | [`0x3d2dd14dbBF28D00412e92c399d0bA136E226922`](https://sepolia.etherscan.io/address/0x3d2dd14dbBF28D00412e92c399d0bA136E226922) |
+| Uniswap v4 PoolManager (canonical) | [`0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543) |
+| PolicyOracle (credit) | [`0x4369706eAAE3f228F965Ec0Fc1120B442EB9D4E8`](https://sepolia.etherscan.io/address/0x4369706eAAE3f228F965Ec0Fc1120B442EB9D4E8) |
+| MirrortechRoleProvider | [`0x2541fcC3b63518A79981a6C637AC8364a94A664f`](https://sepolia.etherscan.io/address/0x2541fcC3b63518A79981a6C637AC8364a94A664f) |
+| MockWildcatMarket | [`0xFd99ea7F7C63C3c0BBFf56c7EB629B3760c19E93`](https://sepolia.etherscan.io/address/0xFd99ea7F7C63C3c0BBFf56c7EB629B3760c19E93) |
+| MirrortechRouter (SwapVM + PolicyGuard) | [`0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C`](https://sepolia.etherscan.io/address/0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C) |
+| 1inch Aqua (canonical) | [`0x1111113ccf1426a8e30e2bff5e005d929bf6a90a`](https://sepolia.etherscan.io/address/0x1111113ccf1426a8e30e2bff5e005d929bf6a90a) |
+
 ## Honest limits
 
 The venue enforces what it can observe. Screening results, countersignature, AML/KYC information and solvency are **attested**, not proved — a policy hash is not evidence that anyone was screened correctly. The sanctions oracle and the Wildcat market are mocks with the real interfaces; the real Wildcat market is mainnet-only. Fact bitmaps are readable per wallet (no identities or reasons are stored on chain, but presence of a designation is visible). The fund token is non-rebasing by design because Uniswap v4 does not support rebasing balances. A pool's singleton custody is answered by the hook checking the beneficial owner at the boundary. This is a prototype on a local chain with mock USD; it is not legal advice and describes no real counterparty.

@@ -11,3 +11,5 @@ A1.2 The offer in A1.1 remains open until 2026-12-31, unless earlier revoked by 
 A1.3 The Borrower may fulfil the offer through a venue of its choosing, provided that the venue admits as counterparty only a Wallet Address holding a valid Deposit Credential, and provided that no funds of the Borrower are committed to the venue before a purchase is executed.
 
 A1.4 Nothing in this Addendum obliges any Lender to sell, and nothing in it varies the Withdrawal terms of the Agreement.
+
+A1.5 The Borrower may, at its election, open the offer at the price in A1.1 and improve it over a window of not more than six (6) hours, up to a ceiling of 1.00 units of the Digital Asset To Be Loaned per Market Token.

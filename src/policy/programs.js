@@ -32,6 +32,9 @@ export const encoders = {
   limitSwap: (opcodes, tokenIn, tokenOut) => instruction(opcodes['LimitSwap._limitSwap1D'],
     toBeHex(BigInt(tokenIn) < BigInt(tokenOut) ? 1 : 0, 1)),
   invalidateTokenIn: (opcodes) => instruction(opcodes['Invalidators._invalidateTokenIn1D']),
+  // Raises what the maker pays per unit over the window: startTime (5) · duration (2) · decay per second (8, 1e18 scale).
+  dutchAuctionBalanceOut: (opcodes, startTime, durationSeconds, decayFactor) => instruction(opcodes['DutchAuction._dutchAuctionBalanceOut1D'],
+    concat([zeroPadValue(toBeHex(startTime), 5), zeroPadValue(toBeHex(durationSeconds), 2), zeroPadValue(toBeHex(decayFactor), 8)])),
   policyGuard: (opcode, policyHash, action) => instruction(opcode, concat([policyHash, toBeHex(action, 1)])),
   fixedRateBalances: (opcode, tokenA, balanceA, tokenB, balanceB) => instruction(opcode, concat([
     tokenA, zeroPadValue(toBeHex(balanceA), 32), tokenB, zeroPadValue(toBeHex(balanceB), 32),
@@ -46,6 +49,24 @@ export function buildBuybackProgram({ opcodes, policyGuardOpcode, fixedRateBalan
     encoders.deadline(opcodes, deadline),
     encoders.policyGuard(policyGuardOpcode, policyHash, action),
     encoders.fixedRateBalances(fixedRateBalancesOpcode, positionToken, capPosition, asset, capAsset),
+    encoders.limitSwap(opcodes, positionToken, asset),
+    encoders.invalidateTokenIn(opcodes),
+  ]);
+}
+
+// The tender-offer template: the same agreement and cap, but the price the borrower pays opens at the
+// addendum floor and improves exponentially to the ceiling over the window, then expires. The Aqua
+// allowance is shipped at the ceiling so late fills can settle. `DutchAuction` must run before the
+// swap instruction computes amounts, so it sits between the rate and the curve.
+export function buildDutchBuybackProgram({ opcodes, policyGuardOpcode, fixedRateBalancesOpcode, policyHash, action, deadline, positionToken, asset, capPosition, capAssetFloor, floor, ceiling, startTime, windowSeconds }) {
+  if (windowSeconds > 65535) throw new Error('The auction window is limited to 65535 seconds by the instruction');
+  // decay^window = floor/ceiling  ⇒  decay = (floor/ceiling)^(1/window), at 1e18 scale.
+  const decayFactor = BigInt(Math.round(Math.pow(Number(floor) / Number(ceiling), 1 / windowSeconds) * 1e18));
+  return concat([
+    encoders.deadline(opcodes, deadline),
+    encoders.policyGuard(policyGuardOpcode, policyHash, action),
+    encoders.fixedRateBalances(fixedRateBalancesOpcode, positionToken, capPosition, asset, capAssetFloor),
+    encoders.dutchAuctionBalanceOut(opcodes, startTime, windowSeconds, decayFactor),
     encoders.limitSwap(opcodes, positionToken, asset),
     encoders.invalidateTokenIn(opcodes),
   ]);
@@ -89,12 +110,16 @@ export function buybackTermsFrom(policy) {
   const cap = term('buybackCap');
   const deadline = term('buybackDeadline');
   if (!price || !cap || !deadline) throw new Error('The policy does not carry buyback terms');
-  const priceMicro = BigInt(Math.round(Number(price) * 1_000_000));
+  const ceiling = term('buybackCeiling');
+  const windowHours = term('buybackWindowHours');
+  const micro = (decimal) => BigInt(Math.round(Number(decimal) * 1_000_000));
   const capPosition = BigInt(cap) * 1_000_000n;
   return {
-    price, cap, deadline,
+    price, cap, deadline, ceiling: ceiling ?? null, windowHours: windowHours ?? null,
     capPosition,
-    capAsset: capPosition * priceMicro / 1_000_000n,
+    capAsset: capPosition * micro(price) / 1_000_000n,
+    capAssetCeiling: ceiling ? capPosition * micro(ceiling) / 1_000_000n : null,
+    windowSeconds: windowHours ? Number(windowHours) * 3600 : null,
     deadlineTimestamp: Math.floor(Date.parse(`${deadline}T23:59:59Z`) / 1000),
   };
 }

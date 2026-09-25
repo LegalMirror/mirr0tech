@@ -40,7 +40,7 @@ const files = {
 if (result.solidity) files['CompiledMirrorToken.sol'] = result.solidity;
 if (result.policy.ast.terms.some((term) => term.name === 'buybackPrice')) {
   const terms = buybackTermsFrom(result.policy);
-  files['buyback-terms.json'] = JSON.stringify({ policyHash: result.policy.hash, ...terms, capPosition: String(terms.capPosition), capAsset: String(terms.capAsset) }, null, 2);
+  files['buyback-terms.json'] = JSON.stringify({ policyHash: result.policy.hash, ...terms }, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2);
 }
 for (const [name, body] of Object.entries(files)) await writeFile(`generated/${name}`, `${body}\n`);
 

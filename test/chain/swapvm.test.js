@@ -165,3 +165,71 @@ test('the compiled agreement runs as an instruction inside a 1inch SwapVM progra
     await assert.rejects(router.connect(lender).swap(order, market.target, usdc.target, 10n * MICRO, takerData(0n)));
   });
 });
+
+test('the tender-offer template improves the price from the floor to the ceiling and then expires', { timeout: 300_000 }, async (t) => {
+  const { buildDutchBuybackProgram } = await import('../../src/policy/programs.js');
+  const { provider } = await startAnvil(t);
+  const admin = new Wallet(DEV_KEY, provider);
+  const borrower = await provider.getSigner(1);
+  const lender = await provider.getSigner(2);
+  const deploy = async (name, ...args) => {
+    const contract = await new ContractFactory(artifacts[name].abi, artifacts[name].bytecode, admin).deploy(...args);
+    await contract.waitForDeployment();
+    return contract;
+  };
+  const addr = (contract) => contract.getAddress();
+  const attestor = await deploy('PolicyAttestor', admin.address);
+  await (await attestor.grantRole(id('ATTESTOR_ROLE'), admin.address)).wait();
+  const sanctions = await deploy('MockSanctionsOracle', admin.address);
+  const oracle = await deploy('PolicyOracle', await addr(attestor), await addr(sanctions));
+  const roleProvider = await deploy('MirrortechRoleProvider', await addr(oracle));
+  const usdc = await deploy('MockERC20', 'Mock USD Coin', 'mUSDC');
+  const market = await deploy('MockWildcatMarket', await addr(usdc), await addr(roleProvider), await borrower.getAddress());
+  await (await oracle.bindMarket(await addr(market))).wait();
+  const weth = await deploy('MockERC20', 'Wrapped Ether', 'WETH');
+  const aqua = await deploy('Aqua');
+  const router = await deploy('MirrortechRouter', await addr(aqua), await addr(weth), admin.address, await addr(oracle));
+  await (await market.connect(borrower).setVenue(await addr(router), true)).wait();
+  const attest = async (subject) => {
+    const { known, value } = pack(ATTESTED);
+    const now = (await provider.getBlock('latest')).timestamp;
+    await (await attestor.attest(subject, policy.hash, known, value, now, now + policy.config.attestationValiditySeconds)).wait();
+  };
+  await attest(await borrower.getAddress());
+  await attest(await lender.getAddress());
+  await (await usdc.mint(await lender.getAddress(), 1_000_000n * MICRO)).wait();
+  await (await usdc.connect(lender).approve(await addr(market), MaxUint256)).wait();
+  await (await market.connect(lender).deposit(1_000_000n * MICRO)).wait();
+  await (await usdc.mint(await borrower.getAddress(), 2_000_000n * MICRO)).wait();
+  await (await usdc.connect(borrower).approve(await addr(aqua), MaxUint256)).wait();
+  await (await market.connect(lender).approve(await addr(router), MaxUint256)).wait();
+
+  const opcodes = loadOpcodes();
+  const terms = buybackTermsFrom(policy);
+  assert.equal(terms.ceiling, '1.00');
+  assert.equal(terms.windowSeconds, 6 * 3600);
+  const start = (await provider.getBlock('latest')).timestamp;
+  const program = buildDutchBuybackProgram({
+    opcodes, policyGuardOpcode: Number(await router.policyGuardOpcode()), fixedRateBalancesOpcode: Number(await router.fixedRateBalancesOpcode()),
+    policyHash: policy.hash, action: policy.actionOrder.indexOf('transfer'), deadline: start + 30 * 86400,
+    positionToken: market.target, asset: usdc.target, capPosition: terms.capPosition, capAssetFloor: terms.capAsset,
+    floor: terms.price, ceiling: terms.ceiling, startTime: start, windowSeconds: terms.windowSeconds,
+  });
+  const order = buildAquaOrder(await borrower.getAddress(), program);
+  const strategy = encodeOrder(order);
+  await (await aqua.connect(borrower).ship(await addr(router), strategy, [market.target, usdc.target], [terms.capPosition, terms.capAssetCeiling])).wait();
+  const quote = async () => (await router.connect(lender).quote.staticCall(order, market.target, usdc.target, 100_000n * MICRO, buildTakerData({ threshold: 0n, deadline: start + 8 * 3600 })))[1];
+
+  const opening = await quote();
+  assert.ok(opening >= 96_000n * MICRO && opening < 96_100n * MICRO, `opens at the floor, got ${opening}`);
+  await warp(provider, 3 * 3600);
+  const midway = await quote();
+  assert.ok(midway > opening && midway < 100_000n * MICRO, `improves over the window, got ${midway}`);
+  await warp(provider, 3 * 3600 - 30);
+  const closing = await quote();
+  assert.ok(closing > midway && closing <= 100_000n * MICRO, `approaches the ceiling, got ${closing}`);
+  const now = (await provider.getBlock('latest')).timestamp;
+  await (await router.connect(lender).swap(order, market.target, usdc.target, 100_000n * MICRO, buildTakerData({ threshold: 0n, deadline: now + 3600 }))).wait();
+  await warp(provider, 120);
+  await assert.rejects(quote(), (error) => /DutchAuctionExpired|revert/.test(error.message));
+});

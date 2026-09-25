@@ -95,7 +95,7 @@ Templates are fixed instruction sequences with parameter slots. The compiler fil
 
 Token ordering: SwapVM requires `tokenA < tokenB` by address; the template resolves direction at build time.
 
-**`BuybackDutchAuction` (P2)** — replaces `StaticBalances` with `DutchAuctionBalanceIn`: price improves over time until filled. Corporate tender-offer shape.
+**`BuybackDutchAuction` (built)** — inserts the official `DutchAuctionBalanceOut` between the rate and the curve: the price the borrower pays opens at the addendum floor (A1.1) and improves exponentially to the ceiling over the window (A1.5), then the instruction expires. The Aqua allowance ships at the ceiling so late fills settle. `POST /v1/stack/credit/buyback {auction: true}`. Corporate tender-offer shape.
 
 Each template ships with its **clause template** — the sentence the borrower adds to the agreement so the compiler can quote it (PRD §7.1 addendum).
 

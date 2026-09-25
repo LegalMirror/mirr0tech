@@ -5,7 +5,7 @@
 import { Contract, MaxUint256, id, keccak256, formatUnits, parseUnits } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
-import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
+import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
 import { AppError } from './errors.js';
 import { indexedEvents } from './multibaas.js';
 
@@ -186,23 +186,29 @@ export class VenueService {
     const signer = await this.signerFor(wallet);
     return this.run('credit.withdraw', { policy: 'credit', wallet: this.name(this.address(wallet)), amount }, () => this.c.market.connect(signer).withdraw(parseUnits(amount, 6)));
   }
-  async shipBuyback() {
+  async shipBuyback({ auction = false } = {}) {
     const { policy } = this.policies.credit;
     const terms = buybackTermsFrom(policy);
     const now = (await this.provider.getBlock('latest')).timestamp;
     const deadline = Math.min(terms.deadlineTimestamp, now + 30 * 86400);
-    const program = buildBuybackProgram({
+    if (auction && !terms.ceiling) throw new AppError(400, 'NO_AUCTION_TERMS', 'The addendum carries no ceiling or window for an auction');
+    const common = {
       opcodes: this.opcodes, policyGuardOpcode: this.record.credit.policyGuardOpcode, fixedRateBalancesOpcode: this.record.credit.fixedRateBalancesOpcode,
       policyHash: policy.hash, action: policy.actionOrder.indexOf('transfer'), deadline,
-      positionToken: this.record.credit.market, asset: this.record.usdc, capPosition: terms.capPosition, capAsset: terms.capAsset,
-    });
+      positionToken: this.record.credit.market, asset: this.record.usdc, capPosition: terms.capPosition,
+    };
+    const program = auction
+      ? buildDutchBuybackProgram({ ...common, capAssetFloor: terms.capAsset, floor: terms.price, ceiling: terms.ceiling, startTime: now, windowSeconds: terms.windowSeconds })
+      : buildBuybackProgram({ ...common, capAsset: terms.capAsset });
+    const shippedAsset = auction ? terms.capAssetCeiling : terms.capAsset;
     const order = buildAquaOrder(await this.signer.getAddress(), program);
     const strategy = encodeOrder(order);
     const strategyHash = keccak256(strategy);
-    const summary = { strategyHash, maker: order.maker, program, deadline, terms: { ...terms, capPosition: terms.capPosition.toString(), capAsset: terms.capAsset.toString() },
+    const summary = { strategyHash, maker: order.maker, program, deadline, kind: auction ? 'dutch-auction' : 'fixed-price',
+      terms: { ...terms, capPosition: terms.capPosition.toString(), capAsset: terms.capAsset.toString(), capAssetCeiling: terms.capAssetCeiling?.toString() ?? null },
       instructions: disassemble(program, { ...this.opcodes, 'Mirrortech._policyGuard': this.record.credit.policyGuardOpcode, 'Mirrortech._fixedRateBalances': this.record.credit.fixedRateBalancesOpcode }),
       hashChain: { document: policy.source.textSha256, policyHash: policy.hash, programKeccak: keccak256(program), strategyHash }, status: 'shipped', fills: [] };
-    await this.run('credit.buyback.ship', { policy: 'credit', strategyHash }, () => this.c.aqua.ship(this.record.credit.router, strategy, [this.record.credit.market, this.record.usdc], [terms.capPosition, terms.capAsset]));
+    await this.run('credit.buyback.ship', { policy: 'credit', strategyHash, kind: summary.kind }, () => this.c.aqua.ship(this.record.credit.router, strategy, [this.record.credit.market, this.record.usdc], [terms.capPosition, shippedAsset]));
     this.orders.push({ ...summary, order: { maker: order.maker, traits: order.traits.toString(), data: order.data }, strategy });
     return this.buyback();
   }

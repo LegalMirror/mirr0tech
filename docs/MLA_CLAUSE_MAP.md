@@ -75,6 +75,7 @@ Note on `withdraw-sanctions`: the MLA's remedy for a sanctioned lender is escrow
 | `buybackPrice` | "The Borrower will purchase Market Tokens at not less than {{price}} per unit of Equivalent Loaned Asset" |
 | `buybackCap` | "up to an aggregate of {{cap}}" |
 | `buybackDeadline` | "until {{date}}, unless earlier revoked by notice via the Communication Platform" |
+| `buybackCeiling`, `buybackWindowHours` | A1.5: "open the offer at the price in A1.1 and improve it over a window of not more than six (6) hours, up to a ceiling of 1.00" — the Dutch-auction (tender offer) template |
 
 The addendum is **not** in Wildcat's template. Slide wording: *the venue's terms are a clause you can put in the agreement.*
 

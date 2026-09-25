@@ -27,7 +27,7 @@ export function venueRoutes(venues) {
   router.post('/credit/deposit', wrap(async (req) => venues.deposit(field(req.body, 'wallet'), field(req.body, 'amount'))));
   router.post('/credit/withdraw', wrap(async (req) => venues.withdraw(field(req.body, 'wallet'), field(req.body, 'amount'))));
   router.get('/credit/buyback', wrap(async () => venues.buyback()));
-  router.post('/credit/buyback', wrap(async () => venues.shipBuyback()));
+  router.post('/credit/buyback', wrap(async (req) => venues.shipBuyback({ auction: req.body?.auction === true })));
   router.post('/credit/buyback/quote', wrap(async (req) => venues.quote(field(req.body, 'wallet'), field(req.body, 'amount'))));
   router.post('/credit/buyback/fill', wrap(async (req) => venues.fill(field(req.body, 'wallet'), field(req.body, 'amount'))));
   router.post('/credit/buyback/dock', wrap(async () => venues.dock()));

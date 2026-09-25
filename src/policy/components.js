@@ -62,9 +62,9 @@ export const COMPONENTS = [
   {
     id: 'swapvm-buyback', version: '1.0.0', kind: 'venue', venue: 'aqua',
     description: '1inch Aqua strategy with the agreement as an opcode: a standing buyback at a fixed price, capped and dated, refusing ineligible parties at quote time.',
-    coversRule: byAction('transfer'), coversTerm: byTerm('buybackPrice', 'buybackCap', 'buybackDeadline'),
+    coversRule: byAction('transfer'), coversTerm: byTerm('buybackPrice', 'buybackCap', 'buybackDeadline', 'buybackCeiling', 'buybackWindowHours'),
     contracts: [[SWAPVM, 'contracts/swapvm/MirrortechRouter.sol', 'MirrortechRouter'], [SWAPVM, 'vendor/aqua/src/Aqua.sol', 'Aqua']],
-    clauseTemplate: 'The Borrower will purchase Market Tokens from any Known Lender at a price of not less than {{price}} per Market Token, up to an aggregate of {{cap}} Market Tokens, until {{deadline}}, through a venue that admits as counterparty only a Wallet Address holding a valid Deposit Credential.',
+    clauseTemplate: 'The Borrower will purchase Market Tokens from any Known Lender at a price of not less than {{price}} per Market Token, up to an aggregate of {{cap}} Market Tokens, until {{deadline}}, through a venue that admits as counterparty only a Wallet Address holding a valid Deposit Credential. The Borrower may open the offer at that price and improve it over a window of not more than {{windowHours}} hours, up to a ceiling of {{ceiling}} per Market Token.',
   },
   {
     id: 'market-terms', version: '1.0.0', kind: 'terms',

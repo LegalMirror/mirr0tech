@@ -11,11 +11,15 @@ const demo = args.includes('--demo');
 // --mla compiles the sample Master Loan Agreement for a Wildcat market instead of the custodial
 // RWA agreement. Both paths run the same compiler and emit the same on-chain policy library.
 const credit = args.includes('--mla');
+// --secondary compiles the RWA agreement with the transfer rules a Uniswap v4 hook enforces.
+const secondary = args.includes('--secondary');
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
 const defaults = credit
   ? { document: 'test/human_contracts/wildcat-mla.md,test/human_contracts/lender-check-policy.md,test/human_contracts/buyback-addendum.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
-  : { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/demo-config.json', fixture: sampleFixture };
+  : secondary
+    ? { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/rwa-secondary-config.json', fixture: (document) => sampleFixture(document, { secondary: true }) }
+    : { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/demo-config.json', fixture: sampleFixture };
 
 // Several documents may be compiled as one bundle: pass them comma-separated.
 const document = await readDocuments((paths[1] ?? defaults.document).split(','));

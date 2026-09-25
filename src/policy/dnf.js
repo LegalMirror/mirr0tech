@@ -65,15 +65,18 @@ export function evaluateTerms(terms, known, value) {
 
 // The same decision rule as evaluate.js: one permit must hold, every requirement must hold, and no
 // prohibition may hold. Unknown never satisfies anything, so missing evidence denies.
+// A refusal names the failing requirement or prohibition, or — when no permission held — the first
+// permission, so every denial points at a sentence. Mirrors PolicyEval.sol.
 export function decide(program, known, value) {
   let permitted = false;
+  let firstPermit = 0;
   for (const rule of program) {
     const result = evaluateTerms(rule.terms, known, value);
-    if (rule.effect === 'permit') { if (result === true) permitted = true; continue; }
+    if (rule.effect === 'permit') { if (!firstPermit) firstPermit = rule.clauseId; if (result === true) permitted = true; continue; }
     if (rule.effect === 'require' && result !== true) return { allowed: false, clauseId: rule.clauseId };
     if (rule.effect === 'forbid' && result !== false) return { allowed: false, clauseId: rule.clauseId };
   }
-  return permitted ? { allowed: true, clauseId: 0 } : { allowed: false, clauseId: 0 };
+  return permitted ? { allowed: true, clauseId: 0 } : { allowed: false, clauseId: firstPermit };
 }
 
 // Clause ids are one-based indices into a table of the rule's id, clause and verbatim quote. The

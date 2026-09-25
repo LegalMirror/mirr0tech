@@ -76,4 +76,11 @@ contract PolicyOracle {
         (uint256 known, uint256 value,) = facts(subject);
         return PolicyEval.decide(CompiledPolicy.program(action), known, value);
     }
+
+    /// @notice Whether the agreement lets this wallet receive the asset — the question a token
+    /// or a pool asks at the boundary.
+    function mayTransfer(address subject) external view returns (bool allowed, uint16 clauseId) {
+        (uint256 known, uint256 value,) = facts(subject);
+        return PolicyEval.decide(CompiledPolicy.program(CompiledPolicy.ACTION_TRANSFER), known, value);
+    }
 }

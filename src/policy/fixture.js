@@ -2,7 +2,8 @@ import { validateAst } from './schema.js';
 
 const fact = (name) => ({ type: 'fact', name });
 const all = (...names) => ({ type: 'all', children: names.map(fact) });
-export function sampleFixture(document) {
+// `secondary` adds the transfer rules a venue can enforce: only an onboarded investor may hold.
+export function sampleFixture(document, { secondary = false } = {}) {
   const rule = (id, action, effect, condition, clause, quote, rationale) => ({ id, action, effect, condition, source: { clause, quote }, rationale });
   const ast = {
     schemaVersion: '1.0',
@@ -18,6 +19,13 @@ export function sampleFixture(document) {
         'confirmation of receipt or crediting of funds for such order', 'Mint only after the custodian confirms funding.'),
       rule('redemption-authorized', 'burn', 'permit', all('redemptionAuthorized', 'offeringCompliant'), '2.2',
         'redemption is legally authorized.', 'The operator attests that this redemption is authorized and complies with the offering memorandum.'),
+      ...(secondary ? [
+        rule('transfer-onboarded-holder', 'transfer', 'permit', all('kycApproved', 'amlApproved'), 'Exhibit A — Investor Onboarding',
+          'and sanctions checks during onboarding of investors and apply risk rating to each investor',
+          'Only an investor who completed onboarding may receive or hold shares, at a venue or otherwise.'),
+        rule('transfer-sanctions-block', 'transfer', 'forbid', { type: 'not', child: fact('sanctionsClear') }, 'Exhibit A — Investor Onboarding',
+          'escalating and applying blocks in accordance with Sanctions Laws.', 'Shares do not move to or from a wallet without a clear sanctions result.'),
+      ] : []),
       ...['mint', 'burn'].flatMap((action) => [
         rule(`${action}-onboarding`, action, 'require', all('kycApproved', 'amlApproved'), 'Exhibit A — Investor Onboarding',
           'and sanctions checks during onboarding of investors and apply risk rating to each investor',

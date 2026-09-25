@@ -7,7 +7,7 @@ import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTak
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
-const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
+const load = async (name) => JSON.parse(await readFile(`artifacts/wildcat-credit/${name}.json`, 'utf8'));
 const artifacts = Object.fromEntries(await Promise.all(
   ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockWildcatMarket', 'MockERC20', 'MirrortechRoleProvider', 'MirrortechRouter', 'Aqua']
     .map(async (name) => [name, await load(name)])));

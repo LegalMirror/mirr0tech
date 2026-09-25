@@ -1,0 +1,32 @@
+{
+  "name": "@mirrortech/dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "mirr0tech compliance dashboard: legal clause to smart-contract highlighter, lenders, queue, exit and audit",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "export": "npm --prefix .. run ui:export --silent",
+    "dev": "npm run export && node scripts/build-info.mjs && next dev -p 3100",
+    "build": "npm run export && node scripts/build-info.mjs && next build",
+    "start": "npx --yes serve@14 out -l 3100",
+    "test": "vitest run",
+    "typecheck": "node scripts/build-info.mjs && tsc --noEmit",
+    "lint": "prettier --check 'app/**/*.{ts,tsx}' 'lib/**/*.ts' 'test/**/*.ts'",
+    "lint:fix": "prettier --write 'app/**/*.{ts,tsx}' 'lib/**/*.ts' 'test/**/*.ts'"
+  },
+  "dependencies": {
+    "next": "^15.1.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

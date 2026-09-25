@@ -7,7 +7,7 @@ import { evaluatePolicy } from '../../src/policy/evaluate.js';
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
-const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
+const load = async (name) => JSON.parse(await readFile(`artifacts/wildcat-credit/${name}.json`, 'utf8'));
 const artifacts = Object.fromEntries(await Promise.all(
   ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockWildcatMarket', 'MockERC20', 'MirrortechRoleProvider']
     .map(async (name) => [name, await load(name)])));
@@ -85,7 +85,11 @@ test('the compiled agreement decides the same way on a real EVM as it does in Ja
         const expected = evaluatePolicy(policy.ast, action, observed);
         const { allowed, clauseId } = await explain(lender, action);
         assert.equal(allowed, expected.allowed, `${action} disagrees on ${JSON.stringify(observed)}`);
-        if (!allowed && clauseId !== 0n) assert.ok(expected.reasons.includes(clauseOf(clauseId).ruleId));
+        if (!allowed && clauseId !== 0n) {
+          const clause = clauseOf(clauseId);
+          if (clause.effect === 'permit') assert.ok(expected.reasons.includes('NO_MATCHING_PERMISSION'), `${action}: permit named without a missing permission`);
+          else assert.ok(expected.reasons.includes(clause.ruleId), `clause ${clauseId} is not among ${expected.reasons}`);
+        }
       }
     }
     await (await sanctions.setSanctioned(lender, false)).wait();
@@ -159,7 +163,7 @@ test('the compiled agreement decides the same way on a real EVM as it does in Ja
     await (await market.connect(borrower).setOpenTerm(false)).wait();
     const [allowed, clauseId] = await roleProvider.mayWithdraw(lender);
     assert.equal(allowed, false);
-    assert.equal(clauseId, 0n, 'no permit matches, so no single clause is responsible');
+    assert.equal(clauseOf(clauseId).ruleId, 'withdraw-open-term', 'the refusal names the permission the lender lacks');
     await (await market.connect(borrower).setOpenTerm(true)).wait();
   });
 

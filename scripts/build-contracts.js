@@ -5,7 +5,9 @@ import { readFileSync, existsSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 
 const policy = JSON.parse(readFileSync('generated/policy.json', 'utf8'));
-const credit = policy.profile === 'wildcat-credit';
+const profile = policy.profile;
+const credit = profile === 'wildcat-credit';
+const secondary = profile === 'rwa-secondary';
 
 // The venue contracts are pinned to the compiler Uniswap v4 requires; everything else builds on the
 // repository's own compiler. Source keys are repository paths so relative imports resolve.
@@ -19,25 +21,27 @@ const bundles = [
          ['contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], ['contracts/MockWildcatMarket.sol', 'MockWildcatMarket'],
          ['contracts/test/MockERC20.sol', 'MockERC20'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider']]
       : [['contracts/MirrorToken.sol', 'MirrorToken'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
-         ['contracts/PolicyAttestor.sol', 'PolicyAttestor']],
+         ['contracts/PolicyAttestor.sol', 'PolicyAttestor'], ['contracts/PolicyOracle.sol', 'PolicyOracle'],
+         ['contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], ['contracts/test/MockERC20.sol', 'MockERC20']],
   },
-  {
+  ...(credit ? [{
     // 1inch SwapVM and Aqua pin 0.8.30 and need the IR pipeline; the router is a modified SwapVM redeploy.
     compiler: solcSwapVM, evmVersion: 'cancun', viaIR: true, runs: 200,
     targets: [['contracts/swapvm/MirrortechRouter.sol', 'MirrortechRouter'],
               ['vendor/aqua/src/Aqua.sol', 'Aqua']],
-  },
-  {
+  }] : []),
+  ...(credit || secondary ? [{
     // Uniswap's PoolManager pins solidity 0.8.26 exactly, so the venue bundle uses that compiler.
     compiler: solcV4, evmVersion: 'cancun',
     targets: [['contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook'],
               ['contracts/test/MirrorLiquidityRouter.sol', 'MirrorLiquidityRouter'],
               ['contracts/test/MockERC20.sol', 'MockERC20'],
               ['node_modules/@uniswap/v4-core/src/PoolManager.sol', 'PoolManager']],
-  },
+  }] : []),
 ];
 
-await mkdir('artifacts', { recursive: true });
+// One directory per profile, so the custodial, secondary and credit builds coexist.
+await mkdir(`artifacts/${profile}`, { recursive: true });
 const built = [];
 for (const bundle of bundles) {
   const sources = Object.fromEntries([...bundle.targets.map(([path]) => path), ...support]
@@ -56,7 +60,7 @@ for (const bundle of bundles) {
   for (const error of output.errors ?? []) if (error.severity === 'error') throw new Error(error.formattedMessage);
   for (const [file, name] of bundle.targets) {
     const contract = output.contracts[file][name];
-    await writeFile(`artifacts/${name}.json`, JSON.stringify({
+    await writeFile(`artifacts/${profile}/${name}.json`, JSON.stringify({
       abi: contract.abi, bytecode: `0x${contract.evm.bytecode.object}`, compiler: bundle.compiler.version(),
       policyHash: policy.hash, clauseTableHash: policy.clauseTableHash,
     }, null, 2));
@@ -64,4 +68,4 @@ for (const bundle of bundles) {
     built.push(`${name}${size > 24_576 ? ` (${size} bytes: OVER the 24576 limit)` : ''}`);
   }
 }
-console.log(`Compiled ${built.join(', ')}`);
+console.log(`Compiled ${built.join(', ')} → artifacts/${profile}/`);

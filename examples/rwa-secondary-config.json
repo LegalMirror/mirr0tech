@@ -1,0 +1,20 @@
+{
+  "name": "Mirrortech Demo RWA",
+  "symbol": "MIRROR",
+  "decimals": 6,
+  "maxSupply": "1000000000000",
+  "custody": "backend",
+  "currency": "USD",
+  "priceModel": "one-token-per-usd",
+  "assumptions": [
+    "Demo economics: one token represents one mock USD, using six decimal places.",
+    "Demo maximum outstanding supply is 1,000,000 tokens; the agreement does not specify this cap.",
+    "The backend wallet holds all tokens; an off-chain ledger records beneficial investor balances.",
+    "Issuer authorization, offering compliance and redemption authorization are operator attestations.",
+    "KYC, AML, sanctions screening and fiat settlement are simulated. No real assets are represented.",
+    "Shares may leave custody to an onboarded investor's wallet and may be pooled only through a Uniswap v4 pool carrying the policy hook; any other transfer is refused by the token itself.",
+    "The pool manager holds pooled shares in street name; beneficial owners are checked by the hook at every entry and exit."
+  ],
+  "profile": "rwa-secondary",
+  "secondaryVenue": "uniswap-v4"
+}

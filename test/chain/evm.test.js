@@ -10,8 +10,8 @@ import { compiled, setup, funded } from '../helpers.js';
 
 // Public Anvil development key, never use for assets or a public chain.
 const DEV_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
-const artifact = JSON.parse(await readFile('artifacts/CompiledMirrorToken.json', 'utf8'));
-const baseArtifact = JSON.parse(await readFile('artifacts/MirrorToken.json', 'utf8'));
+const artifact = JSON.parse(await readFile('artifacts/custodial-rwa/CompiledMirrorToken.json', 'utf8'));
+const baseArtifact = JSON.parse(await readFile('artifacts/custodial-rwa/MirrorToken.json', 'utf8'));
 
 test('Solidity guards and backend signer integration on a real local EVM', { timeout: 120_000 }, async (t) => {
   const probe = createServer().listen(0, '127.0.0.1');

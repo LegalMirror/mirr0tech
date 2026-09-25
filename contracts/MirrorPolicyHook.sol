@@ -54,6 +54,10 @@ contract MirrorPolicyHook is IHooks {
 
     event PolicyChecked(PoolId indexed poolId, address indexed subject, uint8 action, bool allowed, uint16 clauseId);
 
+    /// @dev Transient slot holding the subject the hook approved in this transaction. The token
+    /// reads it on any transfer to or from the pool manager: no approval, no door.
+    bytes32 private constant APPROVED_SUBJECT_SLOT = keccak256("mirrortech.hook.approvedSubject");
+
     /// @dev beforeAddLiquidity | beforeRemoveLiquidity | beforeSwap.
     uint160 internal constant REQUIRED_FLAGS =
         Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG;
@@ -72,6 +76,16 @@ contract MirrorPolicyHook is IHooks {
     modifier onlyPoolManager() {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
         _;
+    }
+
+    /// @notice The subject this hook admitted in the current transaction, or zero.
+    /// @dev EIP-1153 transient storage: set on a successful check, gone when the transaction ends.
+    /// A pool without this hook never sets it, so the token refuses to settle with the pool manager.
+    function approvedSubject() external view returns (address subject) {
+        bytes32 slot = APPROVED_SUBJECT_SLOT;
+        assembly ("memory-safe") {
+            subject := tload(slot)
+        }
     }
 
     /// @notice Evaluate without transacting, so a front end can explain a refusal before it happens.
@@ -116,6 +130,10 @@ contract MirrorPolicyHook is IHooks {
             PolicyEval.decide(CompiledPolicy.program(CompiledPolicy.ACTION_TRANSFER), known, value);
         emit PolicyChecked(key.toId(), subject, CompiledPolicy.ACTION_TRANSFER, allowed, clauseId);
         if (!allowed) revert LegalClauseViolation(clauseId, policyHash);
+        bytes32 slot = APPROVED_SUBJECT_SLOT;
+        assembly ("memory-safe") {
+            tstore(slot, subject)
+        }
     }
 
     // Hooks this contract's address does not enable. The pool manager never calls them; anything

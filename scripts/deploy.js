@@ -9,7 +9,7 @@ try {
   if (!process.env.MINTER_PRIVATE_KEY) throw new Error('Set MINTER_PRIVATE_KEY to a funded local development account');
   const wallet = new Wallet(process.env.MINTER_PRIVATE_KEY, provider);
   const policy = verifyPolicy(JSON.parse(await readFile('generated/policy.json', 'utf8')));
-  const artifact = JSON.parse(await readFile('artifacts/CompiledMirrorToken.json', 'utf8'));
+  const artifact = JSON.parse(await readFile('artifacts/custodial-rwa/CompiledMirrorToken.json', 'utf8'));
   if (artifact.policyHash !== policy.hash) throw new Error('Build artifacts are stale; run npm run build:contracts');
   const contract = await new ContractFactory(artifact.abi, artifact.bytecode, wallet).deploy(process.env.ADMIN_ADDRESS ?? wallet.address, wallet.address);
   await contract.waitForDeployment();

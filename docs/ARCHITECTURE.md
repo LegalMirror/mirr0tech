@@ -63,7 +63,7 @@ Runtime state is two words: `known` (which fact bits are established) and `value
 
 ### 3.2 `PolicyEval.sol` (exists)
 
-Pure library. `decide(bytes program, uint256 known, uint256 value) → (bool allowed, uint16 clauseId)`. `program` is `abi.encode(Rule[])` where `Rule { uint8 effect; uint16 clauseId; uint256[] pos; uint256[] neg; }`. Returns the first failing clause, or 0 when no permit matched. Gas: decoding ~10 rules is tens of thousands of gas; acceptable for admission and fills; not for hot paths.
+Pure library. `decide(bytes program, uint256 known, uint256 value) → (bool allowed, uint16 clauseId)`. `program` is `abi.encode(Rule[])` where `Rule { uint8 effect; uint16 clauseId; uint256[] pos; uint256[] neg; }`. Returns the first failing requirement or prohibition, or the first permission when none held (the permission the subject lacks); 0 only for an action with no rules. Gas: decoding ~10 rules is tens of thousands of gas; acceptable for admission and fills; not for hot paths.
 
 ### 3.3 `CompiledPolicy.sol` (generated)
 
@@ -129,7 +129,7 @@ Hash chain, none of it built by us:
 document sha256 ⊂ policyHash ⊂ program bytes ⊂ order.data ⊂ orderHash (EIP-712)
 ```
 
-### 5.3 Uniswap v4 — `MirrorPolicyHook.sol` (exists; handshake to add)
+### 5.3 Uniswap v4 — `MirrorPolicyHook.sol` (exists, handshake built)
 
 `beforeAddLiquidity | beforeRemoveLiquidity | beforeSwap`, all evaluated against `ACTION_TRANSFER` — the agreement has no concept of a swap or a position, only of a transfer, and all three are transfers. Subject comes from `hookData` written by a trusted router (`contracts/test/MirrorLiquidityRouter.sol`) because the pool manager passes the router, not the person, as `sender`. Address mined via `src/policy/hookAddress.js`; constructor rejects any address whose low bits don't match. Tested against Uniswap's own `PoolManager` in `test/chain/hook.test.js`.
 
@@ -191,6 +191,8 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `contracts/MockSanctionsOracle.sol`, `contracts/MockWildcatMarket.sol` | Sepolia stand-ins for the Chainalysis oracle and a V2 market |
 | `contracts/swapvm/PolicyGuard.sol`, `FixedRateBalances.sol`, `MirrortechRouter.sol` | 1inch venue |
 | `test/chain/swapvm.test.js` | ship → quote → fill → refusals → cap/deadline → dock on anvil |
+| `test/chain/rwa-pool.test.js` | Act 1: custody → release → hookless pool refused at the token → hooked pool admits/refuses |
+| `examples/rwa-secondary-config.json` | `rwa-secondary` profile: the fund agreement with the transfer rules a v4 hook enforces |
 | `scripts/vendor.sh` | clones the source-available SwapVM/Aqua sources into `vendor/` (gitignored) |
 | `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
 | `contracts/PolicyEval.sol` | three-valued evaluator |
@@ -203,6 +205,8 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `examples/wildcat-config.json` | credit profile config |
 | `test/dnf.test.js`, `test/chain/{anvil,credit,hook}.test.js` | proofs and chain tests |
 | `test/human_contracts/wildcat-mla.md`, `lender-check-policy.md`, `buyback-addendum.md` | source documents: Wildcat template MLA with an illustrative Term Sheet, the borrower's policy, the addendum |
+
+Builds write `artifacts/<profile>/` so the `custodial-rwa`, `rwa-secondary` and `wildcat-credit` builds coexist; `generated/` holds the last compiled policy.
 
 **To build (PRD §7)**
 

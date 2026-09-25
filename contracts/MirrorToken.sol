@@ -5,8 +5,21 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 
-/// @notice Custodial MVP: the signer authorizes policy decisions and all supply stays in custody.
+interface IPolicyOracleTransfer {
+    function mayTransfer(address subject) external view returns (bool allowed, uint16 clauseId);
+}
+
+interface IVenueHook {
+    function poolManager() external view returns (address);
+    function approvedSubject() external view returns (address);
+}
+
+/// @notice Custodial by default: the signer authorizes policy decisions and all supply stays in
+/// custody. Once a secondary venue is configured, shares may be released to an onboarded investor
+/// and pooled — but only through a pool carrying the policy hook.
 /// @dev The hash commits to the compiled policy; it does not prove off-chain KYC or settlement.
+/// The pool manager is a singleton, so a token cannot tell which pool a transfer belongs to; the
+/// hook can, and it records the subject it admitted in transient storage for the token to check.
 contract MirrorToken is ERC20, AccessControl, Pausable {
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     address public immutable custodian;
@@ -15,6 +28,8 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
     bool public immutable mintEnabled;
     bool public immutable burnEnabled;
     mapping(bytes32 => bool) public processed;
+    IPolicyOracleTransfer public policyOracle;
+    IVenueHook public venueHook;
 
     error InvalidConfiguration();
     error InvalidOperation();
@@ -22,7 +37,12 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
     error SupplyCapExceeded();
     error TransfersDisabled();
     error ActionDisabled();
+    error SecondaryAlreadyConfigured();
+    error TransferRefused(address to, uint16 clauseId);
+    error NoPolicyDoor(address subject);
     event Operation(bytes32 indexed operationId, bool indexed isMint, uint256 amount);
+    event SecondaryConfigured(address policyOracle, address venueHook);
+    event Released(bytes32 indexed operationId, address indexed investor, uint256 amount);
 
     constructor(string memory name_, string memory symbol_, address admin, address minter,
         bytes32 policyHash_, uint256 maxSupply_, bool mintEnabled_, bool burnEnabled_)
@@ -56,6 +76,22 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
         emit Operation(operationId, false, amount);
     }
 
+    /// @notice Bind the compiled policy oracle and the venue hook, once. Enables transfers.
+    function configureSecondary(IPolicyOracleTransfer oracle, IVenueHook hook) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (address(venueHook) != address(0)) revert SecondaryAlreadyConfigured();
+        if (address(oracle) == address(0) || address(hook) == address(0)) revert InvalidConfiguration();
+        policyOracle = oracle;
+        venueHook = hook;
+        emit SecondaryConfigured(address(oracle), address(hook));
+    }
+
+    /// @notice Move shares from custody to an onboarded investor's own wallet.
+    function release(bytes32 operationId, address investor, uint256 amount) external onlyRole(MINTER_ROLE) whenNotPaused {
+        _consume(operationId, amount);
+        _transfer(custodian, investor, amount);
+        emit Released(operationId, investor, amount);
+    }
+
     function _consume(bytes32 operationId, uint256 amount) private {
         if (operationId == bytes32(0) || amount == 0) revert InvalidOperation();
         if (processed[operationId]) revert AlreadyProcessed();
@@ -63,7 +99,18 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
     }
 
     function _update(address from, address to, uint256 value) internal override {
-        if (from != address(0) && to != address(0)) revert TransfersDisabled();
+        if (from != address(0) && to != address(0)) {
+            if (address(venueHook) == address(0)) revert TransfersDisabled();
+            address poolManager = venueHook.poolManager();
+            if (from == poolManager || to == poolManager) {
+                // The only door into Uniswap: a pool that ran the policy hook in this transaction.
+                address subject = from == poolManager ? to : from;
+                if (venueHook.approvedSubject() != subject) revert NoPolicyDoor(subject);
+            } else {
+                (bool allowed, uint16 clauseId) = policyOracle.mayTransfer(to);
+                if (!allowed) revert TransferRefused(to, clauseId);
+            }
+        }
         super._update(from, to, value);
     }
 }

@@ -20,7 +20,9 @@ library PolicyEval {
     }
 
     /// @return allowed Whether the action is permitted.
-    /// @return clauseId The clause that denied it, or zero when no single clause is responsible.
+    /// @return clauseId The clause that denied it: the failing requirement or prohibition, or the
+    /// first permission when none held — the permission the subject lacks. Zero only when the
+    /// action has no rules at all.
     function decide(bytes memory program, uint256 known, uint256 value)
         internal
         pure
@@ -28,9 +30,11 @@ library PolicyEval {
     {
         Rule[] memory rules = abi.decode(program, (Rule[]));
         bool permitted;
+        uint16 firstPermit;
         for (uint256 i; i < rules.length; ++i) {
             (bool isTrue, bool isFalse) = evaluate(rules[i], known, value);
             if (rules[i].effect == PERMIT) {
+                if (firstPermit == 0) firstPermit = rules[i].clauseId;
                 if (isTrue) permitted = true;
             } else if (rules[i].effect == REQUIRE) {
                 if (!isTrue) return (false, rules[i].clauseId);
@@ -38,7 +42,7 @@ library PolicyEval {
                 return (false, rules[i].clauseId);
             }
         }
-        return (permitted, 0);
+        return (permitted, permitted ? 0 : firstPermit);
     }
 
     /// @dev Neither flag set means unknown. A fact on both sides of one term is left in place:

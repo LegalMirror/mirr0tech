@@ -7,7 +7,7 @@ import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOO
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
-const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
+const load = async (name) => JSON.parse(await readFile(`artifacts/wildcat-credit/${name}.json`, 'utf8'));
 const [attestorArtifact, oracleArtifact, sanctionsArtifact, hookArtifact, routerArtifact, tokenArtifact, managerArtifact] =
   await Promise.all(['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'MockERC20', 'PoolManager'].map(load));
 

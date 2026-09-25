@@ -43,7 +43,7 @@ for (let attempt = 0; attempt < 200; attempt++) {
 }
 
 const admin = new Wallet(DEV_KEY, provider);
-const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
+const load = async (name) => JSON.parse(await readFile(`artifacts/wildcat-credit/${name}.json`, 'utf8'));
 const attestorArtifact = await load('PolicyAttestor');
 const providerArtifact = await load('MirrortechRoleProvider');
 const oracleArtifact = await load('PolicyOracle');

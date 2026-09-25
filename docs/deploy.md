@@ -11,7 +11,8 @@ no host ports in the production compose, everything as environment.
 
 **Sepolia.** Set `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `DEPLOYMENT_PATH=deployments/sepolia.json`
 (the committed record; matching chain id → no redeploy), `AUDIT_PATH=deployments/sepolia-audit.json`
-(the seeded timeline) with `SEED=false`, and `MULTIBAAS_*` to register the contracts. The canonical `AQUA`, `POOL_MANAGER`, `WETH` are in
+(the seeded timeline) with `SEED=false`, and `MULTIBAAS_*` to register the contracts. The static site ships
+that timeline and `deployments/sepolia-parties.json` (refresh with `STACK_URL=… API_KEY=… node scripts/snapshot-parties.js`). The canonical `AQUA`, `POOL_MANAGER`, `WETH` are in
 `.env.coolify.example`.
 
 ## Coolify

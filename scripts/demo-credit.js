@@ -5,7 +5,7 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { ContractFactory, JsonRpcProvider, Wallet, id } from 'ethers';
-import { readDocument } from '../src/policy/document.js';
+import { readDocuments } from '../src/policy/document.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 
@@ -13,7 +13,7 @@ const DEV_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2f
 const say = (line = '') => console.log(line);
 const step = (title) => { say(); say(`── ${title}`); };
 
-const document = await readDocument('test/human_contracts/sample-mla.md');
+const document = await readDocuments(['test/human_contracts/wildcat-mla.md', 'test/human_contracts/lender-check-policy.md', 'test/human_contracts/buyback-addendum.md']);
 const config = JSON.parse(await readFile('examples/wildcat-config.json', 'utf8'));
 const compiled = compilePolicy(mlaFixture(document), config, document, { demo: true });
 const clauses = compiled.clauseTable.clauses;
@@ -84,8 +84,8 @@ const attest = async (facts) => {
   const now = (await provider.getBlock('latest')).timestamp;
   await (await attestor.attest(lender, compiled.policy.hash, known, value, now, now + config.attestationValiditySeconds)).wait();
 };
-const ADMITTED = { mlaExecuted: true, kycApproved: true, amlApproved: true, jurisdictionPermitted: true,
-  accreditedInvestor: true, screeningCurrent: true, sanctionsClear: true, lenderCapacityAvailable: true };
+const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvided: true, notInsolvent: true,
+  screeningCurrent: true, sanctionsClear: true, openTermState: true };
 
 step(`Lender ${lender} applies`);
 await report('Before any screening:');
@@ -111,7 +111,7 @@ await (await attestor.revokeFacts(lender, compiled.policy.hash, bit('sanctionsCl
 await report('Immediately after the watcher clears one fact:');
 
 step('The lender is owed interest — is the borrower allowed to pay?');
-await attest({ ...ADMITTED, withdrawalWindowOpen: true, lockupElapsed: true });
+await attest(ADMITTED);
 let [mayPay] = await roleProvider.mayWithdraw(lender);
 say(`  With screening current:      ${mayPay ? 'payment permitted' : 'payment blocked'}`);
 await (await attestor.revokeFacts(lender, compiled.policy.hash, bit('sanctionsClear'), 'OFAC SDN match')).wait();

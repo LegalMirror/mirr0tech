@@ -19,10 +19,8 @@ const pack = (facts) => {
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }
   return { known, value };
 };
-const ADMITTED = {
-  mlaExecuted: true, kycApproved: true, amlApproved: true, jurisdictionPermitted: true,
-  accreditedInvestor: true, screeningCurrent: true, sanctionsClear: true, lenderCapacityAvailable: true,
-};
+const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvided: true, notInsolvent: true,
+  screeningCurrent: true, sanctionsClear: true, openTermState: true };
 
 test('the compiled agreement decides the same way on a real EVM as it does in JavaScript', { timeout: 180_000 }, async (t) => {
   const { provider } = await startAnvil(t);
@@ -110,7 +108,7 @@ test('the compiled agreement decides the same way on a real EVM as it does in Ja
 
   await t.test('eligibility is re-checked at payment time, not at onboarding', async () => {
     const lender = Wallet.createRandom().address;
-    await attest(lender, { ...ADMITTED, withdrawalWindowOpen: true, lockupElapsed: true });
+    await attest(lender, ADMITTED);
     let [allowed] = await roleProvider.mayWithdraw(lender);
     assert.equal(allowed, true);
 
@@ -121,12 +119,12 @@ test('the compiled agreement decides the same way on a real EVM as it does in Ja
     assert.equal(clauseTable.clauses[Number(clauseId) - 1].ruleId, 'withdraw-sanctions');
   });
 
-  await t.test('the lockup and the withdrawal window are enforced separately', async () => {
+  await t.test('a fixed-term market blocks withdrawals until it is open term', async () => {
     const lender = Wallet.createRandom().address;
-    await attest(lender, { ...ADMITTED, withdrawalWindowOpen: true, lockupElapsed: false });
+    await attest(lender, { ...ADMITTED, openTermState: false });
     const [allowed, clauseId] = await roleProvider.mayWithdraw(lender);
     assert.equal(allowed, false);
-    assert.equal(clauseTable.clauses[Number(clauseId) - 1].clause, '5.3');
+    assert.equal(clauseId, 0n, 'no permit matches, so no single clause is responsible');
   });
 
   await t.test('presenting a signed screening certificate admits a lender in one transaction', async () => {

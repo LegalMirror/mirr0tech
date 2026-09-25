@@ -21,3 +21,20 @@ export async function readDocument(path) {
   if (!text) throw new Error('Document is empty');
   return { name: basename(path), sha256: sha256(bytes), textSha256: sha256(text), text };
 }
+
+// A policy may quote several documents at once: the agreement, the borrower's own policy, an
+// addendum. They are read as one bundle so quote validation and hashing see a single text, while
+// each part keeps its own hash for provenance.
+export async function readDocuments(paths) {
+  if (paths.length === 1) return readDocument(paths[0]);
+  const parts = [];
+  for (const path of paths) parts.push(await readDocument(path));
+  const text = parts.map((part) => part.text).join(' ');
+  return {
+    name: parts.map((part) => part.name).join('+'),
+    sha256: sha256(canonical(parts.map((part) => part.sha256))),
+    textSha256: sha256(text),
+    text,
+    parts: parts.map(({ name, sha256: raw, textSha256 }) => ({ name, sha256: raw, textSha256 })),
+  };
+}

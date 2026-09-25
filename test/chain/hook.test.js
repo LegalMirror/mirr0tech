@@ -13,8 +13,8 @@ const [attestorArtifact, hookArtifact, routerArtifact, tokenArtifact, managerArt
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
-const ADMITTED = { mlaExecuted: true, kycApproved: true, amlApproved: true, jurisdictionPermitted: true,
-  accreditedInvestor: true, screeningCurrent: true, sanctionsClear: true, lenderCapacityAvailable: true };
+const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvided: true, notInsolvent: true,
+  screeningCurrent: true, sanctionsClear: true, openTermState: true };
 const pack = (facts) => {
   let known = 0n; let value = 0n;
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }

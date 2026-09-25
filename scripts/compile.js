@@ -1,5 +1,5 @@
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
-import { readDocument } from '../src/policy/document.js';
+import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
@@ -13,10 +13,11 @@ const credit = args.includes('--mla');
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
 const defaults = credit
-  ? { document: 'test/human_contracts/sample-mla.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
+  ? { document: 'test/human_contracts/wildcat-mla.md,test/human_contracts/lender-check-policy.md,test/human_contracts/buyback-addendum.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
   : { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/demo-config.json', fixture: sampleFixture };
 
-const document = await readDocument(paths[1] ?? defaults.document);
+// Several documents may be compiled as one bundle: pass them comma-separated.
+const document = await readDocuments((paths[1] ?? defaults.document).split(','));
 const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : defaults.fixture(document);
 const config = JSON.parse(await readFile(paths[2] ?? defaults.config, 'utf8'));
 const result = compilePolicy(envelope, config, document, { demo });

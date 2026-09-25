@@ -8,6 +8,7 @@ export function sampleFixture(document) {
     schemaVersion: '1.0',
     title: 'Platform Services, Transfer Agent and Registrar Agreement — executable subset',
     parties: [{ name: 'Securitize LLC', role: 'transfer agent' }, { name: 'BlackRock USD Institutional Digital Liquidity Fund Ltd.', role: 'issuer' }],
+    terms: [],
     rules: [
       rule('issuance-authorized', 'mint', 'permit', all('issuerAuthorized', 'offeringCompliant'), '2.1–2.2',
         'Securitize is authorized and directed to issue and credit', 'An operator must attest that issuance prerequisites and offering restrictions have been satisfied.'),

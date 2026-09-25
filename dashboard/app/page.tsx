@@ -2,12 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { source } from "@/lib/adapter";
-import { KIND_LABEL, VERDICT_LABEL } from "@/lib/labels";
+import { KIND_LABEL, plainSummary, VERDICT_LABEL } from "@/lib/labels";
 import { proofLinks, standings } from "@/lib/overview";
 import type { AuditEvent, Party, PolicyData, ProfileId, ProfileSummary } from "@/lib/types";
 import { useResource } from "@/lib/hooks";
 import { Failed, Glyph, Loading, PageHead } from "./_components/common";
 import { useProfile } from "./providers";
+
+const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 type ActData = { summary: ProfileSummary; policy: PolicyData; parties: Party[]; events: AuditEvent[] };
 
@@ -30,6 +32,8 @@ function ActCard({ act }: { act: ActData }) {
   const { setProfile } = useProfile();
   const { summary, policy, parties, events } = act;
   const coverage = summary.coverage ?? policy.coverage;
+  // Decisions under an action, not attestations: those are the transactions worth a click.
+  const proofs = proofLinks(events.filter((event) => policy.actionOrder.includes(event.action)));
   const open = (profile: ProfileId) => {
     setProfile(profile);
     router.push("/agreement");
@@ -54,14 +58,14 @@ function ActCard({ act }: { act: ActData }) {
           </li>
         ))}
       </ul>
-      {proofLinks(events).length > 0 && (
+      {proofs.length > 0 && (
         <p className="meta">
           On Sepolia:{" "}
-          {proofLinks(events).map((event, index) => (
+          {proofs.map((event, index) => (
             <span key={event.id}>
               {index > 0 && " · "}
-              <a href={event.explorer!} target="_blank" rel="noreferrer">
-                {KIND_LABEL[event.kind] ?? event.kind} ↗
+              <a href={event.explorer!} target="_blank" rel="noreferrer" title={KIND_LABEL[event.kind]}>
+                {sentence(plainSummary(event.summary))} ↗
               </a>
             </span>
           ))}

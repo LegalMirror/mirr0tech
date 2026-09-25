@@ -1,0 +1,176 @@
+// Shapes written by scripts/export-ui.js. A gateway that serves GET /v1/policy returns the same shape.
+
+export type ProfileId = "custodial-rwa" | "wildcat-credit";
+export type Effect = "permit" | "require" | "forbid";
+export type Tri = boolean | null;
+
+export type Condition =
+  | { type: "fact"; name: string }
+  | { type: "all" | "any"; children: Condition[] }
+  | { type: "not"; child: Condition };
+
+export type QuoteLocation = {
+  /** Offsets into the bundled normalized text the compiler hashed */
+  start: number;
+  end: number;
+  /** Which document of the bundle, and where the quote sits in that document's display text */
+  part: number;
+  displayStart: number;
+  displayEnd: number;
+};
+
+export type DnfTerm = { pos: number[]; neg: number[]; posMask: string; negMask: string };
+
+export type Rule = {
+  id: string;
+  action: string;
+  effect: Effect;
+  condition: Condition;
+  source: { clause: string; quote: string };
+  rationale: string;
+  clauseId: number;
+  dnf: DnfTerm[];
+  quotes: QuoteLocation[];
+};
+
+export type Term = {
+  name: string;
+  value: string;
+  unit: string;
+  source: { clause: string; quote: string };
+  rationale: string;
+  quotes: QuoteLocation[];
+};
+
+export type Unresolved = { clause: string; description: string; anchor: { part: number; offset: number } | null };
+
+export type DocumentPart = {
+  name: string;
+  sha256: string;
+  textSha256: string;
+  start: number;
+  end: number;
+  display: string;
+};
+
+export type ClauseEntry = {
+  clauseId: number;
+  ruleId: string;
+  action: string;
+  effect: Effect;
+  clause: string;
+  quote: string;
+};
+
+export type ProgramWord = { offset: number; label: string; hex: string };
+
+export type ActionProgram = {
+  action: string;
+  index: number;
+  hex: string;
+  byteLength: number;
+  header: ProgramWord[];
+  rules: {
+    clauseId: number;
+    ruleId: string | null;
+    effect: Effect;
+    byteStart: number;
+    byteEnd: number;
+    words: ProgramWord[];
+  }[];
+};
+
+export type BuybackInstruction = {
+  name: string;
+  opcode: number;
+  bytes: string;
+  args: Record<string, string>;
+  source: string;
+};
+
+export type Buyback =
+  | { available: false; reason: string }
+  | {
+      available: true;
+      terms: {
+        price: string;
+        cap: string;
+        deadline: string;
+        deadlineTimestamp: number;
+        capPosition: string;
+        capAsset: string;
+      };
+      placeholders: { maker: string; positionToken: string; asset: string };
+      instructions: BuybackInstruction[];
+      program: string;
+      order: { maker: string; traits: string; data: string };
+      strategyHash: string;
+    };
+
+export type PolicyData = {
+  schemaVersion: 1;
+  profile: ProfileId;
+  act: number;
+  label: string;
+  venue: string;
+  title: string;
+  parties: { name: string; role: string }[];
+  source: {
+    name: string;
+    sha256: string;
+    textSha256: string;
+    parts: { name: string; sha256: string; textSha256: string }[] | null;
+  };
+  policyHash: string;
+  clauseTableHash: string;
+  equivalenceChecks: number;
+  demo: boolean;
+  config: Record<string, unknown> & { assumptions: string[] };
+  extraction: { provider: string; model: string | null };
+  factOrder: string[];
+  actionOrder: string[];
+  text: string;
+  documents: DocumentPart[];
+  rules: Rule[];
+  terms: Term[];
+  unresolved: Unresolved[];
+  clauseTable: ClauseEntry[];
+  programs: ActionProgram[];
+  buyback: Buyback | null;
+};
+
+export type ProfileSummary = {
+  profile: ProfileId;
+  act: number;
+  label: string;
+  venue: string;
+  title: string;
+  policyHash: string;
+};
+
+/** A wallet the policy decides about: a lender (credit) or an investor (custodial). */
+export type Party = {
+  id: string;
+  name: string;
+  address: string;
+  role: "lender" | "investor" | "borrower" | "stranger";
+  facts: Record<string, Tri>;
+  /** Unix seconds of the screening behind the attested facts, or null when none is live */
+  screenedAt: number | null;
+  sanctions: "clear" | "flagged" | "unknown";
+  /** A reviewer's resolution of a queue item, if any */
+  resolution?: "approved" | "rejected";
+};
+
+export type AuditEvent = {
+  id: string;
+  at: string;
+  kind: "Attested" | "Revoked" | "CredentialDecision" | "PolicyChecked" | "Fill" | "QuoteRefused" | "Shipped" | "Minted" | "Refused";
+  subject: string;
+  action: string;
+  summary: string;
+  /** The fact set the decision ran on, so the row can replay the trace */
+  facts: Record<string, Tri>;
+  txHash: string | null;
+  venue: string;
+};

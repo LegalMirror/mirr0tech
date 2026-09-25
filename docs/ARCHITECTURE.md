@@ -194,6 +194,9 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `test/chain/rwa-pool.test.js` | Act 1: custody → release → hookless pool refused at the token → hooked pool admits/refuses |
 | `examples/rwa-secondary-config.json` | `rwa-secondary` profile: the fund agreement with the transfer rules a v4 hook enforces |
 | `scripts/vendor.sh` | clones the source-available SwapVM/Aqua sources into `vendor/` (gitignored) |
+| `src/deploy.js`, `scripts/deploy-stack.js`, `test/chain/stack.test.js` | one-call deployment of both acts against any RPC; canonical venue addresses via env |
+| `src/refusal.js` | revert → clause decoder (unwraps Uniswap's `WrappedError`) |
+| `scripts/demo-golden.js` | both acts end to end on anvil — the demo script as a terminal run |
 | `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
 | `contracts/PolicyEval.sol` | three-valued evaluator |
 | `contracts/PolicyAttestor.sol` | facts, expiry, revocation, EIP-712 relay |

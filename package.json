@@ -17,13 +17,16 @@
     "deploy": "node scripts/deploy.js",
     "test": "node --test test/*.test.js",
     "test:chain": "node --test test/chain/credit.test.js test/chain/swapvm.test.js test/chain/hook.test.js",
-    "check": "npm test && npm run build && npm run build:secondary && npm run test:chain:rwa && npm run build:credit && npm run test:chain",
+    "check": "npm test && npm run build && npm run build:secondary && npm run test:chain:rwa && npm run build:credit && npm run test:chain && npm run test:chain:stack",
     "build:credit": "npm run vendor --silent && node scripts/compile.js --mla --demo && node scripts/build-contracts.js",
     "demo:credit": "npm run build:credit --silent && node scripts/demo-credit.js",
     "test:chain:rwa": "node --test test/chain/evm.test.js test/chain/rwa-pool.test.js",
     "vendor": "sh scripts/vendor.sh",
     "ui:export": "node scripts/export-ui.js",
-    "build:secondary": "node scripts/compile.js --secondary --demo && node scripts/build-contracts.js"
+    "build:secondary": "node scripts/compile.js --secondary --demo && node scripts/build-contracts.js",
+    "deploy:stack": "node scripts/deploy-stack.js",
+    "test:chain:stack": "node --test test/chain/stack.test.js",
+    "demo:golden": "node scripts/demo-golden.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "5.6.1",

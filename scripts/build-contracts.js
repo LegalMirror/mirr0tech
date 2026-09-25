@@ -2,7 +2,7 @@ import solcLatest from 'solc';
 import solcV4 from 'solc-v4';
 import solcSwapVM from 'solc-swapvm';
 import { readFileSync, existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 
 const policy = JSON.parse(readFileSync('generated/policy.json', 'utf8'));
 const profile = policy.profile;
@@ -68,4 +68,7 @@ for (const bundle of bundles) {
     built.push(`${name}${size > 24_576 ? ` (${size} bytes: OVER the 24576 limit)` : ''}`);
   }
 }
+// The artifact directory is self-contained: the policy and clause table travel with the bytecode.
+await copyFile('generated/policy.json', `artifacts/${profile}/policy.json`);
+await copyFile('generated/clause-table.json', `artifacts/${profile}/clause-table.json`);
 console.log(`Compiled ${built.join(', ')} → artifacts/${profile}/`);

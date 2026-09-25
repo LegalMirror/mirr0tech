@@ -2,7 +2,7 @@
 
 | | |
 | --- | --- |
-| **Status** | **v2** — supersedes v1 (`PRD_v1.pdf`). Decisions are locked unless marked ⚠️ |
+| **Status** | **v2** — supersedes v1 (`PRD_v1.pdf`). Decisions are locked unless marked ⚠️. **Sat progress:** G1–G6 built and green on anvil (`npm run demo:golden`); dashboard in progress; gateway endpoints, hosting and submission material open |
 | **Owner** | Lam (PM) |
 | **Team** | Lam (PM, pitch, legal content, QA) · Eng A (contracts + chain) · Eng B (backend, integrations) · dashboard shared, see §10 |
 | **Deadline** | **Sun 27 Sep 2026, 09:00 JST** submission. Internal code freeze **Sun 03:00 JST** |

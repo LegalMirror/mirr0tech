@@ -1,0 +1,9 @@
+{
+  "name": "mirr0tech",
+  "short_name": "mirr0tech",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#060a18",
+  "theme_color": "#060a18",
+  "icons": [{ "src": "/mark.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

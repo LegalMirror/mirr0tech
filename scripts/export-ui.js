@@ -183,6 +183,203 @@ function buybackOf(policy) {
   };
 }
 
+// ── Paragraph coverage ─────────────────────────────────────────────────────────────────────────────
+// Every paragraph of every document is labelled with its clause path and classified: compiled (a rule
+// or term quotes it), unresolved (the compiler flagged it), or not executable (nothing quotes it).
+
+const DOC_PREFIX = [['MLA', 'wildcat-mla'], ['Lender Check Policy', 'lender-check-policy'], ['Addendum', 'buyback-addendum']];
+const prefixOf = (name) => DOC_PREFIX.find(([, fragment]) => name.includes(fragment))?.[0] ?? '';
+
+// A line that opens its own paragraph even without a blank line before it.
+const OPENS_CLAUSE = /^(#+\s|[-*+]\s|\(?[a-z]\)\s|[A-Z]?\d+(?:\.\d+)*(?:[.)]|\s))/;
+
+/** Blank-line separated blocks, further split before every clause label. Offsets are into `display`. */
+export function paragraphsOf(display) {
+  const out = [];
+  let current = null;
+  let offset = 0;
+  for (const line of display.split('\n')) {
+    const start = offset;
+    const end = offset + line.length;
+    offset = end + 1;
+    if (!line.trim()) {
+      if (current) out.push(current);
+      current = null;
+      continue;
+    }
+    if (current && OPENS_CLAUSE.test(line)) {
+      out.push(current);
+      current = null;
+    }
+    if (current) current.end = end;
+    else current = { start, end };
+  }
+  if (current) out.push(current);
+  return out;
+}
+
+const isCapsHeading = (line) => line.length <= 100 && /[A-Z]{3}/.test(line) && !/[a-z]/.test(line);
+const BOILERPLATE = [/^\d{1,3}$/, /^Exhibit [A-Z] - \d+$/i, /^[\s*_#-]+$/];
+
+/**
+ * Walks a document's paragraphs keeping a clause path: `13) e) 1.` in the MLA, `2.1.1` in the
+ * converted HTML, `A1.1` in the addendum. Paths are what an unresolved clause reference is matched on.
+ */
+export function labelParagraphs(display, { markdown, prefix }) {
+  let exhibit = null;
+  let clause = { path: [], label: '' };
+  let preamble = true;
+  let definitions = false;
+  // Markdown lists nest without indentation once collapsed: a "1." after an item opens a sub-list,
+  // and a number that continues an outer level closes the inner ones.
+  let list = [];
+  let previousWasItem = false;
+  return paragraphsOf(display).map(({ start, end }) => {
+    const text = display.slice(start, end);
+    const first = text.split('\n')[0].trim();
+    const md = markdown ? /^(#+)\s+(.*)$/.exec(first) : null;
+    const heading = Boolean(md) || (!markdown && isCapsHeading(first));
+    const body = (md ? md[2] : first).replace(/^\*\*/, '');
+    const boilerplate = BOILERPLATE.some((pattern) => pattern.test(first));
+    let own = null;
+    let listItem = false;
+    let m;
+    if (boilerplate) {
+      // Page numbers and rules carry no clause of their own.
+    } else if ((m = /^EXHIBIT\s+([A-Z])\b/i.exec(body)) && (heading || body.length < 80)) {
+      exhibit = `Exhibit ${m[1].toUpperCase()}`;
+      clause = { path: [], label: '' };
+      preamble = false;
+      definitions = false;
+    } else if ((m = /^([A-Z]?\d+(?:\.\d+)+)\.?(?=\s|\S)/.exec(body))) {
+      own = { path: m[1].split('.'), label: m[1] };
+    } else if ((m = /^([A-Z]?\d+)\)\s/.exec(body))) {
+      own = { path: [m[1]], label: `${m[1]})` };
+    } else if ((m = /^\(?([a-z])\)\s/.exec(body))) {
+      const section = clause.path.slice(0, 1);
+      const sectionLabel = clause.label.split(' ')[0];
+      own = { path: [...section, m[1]], label: `${sectionLabel} ${m[1]})`.trim() };
+    } else if ((m = /^(\d+)\.(\S)/.exec(body))) {
+      own = { path: [m[1]], label: m[1] };
+    } else if ((m = /^(\d+)\.\s/.exec(body))) {
+      if (md) own = { path: [m[1]], label: m[1] };
+      else {
+        const n = Number(m[1]);
+        if (n === 1) list = previousWasItem ? [...list, 1] : [1];
+        else {
+          while (list.length && list.at(-1) + 1 !== n) list.pop();
+          list = list.length ? [...list.slice(0, -1), n] : [n];
+        }
+        listItem = true;
+        own = {
+          path: [...clause.path, ...list.map(String)],
+          label: `${clause.label} ${list.map((item) => `${item}.`).join(' ')}`.trim(),
+        };
+      }
+    } else if (md && md[1].length <= 3 && !exhibit && !preamble) {
+      clause = { path: [], label: '' };
+    }
+    if (/^(DEFINITIONS\b|TERMS AND CONDITIONS\b)/i.test(body) || /^\d+\)\s+Definitions\b/i.test(body)) preamble = false;
+    if (own) {
+      preamble = false;
+      if (!listItem) clause = own;
+    }
+    if (!listItem && !boilerplate && (own || heading)) list = [];
+    if (!boilerplate) previousWasItem = listItem;
+    if (/^(\d+\)\s+)?DEFINITIONS\b/i.test(body)) definitions = true;
+    else if ((own && !listItem) || (md && !/definitions/i.test(body))) definitions = false;
+
+    const path = preamble ? ['Preamble'] : [...(exhibit ? [exhibit] : []), ...(own ?? clause).path];
+    const local = preamble ? 'Preamble' : definitions && !(own ?? clause).label ? 'Definitions' : (own ?? clause).label;
+    const label = [prefix, exhibit && !preamble ? exhibit : null, local].filter(Boolean).join(' ');
+    const kind = boilerplate ? 'boilerplate' : heading ? 'heading' : definitions ? 'definition' : own ? 'clause' : 'text';
+    return { start, end, path: definitions && !own && !clause.path.length ? ['Definitions'] : path, label, kind };
+  });
+}
+
+/** "MLA 13) c), e)" → [{doc, path: ['13','c']}, {doc, path: ['13','e']}]; ranges like 2.1–2.2 expand. */
+export function parseClauseRef(clause) {
+  const refs = [];
+  for (let piece of clause.split(';')) {
+    piece = piece.trim();
+    let doc = null;
+    for (const [prefix, fragment] of DOC_PREFIX) {
+      if (piece.startsWith(`${prefix} `)) {
+        doc = fragment;
+        piece = piece.slice(prefix.length + 1);
+      }
+    }
+    if (/^Preamble\b/i.test(piece)) { refs.push({ doc, path: ['Preamble'] }); continue; }
+    const exhibit = /^Exhibit ([A-Z])\b/.exec(piece);
+    if (exhibit) { refs.push({ doc, path: [`Exhibit ${exhibit[1]}`] }); continue; }
+    let previous = null;
+    for (const entry of piece.split(',').map((value) => value.trim()).filter(Boolean)) {
+      const range = /^([A-Z]?\d+(?:\.\d+)*)\s*[–-]\s*([A-Z]?\d+(?:\.\d+)*)$/.exec(entry);
+      if (range) {
+        const from = range[1].split('.');
+        const to = range[2].split('.');
+        const head = from.slice(0, -1);
+        if (from.length === to.length && head.join('.') === to.slice(0, -1).join('.')) {
+          for (let n = Number(from.at(-1)); n <= Number(to.at(-1)); n++) refs.push({ doc, path: [...head, String(n)] });
+        }
+        continue;
+      }
+      const tokens = /^[A-Z]?\d+(?:\.\d+)+$/.test(entry) ? entry.split('.') : entry.match(/[A-Za-z0-9]+(?=\))/g);
+      if (!tokens) continue;
+      const path = previous && tokens.length < previous.length ? [...previous.slice(0, previous.length - tokens.length), ...tokens] : tokens;
+      previous = path;
+      refs.push({ doc, path });
+    }
+  }
+  return refs;
+}
+
+const startsWithPath = (path, prefix) => prefix.length <= path.length && prefix.every((token, index) => path[index] === token);
+
+export function coverageOf({ parts, rules, terms, unresolved, enforcedBy }) {
+  const refs = unresolved.map((entry) => parseClauseRef(entry.clause));
+  const labelled = parts.map((part) => labelParagraphs(part.display, { markdown: part.name.endsWith('.md'), prefix: prefixOf(part.name) }));
+  const matches = (index, part, paragraph) =>
+    refs[index].some((ref) => (ref.doc === null || part.name.includes(ref.doc)) && startsWithPath(paragraph.path, ref.path));
+  // An unresolved entry's marker sits on the first paragraph its clause reference names, falling back
+  // to the heading heuristic when the reference names no clause ("Agreement generally").
+  const anchors = unresolved.map((entry, index) => {
+    for (const [partIndex, paragraphs] of labelled.entries()) {
+      const hit = paragraphs.find((paragraph) => matches(index, parts[partIndex], paragraph));
+      if (hit) return { part: partIndex, offset: hit.start };
+    }
+    return entry.anchor;
+  });
+  const paragraphs = parts.flatMap((part, partIndex) =>
+    labelled[partIndex].map((paragraph) => {
+      const inside = (quote) => quote.part === partIndex && quote.displayStart < paragraph.end && quote.displayEnd > paragraph.start;
+      const ruleIds = rules.filter((rule) => rule.quotes.some(inside)).map((rule) => rule.id);
+      const termNames = terms.filter((term) => term.quotes.some(inside)).map((term) => term.name);
+      const flagged = unresolved.flatMap((entry, index) => {
+        const anchor = anchors[index];
+        const anchored = anchor?.part === partIndex && anchor.offset >= paragraph.start && anchor.offset <= paragraph.end;
+        return anchored || matches(index, part, paragraph) ? [index] : [];
+      });
+      const components = [...new Set([...ruleIds.flatMap((id) => enforcedBy.rules[id] ?? []), ...termNames.flatMap((name) => enforcedBy.terms[name] ?? [])])];
+      const status = ruleIds.length || termNames.length ? 'compiled' : flagged.length ? 'unresolved' : 'not-executable';
+      return {
+        part: partIndex, displayStart: paragraph.start, displayEnd: paragraph.end, label: paragraph.label, kind: paragraph.kind,
+        status, rules: ruleIds, terms: termNames, unresolved: flagged, components,
+      };
+    }));
+  // Headings and page furniture are shown with a status but not counted as paragraphs of the agreement.
+  const counted = paragraphs.filter((paragraph) => paragraph.kind !== 'heading' && paragraph.kind !== 'boilerplate');
+  const count = (status) => counted.filter((paragraph) => paragraph.status === status).length;
+  return {
+    anchors,
+    paragraphs,
+    total: counted.length,
+    counts: { compiled: count('compiled'), unresolved: count('unresolved'), 'not-executable': count('not-executable') },
+    rules: new Set(paragraphs.flatMap((paragraph) => paragraph.rules)).size,
+    terms: new Set(paragraphs.flatMap((paragraph) => paragraph.terms)).size,
+  };
+}
+
 export async function exportProfile(spec) {
   const document = await readDocuments(spec.documents.map(at));
   const envelope = spec.fixture(document);
@@ -227,6 +424,10 @@ export async function exportProfile(spec) {
   const unresolved = ast.unresolved.map((entry) => ({ ...entry, anchor: anchorFor(entry.clause, parts) }));
   for (const item of [...rules, ...terms]) if (!item.quotes.length) throw new Error(`Quote not located: ${item.id ?? item.name}`);
 
+  const enforcedBy = compiled.policy.coverage ?? { rules: {}, terms: {} };
+  const { anchors, ...coverage } = coverageOf({ parts, rules, terms, unresolved, enforcedBy });
+  unresolved.forEach((entry, index) => { entry.anchor = anchors[index]; });
+
   const programs = onchain.actions.map((action, index) => ({
     action, index, hex: onchain.programs[index], ...annotateProgram(onchain.programs[index], onchain.clauses),
   }));
@@ -252,6 +453,10 @@ export async function exportProfile(spec) {
     clauseTable: onchain.clauses,
     programs,
     buyback: ast.terms.some((term) => term.name === 'buybackPrice') ? buybackOf(compiled.policy) : null,
+    components: (compiled.components ?? []).map(({ id, version, kind, venue, description, rules: ruleIds, terms: termNames }) =>
+      ({ id, version, kind, venue, description, rules: ruleIds, terms: termNames })),
+    enforcedBy,
+    coverage,
   };
 }
 
@@ -262,7 +467,8 @@ export async function exportAll(outDir = OUT) {
     const exported = await exportProfile(spec);
     await writeFile(`${outDir}/${spec.profile}.json`, `${JSON.stringify(exported)}\n`);
     profiles.push({ profile: exported.profile, act: exported.act, label: exported.label, venue: exported.venue, title: exported.title, policyHash: exported.policyHash });
-    console.log(`ui:export ${spec.profile.padEnd(15)} ${exported.rules.length} rules · ${exported.terms.length} terms · ${exported.unresolved.length} unresolved · ${exported.policyHash}`);
+    const { counts, total } = exported.coverage;
+    console.log(`ui:export ${spec.profile.padEnd(15)} ${exported.rules.length} rules · ${exported.terms.length} terms · ${exported.unresolved.length} unresolved · paragraphs ${counts.compiled}/${counts.unresolved}/${counts['not-executable']} of ${total} · ${exported.policyHash}`);
   }
   await writeFile(`${outDir}/index.json`, `${JSON.stringify({ profiles }, null, 2)}\n`);
   return profiles;

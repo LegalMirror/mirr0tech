@@ -66,6 +66,43 @@ export type ClauseEntry = {
   quote: string;
 };
 
+export type ParagraphStatus = "compiled" | "unresolved" | "not-executable";
+
+/** One paragraph of a document part and what the compiler made of it. */
+export type Paragraph = {
+  part: number;
+  displayStart: number;
+  displayEnd: number;
+  /** Clause path as the document numbers it, e.g. "MLA 13) e)" or "2.1.1" */
+  label: string;
+  kind: "heading" | "definition" | "boilerplate" | "clause" | "text";
+  status: ParagraphStatus;
+  rules: string[];
+  terms: string[];
+  /** Indexes into PolicyData.unresolved */
+  unresolved: number[];
+  components: string[];
+};
+
+export type Coverage = {
+  paragraphs: Paragraph[];
+  /** Paragraphs counted, i.e. excluding headings and page furniture */
+  total: number;
+  counts: Record<ParagraphStatus, number>;
+  rules: number;
+  terms: number;
+};
+
+export type ComponentInfo = {
+  id: string;
+  version: string;
+  kind: string;
+  venue: string | null;
+  description: string;
+  rules: string[];
+  terms: string[];
+};
+
 export type ProgramWord = { offset: number; label: string; hex: string };
 
 export type ActionProgram = {
@@ -141,6 +178,11 @@ export type PolicyData = {
   clauseTable: ClauseEntry[];
   programs: ActionProgram[];
   buyback: Buyback | null;
+  /** The component library blocks this profile links against */
+  components: ComponentInfo[];
+  /** Rule id / term name → enforcing component ids */
+  enforcedBy: { rules: Record<string, string[]>; terms: Record<string, string[]> };
+  coverage: Coverage;
 };
 
 export type ProfileSummary = {

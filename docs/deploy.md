@@ -6,7 +6,7 @@ no host ports in the production compose, everything as environment.
 | Service (`deploy/docker-compose.yml`) | Port | Role |
 | --- | --- | --- |
 | `anvil` | 8545 | throwaway chain, skipped when `RPC_URL` is set |
-| `api` (`deploy/Dockerfile.api`) | 3200 | compiles the three profiles at build; on boot deploys both acts to `RPC_URL` or reuses `DEPLOYMENT_PATH`; serves `/v1/*`; seeds the golden path when `SEED=true` |
+| `api` (`deploy/Dockerfile.api`) | 3200 | compiles the three profiles at build; on boot deploys both acts to `RPC_URL` or reuses `DEPLOYMENT_PATH`; serves `/v1/*`; seeds the golden path when `SEED=true`; the audit persists in the `api-data` volume |
 | `dashboard` (`deploy/Dockerfile.dashboard`) | 3100 | static Next.js, `NEXT_PUBLIC_*` inlined at build |
 
 **Sepolia.** Set `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `DEPLOYMENT_PATH=deployments/sepolia.json`

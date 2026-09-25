@@ -27,6 +27,7 @@ services:
     expose: ["3200"]
     restart: unless-stopped
     depends_on: [anvil]
+    volumes: [api-data:/app/.data]
     environment:
       PORT: "3200"
       HOST: 0.0.0.0
@@ -35,6 +36,7 @@ services:
       SEED: ${SEED:-true}
       DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
       DEPLOYMENT_PATH: ${DEPLOYMENT_PATH:-}
+      DATA_DIR: /app/.data
       BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}
       AQUA: ${AQUA:-}
       POOL_MANAGER: ${POOL_MANAGER:-}
@@ -55,3 +57,6 @@ services:
     restart: unless-stopped
     environment:
       PORT: "3100"
+
+volumes:
+  api-data:

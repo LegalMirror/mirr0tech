@@ -14,6 +14,7 @@ import {
   Loading,
   PageHead,
   Refusal,
+  Glyph,
 } from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
 import { useProfile } from "../providers";
@@ -239,18 +240,16 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
   const transferRules = policy.rules.filter((rule) => rule.action === "transfer");
   return (
     <section className="card">
-      <h2>Uniswap v4 — MirrorPolicyHook</h2>
+      <h2>The pool asks the agreement first</h2>
       <p className="small muted">
-        <code>beforeAddLiquidity · beforeRemoveLiquidity · beforeSwap</code> run the agreement&apos;s{" "}
-        <code>transfer</code> program for the subject the router names. A pool created without the hook is
-        inert: the first settlement reverts at the token.
+        Every deposit into the pool, withdrawal from it and swap through it runs the agreement for the wallet
+        behind it. A pool opened without the hook is inert: its first settlement is refused by the token.
       </p>
       {transferRules.length === 0 && (
         <p className="small">
-          <span className="chip chip-warn">no transfer permit</span> The custodial reading compiles no
-          transfer rule, so every pool operation is refused with <code>clauseId 0</code> and the token itself
-          reverts <code>TransfersDisabled()</code>. The <strong>Trade on v4</strong> profile adds the transfer
-          rules the hook enforces.
+          This reading of the agreement allows no transfers at all, so every pool operation is refused and the
+          token itself refuses to move. The <strong>Trade on v4</strong> profile adds the transfer rules the
+          hook enforces.
         </p>
       )}
       <div className="tbl-wrap">
@@ -258,8 +257,8 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
           <thead>
             <tr>
               <th>Wallet</th>
-              <th>hook.explain(subject)</th>
               <th>Pool operation</th>
+              <th>Why</th>
             </tr>
           </thead>
           <tbody>
@@ -268,21 +267,19 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
               return (
                 <tr key={party.id}>
                   <td>{party.name}</td>
-                  <td>
-                    <code>
-                      ({String(decision.allowed)}, {decision.clauseId})
-                    </code>
+                  <td title={`hook.explain → (${String(decision.allowed)}, ${decision.clauseId})`}>
+                    <Glyph state={decision.allowed ? "approve" : "deny"} />{" "}
+                    {decision.allowed ? "Allowed" : "Blocked"}
                   </td>
                   <td>
                     {decision.allowed ? (
-                      <span className="chip chip-ok">ok</span>
+                      <span className="meta">passes the agreement</span>
                     ) : (
-                      <>
-                        <code className="revert">
-                          LegalClauseViolation({decision.clauseId}, {short(policy.policyHash, 8, 4)})
-                        </code>
+                      <span
+                        title={`revert LegalClauseViolation(${decision.clauseId}, ${short(policy.policyHash, 8, 4)})`}
+                      >
                         <Refusal policy={policy} action="transfer" clauseId={decision.clauseId} />
-                      </>
+                      </span>
                     )}
                   </td>
                 </tr>

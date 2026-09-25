@@ -5,7 +5,7 @@ import { venuesFor, renderRefusal } from "@/lib/enforcement";
 import { factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
-import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel, termLabel } from "@/lib/labels";
+import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel, termLabel, venueLabel } from "@/lib/labels";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
@@ -361,7 +361,7 @@ function RuleSteps({
           <ul className="plain-list">
             {venues.map((venue) => (
               <li key={`${venue.contract}${venue.calls[0]}`}>
-                <strong>{venue.contract.split(" (")[0]}</strong> — {venue.when}
+                <strong>{venueLabel(venue.contract)}</strong> — {venue.when}
                 {venue.refusal && "; a failure refuses the action and names this clause on-chain"}
               </li>
             ))}

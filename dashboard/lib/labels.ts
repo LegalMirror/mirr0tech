@@ -104,3 +104,13 @@ export function plainSummary(text: string): string {
     out = out.replace(new RegExp(`\\b${name}\\b`, "g"), label.toLowerCase());
   return out;
 }
+
+/** Where a rule runs, named for the reader; the contract name stays in the technical fold. */
+export function venueLabel(contract: string): string {
+  if (contract.startsWith("Gateway")) return "Issuance desk (custodial gateway)";
+  if (contract.startsWith("MirrorPolicyHook")) return "Uniswap v4 hook";
+  if (contract.startsWith("MirrorToken")) return "The fund token";
+  if (contract.startsWith("MirrortechRoleProvider")) return "Wildcat role provider";
+  if (contract.startsWith("PolicyGuard")) return "1inch Aqua venue";
+  return contract;
+}

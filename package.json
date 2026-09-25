@@ -16,19 +16,27 @@
     "build:contracts": "node scripts/build-contracts.js",
     "deploy": "node scripts/deploy.js",
     "test": "node --test test/*.test.js",
-    "test:chain": "node --test test/chain/*.test.js",
-    "check": "npm test && npm run build && npm run test:chain"
+    "test:chain": "node --test test/chain/credit.test.js test/chain/hook.test.js",
+    "check": "npm test && npm run build && npm run test:chain:rwa && npm run build:credit && npm run test:chain",
+    "build:credit": "node scripts/compile.js --mla --demo && node scripts/build-contracts.js",
+    "demo:credit": "npm run build:credit --silent && node scripts/demo-credit.js",
+    "test:chain:rwa": "node --test test/chain/evm.test.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "5.6.1",
+    "@uniswap/v4-core": "^1.0.2",
     "ajv": "8.20.0",
     "dotenv": "17.3.1",
     "ethers": "6.17.0",
     "express": "5.2.1",
     "html-to-text": "9.0.5"
   },
-  "overrides": { "tmp": "0.2.7" },
+  "overrides": {
+    "tmp": "0.2.7"
+  },
   "devDependencies": {
-    "solc": "0.8.37"
+    "solc": "0.8.37",
+    "solc-v4": "npm:solc@^0.8.26",
+    "solmate": "^6.8.0"
   }
 }

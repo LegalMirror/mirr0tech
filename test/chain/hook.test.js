@@ -7,14 +7,13 @@ import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOO
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
-const load = async (name) => JSON.parse(await readFile(`artifacts/wildcat-credit/${name}.json`, 'utf8'));
+const load = async (name) => JSON.parse(await readFile(`artifacts/rwa-secondary/${name}.json`, 'utf8'));
 const [attestorArtifact, oracleArtifact, sanctionsArtifact, hookArtifact, routerArtifact, tokenArtifact, managerArtifact] =
   await Promise.all(['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'MockERC20', 'PoolManager'].map(load));
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
-const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvided: true, notInsolvent: true,
-  screeningCurrent: true, sanctionsClear: true, openTermState: true };
+const ADMITTED = { kycApproved: true, amlApproved: true };
 const pack = (facts) => {
   let known = 0n; let value = 0n;
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }
@@ -23,7 +22,7 @@ const pack = (facts) => {
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 const TICK_SPACING = 60;
 
-test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, async (t) => {
+test('the fund agreement gates a real Uniswap v4 pool: mined address, admission, sanctions, caller check', { timeout: 240_000 }, async (t) => {
   const { provider } = await startAnvil(t);
   const admin = new Wallet(DEV_KEY, provider);
   const deploy = async (artifact, ...args) => {
@@ -83,7 +82,7 @@ test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, as
   const attest = async (subject, facts) => {
     const { known, value } = pack(facts);
     const now = (await provider.getBlock('latest')).timestamp;
-    await (await attestor.attest(subject, policy.hash, known, value, now, now + policy.config.attestationValiditySeconds)).wait();
+    await (await attestor.attest(subject, policy.hash, known, value, now, now + (policy.config.attestationValiditySeconds ?? 30 * 86400))).wait();
   };
   const addLiquidity = () => router.modifyLiquidity(key, { tickLower: -TICK_SPACING, tickUpper: TICK_SPACING, liquidityDelta: 10n ** 18n, salt: id('position') });
   const hookInterface = new Contract(mined.address, hookArtifact.abi, admin).interface;
@@ -128,7 +127,7 @@ test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, as
     await (await sanctions.setSanctioned(lender.address, true)).wait();
     const [allowed, clauseId] = await hook.explain(lender.address);
     assert.equal(allowed, false);
-    assert.equal(clauseTable.clauses[Number(clauseId) - 1].ruleId, 'transfer-sanctions');
+    assert.equal(clauseTable.clauses[Number(clauseId) - 1].ruleId, 'transfer-sanctions-block');
     await assert.rejects(addLiquidity(), (error) => decodeViolation(error)?.name === 'LegalClauseViolation');
     await assert.rejects(
       router.swap(key, { zeroForOne: true, amountSpecified: -1000n, sqrtPriceLimitX96: SQRT_PRICE_1_1 - 1000n }),

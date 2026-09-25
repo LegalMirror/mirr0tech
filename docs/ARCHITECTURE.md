@@ -143,7 +143,7 @@ Result: anyone may create a pool for the token; only hooked pools can hold it; t
 
 **Asset class.** The hook is the venue for the **RWA fund token** compiled from the Securitize transfer-agent agreement, not for Wildcat positions: a transfer-restricted fund share is what a permissioned pool is for, and its agreement has an onboarding clause a `transfer` permit can quote. Known limits (stated, not hidden): singleton custody answered by the street-name analogy; adverse selection on passive liquidity is mild for a near-NAV asset; rebasing balances are unsupported by v4, and the token is non-rebasing by design. Scope for any submission is admission plus the handshake — no quota, lockup, fee or LVR claims.
 
-## 6. Component model
+## 6. Component model (built: `src/policy/components.js`)
 
 The compiler is a **resolver** over a library of audited components. Each component declares what it covers, what it needs, and what it emits. Every rule and term must be claimed by a component or it is `unresolved`.
 
@@ -159,7 +159,7 @@ The compiler is a **resolver** over a library of audited components. Each compon
 
 Rules for components: **parameters, never shape.** A clause fills a slot in a versioned template; it never assembles instructions ad hoc (SwapVM: "instruction order is security-critical"). Component ids and versions go into `policyHash` so the hash names the exact blocks that enforce the document. Each component ships with the **clause template** a lawyer pastes into the agreement to authorize it — the library is half code, half legal text.
 
-For the hackathon: four components hardcoded, coverage check enforced, versions in the hash. The registry is a slide.
+Built as `src/policy/components.js`: a registry where each component declares `coversRule`/`coversTerm`, its contracts (with the compiler bundle each needs), an optional config `check`, and its clause template. `resolveComponents(ast, config)` links every rule to an enforcing venue component and every term to a consumer, or throws; `compilePolicy` puts the resolved `{id, version}` list and the coverage map inside `policyHash`, and `scripts/build-contracts.js` builds exactly the contracts the resolved components declare (`generated/components.json`). Profiles are named component sets. `test/components.test.js` proves coverage for every fixture, that an orphan rule or term is a compile error, and that bumping a component version changes the hash.
 
 ## 7. Gateway (Node/Express, existing)
 
@@ -186,6 +186,7 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `src/policy/onchain.js` | ABI-encode programs, emit `CompiledPolicy.sol`, clause table hash |
 | `src/policy/compile.js` | profiles, equivalence proof, `policyHash`, artifact emission |
 | `src/policy/mla-fixture.js` | hand-authored fixture quoting the Wildcat template MLA, the Lender Check Policy and the addendum |
+| `src/policy/components.js` | component registry, profiles, resolver (coverage, hash-committed component set, build targets, clause templates) |
 | `src/policy/programs.js` | SwapVM opcode table (parsed from vendored `LimitOpcodes.sol`), instruction encoders, buyback template, order and taker packing |
 | `contracts/PolicyOracle.sol` | fact assembly (attested ∪ derived ∪ observable) and the decision every venue calls |
 | `contracts/MockSanctionsOracle.sol`, `contracts/MockWildcatMarket.sol` | Sepolia stand-ins for the Chainalysis oracle and a V2 market |

@@ -76,7 +76,7 @@ contract MirrortechRouter is SwapVM, Opcodes {
 }
 ```
 
-- `aqua` = the Aqua registry, redeployed **unmodified** from `@1inch/aqua` on Sepolia (and on anvil for tests); pass its address. The 1inch rules require official contracts and explicitly allow a modified SwapVM redeploy; say both in the README.
+- `aqua` = the Aqua registry. Canonical `0x1111113ccf1426a8e30e2bff5e005d929bf6a90a` exists on Sepolia too, so on Sepolia pass it (`AQUA=` in `.env`) and nothing is redeployed; on a plain anvil `deployStack` deploys `Aqua.sol` unmodified from the vendored source. The router is always ours — the rules allow a modified SwapVM redeploy.
 - Deploy a `*Debug` variant locally for `Print*`; never on Sepolia.
 - The canonical router `0x111111338c5091E8440b67B168bAe16a668AC0De` does not know this opcode and is not on Sepolia. Our router is required either way.
 

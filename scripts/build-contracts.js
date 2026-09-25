@@ -6,41 +6,27 @@ import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 
 const policy = JSON.parse(readFileSync('generated/policy.json', 'utf8'));
 const profile = policy.profile;
-const credit = profile === 'wildcat-credit';
-const secondary = profile === 'rwa-secondary';
-
-// The venue contracts are pinned to the compiler Uniswap v4 requires; everything else builds on the
-// repository's own compiler. Source keys are repository paths so relative imports resolve.
+// The resolved components say which contracts to build and with which compiler.
+const manifest = JSON.parse(readFileSync('generated/components.json', 'utf8'));
+if (manifest.policyHash !== policy.hash) throw new Error('generated/components.json is stale; rerun the compiler');
+const targetsFor = (bundle) => {
+  const seen = new Set();
+  return manifest.components.flatMap((component) => component.contracts)
+    .filter((contract) => contract.bundle === bundle && contract.name && !seen.has(contract.name) && seen.add(contract.name))
+    .map((contract) => [contract.path, contract.name]);
+};
+// Source keys are repository paths so relative imports between contracts and generated code resolve.
 const support = ['contracts/PolicyEval.sol', 'contracts/wildcat/IRoleProvider.sol', 'generated/CompiledPolicy.sol', 'contracts/PolicyAttestor.sol', 'contracts/PolicyOracle.sol'];
 
-const bundles = [
-  {
-    compiler: solcLatest, evmVersion: 'cancun',
-    targets: credit
-      ? [['contracts/PolicyAttestor.sol', 'PolicyAttestor'], ['contracts/PolicyOracle.sol', 'PolicyOracle'],
-         ['contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], ['contracts/MockWildcatMarket.sol', 'MockWildcatMarket'],
-         ['contracts/test/MockERC20.sol', 'MockERC20'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider']]
-      : [['contracts/MirrorToken.sol', 'MirrorToken'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
-         ['contracts/PolicyAttestor.sol', 'PolicyAttestor'], ['contracts/PolicyOracle.sol', 'PolicyOracle'],
-         ['contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], ['contracts/test/MockERC20.sol', 'MockERC20']],
-  },
-  ...(credit ? [{
-    // 1inch SwapVM and Aqua pin 0.8.30 and need the IR pipeline; the router is a modified SwapVM redeploy.
-    compiler: solcSwapVM, evmVersion: 'cancun', viaIR: true, runs: 200,
-    targets: [['contracts/swapvm/MirrortechRouter.sol', 'MirrortechRouter'],
-              ['vendor/aqua/src/Aqua.sol', 'Aqua']],
-  }] : []),
-  ...(credit || secondary ? [{
-    // Uniswap's PoolManager pins solidity 0.8.26 exactly, so the venue bundle uses that compiler.
-    compiler: solcV4, evmVersion: 'cancun',
-    targets: [['contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook'],
-              ['contracts/test/MirrorLiquidityRouter.sol', 'MirrorLiquidityRouter'],
-              ['contracts/test/MockERC20.sol', 'MockERC20'],
-              ['node_modules/@uniswap/v4-core/src/PoolManager.sol', 'PoolManager']],
-  }] : []),
-];
+const compilers = {
+  core: { compiler: solcLatest, evmVersion: 'cancun' },
+  // 1inch SwapVM and Aqua pin 0.8.30 and need the IR pipeline; the router is a modified SwapVM redeploy.
+  swapvm: { compiler: solcSwapVM, evmVersion: 'cancun', viaIR: true, runs: 200 },
+  // Uniswap's PoolManager pins solidity 0.8.26 exactly, so the venue bundle uses that compiler.
+  'uniswap-v4': { compiler: solcV4, evmVersion: 'cancun' },
+};
+const bundles = Object.entries(compilers).map(([name, settings]) => ({ ...settings, targets: targetsFor(name) })).filter((bundle) => bundle.targets.length);
 
-// One directory per profile, so the custodial, secondary and credit builds coexist.
 await mkdir(`artifacts/${profile}`, { recursive: true });
 const built = [];
 for (const bundle of bundles) {

@@ -35,6 +35,7 @@ const files = {
   'policy.mjs': result.javascript,
   'CompiledPolicy.sol': result.compiledPolicy,
   'clause-table.json': JSON.stringify(result.clauseTable, null, 2),
+  'components.json': JSON.stringify({ policyHash: result.policy.hash, profile: result.policy.profile, components: result.components }, null, 2),
 };
 if (result.solidity) files['CompiledMirrorToken.sol'] = result.solidity;
 if (result.policy.ast.terms.some((term) => term.name === 'buybackPrice')) {
@@ -47,4 +48,5 @@ console.log(`Compiled ${envelope.ast.rules.length} rules from ${document.name} (
 console.log(`  policyHash      ${result.policy.hash}`);
 console.log(`  clauseTableHash ${result.clauseTable.clauseTableHash}`);
 console.log(`  proved the on-chain programs match the interpreter over ${result.equivalenceChecks} three-valued assignments`);
+console.log(`  linked against ${result.components.map((component) => `${component.id}@${component.version}`).join(', ')}`);
 console.log(`Artifacts: generated/{${Object.keys(files).join(',')}}`);

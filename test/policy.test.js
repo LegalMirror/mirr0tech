@@ -43,7 +43,7 @@ test('compiler is deterministic, rejects missing terms/source mismatch, and bind
 });
 test('unsupported transfer permission fails compilation explicitly', () => {
   const copy = structuredClone(envelope); copy.ast.rules[0].action = 'transfer';
-  assert.throws(() => compilePolicy(copy, config, document, { demo: true }), /Transfer permissions/);
+  assert.throws(() => compilePolicy(copy, config, document, { demo: true }), /No component in profile custodial-rwa enforces action "transfer"/);
 });
 test('live extractor requests strict structured data and validates returned source citations', async () => {
   let body;

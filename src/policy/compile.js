@@ -3,8 +3,8 @@ import { canonical, sha256 } from './document.js';
 import { evaluatePolicy } from './evaluate.js';
 import { buildOnchainPolicy, emitCompiledPolicy } from './onchain.js';
 import { compileCondition, evaluateTerms } from './dnf.js';
+import { resolveComponents, PROFILES } from './components.js';
 
-const PROFILES = ['custodial-rwa', 'rwa-secondary', 'wildcat-credit'];
 
 // The on-chain evaluator only earns trust if it decides identically to the interpreter the backend
 // runs. Before emitting anything, replay every rule over all three-valued assignments of the facts
@@ -47,8 +47,6 @@ function proveEquivalence(ast, factOrder) {
 }
 
 function checkCustodialConfig(config, ast, { secondary = false } = {}) {
-  // Transfers exist only where a venue enforces the agreement on them: the Uniswap v4 hook.
-  if (!secondary && ast.rules.some((r) => r.action === 'transfer' && r.effect === 'permit')) throw new Error('Transfer permissions are unsupported by the custodial MVP');
   if (secondary && config.secondaryVenue !== 'uniswap-v4') throw new Error('The secondary profile requires secondaryVenue: uniswap-v4');
   if (secondary && !ast.rules.some((r) => r.action === 'transfer' && r.effect === 'permit')) throw new Error('The secondary profile needs a transfer permit quoting the agreement');
   if (config.decimals !== 6 || config.custody !== 'backend' || config.currency !== 'USD' || config.priceModel !== 'one-token-per-usd') throw new Error('Only the six-decimal custodial USD demo price model is implemented');
@@ -64,11 +62,6 @@ function checkCreditConfig(config, ast) {
   if (!Number.isInteger(config.credentialTimeToLiveSeconds) || config.credentialTimeToLiveSeconds <= 0) {
     throw new Error('credentialTimeToLiveSeconds must be a positive integer');
   }
-  // The agreement's re-screening interval is the outer bound; a shorter operational window is fine,
-  // a longer one would let the policy outlive the document's own requirement.
-  if (config.attestationValiditySeconds > config.rescreeningIntervalSeconds) {
-    throw new Error('Attestations may not outlive the re-screening interval the agreement requires');
-  }
   if (!ast.rules.some((rule) => rule.action === 'deposit' && rule.effect === 'permit')) {
     throw new Error('A credit policy must permit deposits under at least one rule');
   }
@@ -79,19 +72,23 @@ export function compilePolicy(envelope, config, document, { demo = false } = {})
   if (envelope.source.sha256 !== document.sha256 || envelope.source.textSha256 !== document.textSha256) throw new Error('Source document hash mismatch');
   if (envelope.ast.unresolved.length && !demo) throw new Error('Unresolved legal terms cannot be compiled for execution. Use --demo only for local simulation.');
   const profile = config.profile ?? 'custodial-rwa';
-  if (!PROFILES.includes(profile)) throw new Error(`Unknown deployment profile: ${profile}`);
+  if (!PROFILES[profile]) throw new Error(`Unknown deployment profile: ${profile}`);
   if (profile === 'custodial-rwa') checkCustodialConfig(config, envelope.ast);
   else if (profile === 'rwa-secondary') checkCustodialConfig(config, envelope.ast, { secondary: true });
   else checkCreditConfig(config, envelope.ast);
   if (!Array.isArray(config.assumptions) || config.assumptions.length === 0) throw new Error('Explicit deployment assumptions are required');
 
+  // Link the AST against the component library: every rule and term must resolve to a component.
+  const resolution = resolveComponents(envelope.ast, config);
   const onchain = buildOnchainPolicy(envelope.ast);
   const checked = proveEquivalence(envelope.ast, onchain.facts);
 
   // The fact and action orders are bit positions on chain, so they belong inside the hash: a
   // reordering is a different policy and must produce a different deployment.
+  // Component ids and versions are inside the hash: the hash names the blocks that enforce the document.
   const policy = {
-    version: 2, demo, profile, source: envelope.source, ast: envelope.ast, config,
+    version: 3, demo, profile, source: envelope.source, ast: envelope.ast, config,
+    components: resolution.components, coverage: resolution.coverage,
     factOrder: onchain.facts, actionOrder: onchain.actions, clauseTableHash: onchain.clauseTableHash,
   };
   policy.hash = `0x${sha256(canonical(policy))}`;
@@ -112,7 +109,7 @@ contract CompiledMirrorToken is MirrorToken {
   const javascript = `// Generated from validated data; no model-generated code is executed.\nexport const policy = ${JSON.stringify(policy, null, 2)};\n${evaluatePolicy.toString()}\nexport const evaluate = (action, facts) => evaluatePolicy(policy.ast, action, facts);\n`;
   const compiledPolicy = emitCompiledPolicy(onchain, policy.hash);
   const clauseTable = { policyHash: policy.hash, clauseTableHash: onchain.clauseTableHash, clauses: onchain.clauses };
-  return { policy, solidity, javascript, compiledPolicy, clauseTable, onchain, equivalenceChecks: checked };
+  return { policy, solidity, javascript, compiledPolicy, clauseTable, onchain, components: resolution.manifest, contracts: resolution.contracts, equivalenceChecks: checked };
 }
 
 export function verifyPolicy(policy) {

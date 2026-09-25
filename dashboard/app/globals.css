@@ -794,6 +794,7 @@ dl.kv dd {
   margin-left: auto;
 }
 .doc-scroll {
+  position: relative;
   overflow: auto;
   padding: var(--sp-md) var(--sp-lg) var(--sp-xl);
   scroll-behavior: smooth;

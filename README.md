@@ -67,7 +67,7 @@ Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right g
 
 ## Dashboard and API
 
-`npm --prefix dashboard run dev` serves http://localhost:3100 on exported data; with `NEXT_PUBLIC_GATEWAY_URL` and `NEXT_PUBLIC_GATEWAY_KEY` it runs live against `npm run dev:stack` (anvil + operator API). The clause highlighter maps every paragraph to what it compiled to and walks a rule from quote to DNF to bytes to contract; the lenders, queue, exit and audit screens drive the chain. Routes and repository map: [docs/API.md](docs/API.md).
+`npm --prefix dashboard run dev` serves http://localhost:3100 on exported data; with `NEXT_PUBLIC_GATEWAY_URL` and `NEXT_PUBLIC_GATEWAY_KEY` it runs live against `npm run dev:stack` (anvil + operator API). The clause highlighter maps every paragraph to what it compiled to and walks a rule from quote to DNF to bytes to contract; the Lenders, Decisions, Exit and History screens drive the chain. Routes and repository map: [docs/API.md](docs/API.md).
 
 ## Deploy
 

@@ -13,7 +13,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Act 1 — tokenize and trade (60 s)
 
-1. **Policy** screen, profile *Tokenize*. Show the Securitize/BlackRock agreement with every quoted span lit
+1. **Agreement** screen, profile *Tokenize*. Show the Securitize/BlackRock agreement with every quoted span lit
    and the coverage bar. Click a lit paragraph. *Eight rules, each one a verbatim quote from the hashed
    document. Terms it leaves open are flagged, not guessed.* Point at the pipeline: quote → rule → logic →
    bytes → contract → what-would-happen. *The interpreter and the on-chain bitmask agree on every input —
@@ -27,7 +27,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Act 2 — lend it out (75 s)
 
-4. **Policy**, profile *Lend it out*. *Same compiler, different paper: Wildcat's template Master Loan
+4. **Agreement**, profile *Lend it out*. *Same compiler, different paper: Wildcat's template Master Loan
    Agreement, the borrower's own Lender Check Policy, one addendum clause.* Click the §1 "Role Provider"
    paragraph. *The agreement delegates admission to a role provider — so that is what we compiled it into.*
 5. **Lenders**: A admitted, B in review, C flagged. Click B. *No countersignature — the policy quotes Lender
@@ -45,7 +45,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Close (30 s)
 
-8. **Audit**: the timeline — every decision with its clause and tx hash. *This is what takes a compliance
+8. **History**: the timeline — every decision with its clause and tx hash. *This is what takes a compliance
    team days to reconstruct.*
 9. Change one word in the agreement (prepared tab): the hash changes. *The deployed provider, hook and
    strategy keep enforcing the agreement exactly as signed. Law stays law; the code is its build artifact.*

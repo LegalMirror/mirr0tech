@@ -243,7 +243,7 @@ Existing, in working tree: `PolicyEval.sol`, `PolicyAttestor.sol`, `MirrortechRo
 - **P1 — the "sophisticated position" item.** `PoolPriceAdjuster` instruction: the issuer's Act-1 bid follows the v4 pool's TWAP plus a spread, **capped at NAV** — an on-chain ETF-style redemption window that narrows the pool discount continuously from cash that never leaves the fund. ~20 lines on top of `PolicyGuard`; it is the difference between "a position" and "a sophisticated position" in the judging text. Manipulation answer: TWAP + NAV cap.
 - **P1** Signature mode (EIP-712 order from a cold wallet, no Aqua) as the "also works without a registry" beat.
 - **P1** Maker-hook variant (`preTransferOut`) for compatibility with the canonical router on mainnets.
-- **P2** `BuybackDutchAuction` template.
+- **P2 — done.** `BuybackDutchAuction` template: the official `DutchAuctionBalanceOut` between the rate and the curve, opening at the A1.1 floor and improving to the A1.5 ceiling over the addendum's window (`buybackCeiling`, `buybackWindowHours` are compiled terms). Chain test quotes at open, midway and near the close, fills, then expires; the golden demo shows the price walk.
 
 ### 7.5 Integrations (owner: Eng B)
 
@@ -376,7 +376,7 @@ Rules of engagement: small PRs to `main`, **commit at least every couple of hour
 
 ## 11. Scope cut order (if behind)
 
-1. Dutch auction template (P2) · Merkleized clause table (P1) · signature-mode order (P1)
+1. Merkleized clause table (P1) · signature-mode order (P1)
 2. MultiBaas (opportunistic) → ethers direct
 3. Third-slot integration (ENS or World) — cut if not green by Sat 22:00; submit two prizes rather than three broken ones
 4. Payout agent (P1) — cut with option B

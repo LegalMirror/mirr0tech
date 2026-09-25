@@ -6,7 +6,7 @@ import { once } from 'node:events';
 import { JsonRpcProvider, Wallet, id, keccak256, MaxUint256 } from 'ethers';
 import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { decodeRefusal } from '../src/refusal.js';
-import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../src/policy/programs.js';
+import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../src/policy/programs.js';
 import { readDocuments, sha256 } from '../src/policy/document.js';
 
 const say = (line = '') => console.log(line);
@@ -149,6 +149,29 @@ say(`  Lender A quote: 100,000 market tokens → ${out / M} mUSDC (${Number(out)
 await (await swapRouter.connect(lenderA).swap(order, record.credit.market, record.usdc, 100_000n * M, takerData(out))).wait();
 say(`  filled: borrower mUSDC now ${await usdc.balanceOf(admin.address) / M}, borrower holds ${await market.balanceOf(admin.address) / M} of its own debt`);
 report('Stranger quotes the same strategy', await refused(quoteFor(stranger, 10n * M), clauseTables.credit));
+
+step('Act 2 · The same addendum as a tender offer: the bid improves from the floor to the ceiling');
+{
+  const opened = (await provider.getBlock('latest')).timestamp;
+  const auction = buildDutchBuybackProgram({
+    opcodes: loadOpcodes(), policyGuardOpcode: record.credit.policyGuardOpcode, fixedRateBalancesOpcode: record.credit.fixedRateBalancesOpcode,
+    policyHash: policies.credit.hash, action: policies.credit.actionOrder.indexOf('transfer'), deadline: opened + 30 * 86400,
+    positionToken: record.credit.market, asset: record.usdc, capPosition: terms.capPosition, capAssetFloor: terms.capAsset,
+    floor: terms.price, ceiling: terms.ceiling, startTime: opened, windowSeconds: terms.windowSeconds,
+  });
+  const auctionOrder = buildAquaOrder(admin.address, auction);
+  const auctionStrategy = encodeOrder(auctionOrder);
+  await (await aqua.ship(record.credit.router, auctionStrategy, [record.credit.market, record.usdc], [terms.capPosition, terms.capAssetCeiling])).wait();
+  say(`  program: Deadline · PolicyGuard · FixedRateBalances · DutchAuctionBalanceOut(${terms.windowHours}h) · LimitSwap · InvalidateTokenIn`);
+  const price = async () => Number((await swapRouter.connect(lenderA).quote.staticCall(auctionOrder, record.credit.market, record.usdc, 100_000n * M, buildTakerData({ threshold: 0n, deadline: opened + 8 * 3600 })))[1]) / Number(100_000n * M);
+  say(`  price at open          ${(await price()).toFixed(4)}  (floor ${terms.price})`);
+  await provider.send('evm_increaseTime', [3 * 3600]); await provider.send('evm_mine', []);
+  say(`  price after 3 hours    ${(await price()).toFixed(4)}`);
+  await provider.send('evm_increaseTime', [3 * 3600 - 60]); await provider.send('evm_mine', []);
+  say(`  price near the close   ${(await price()).toFixed(4)}  (ceiling ${terms.ceiling})`);
+  await (await aqua.dock(record.credit.router, keccak256(auctionStrategy), [record.credit.market, record.usdc])).wait();
+  say('  The lender chooses when to accept; the borrower never parked a cent. A tender offer, compiled.');
+}
 
 step('Act 2 · A sanctions designation lands on Lender A between screenings');
 await (await sanctions.setSanctioned(await lenderA.getAddress(), true)).wait();

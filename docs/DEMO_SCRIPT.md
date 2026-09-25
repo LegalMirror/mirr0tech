@@ -35,6 +35,8 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
    Aqua, so no capital moved. Look at the program: Deadline, then the agreement itself as an opcode, then
    the price, the curve, the cap.* Show Lender A's fill (96,000 for 100,000). Then the Stranger's quote:
    refused at quote time, clause 4.2 quoted. *Refused before a transaction exists.*
+   If time allows, the auction variant: *same addendum, clause A1.5 — the bid opens at 0.96 and improves to 1.00
+   over six hours, so the lender chooses when to accept. A tender offer, compiled from one sentence.*
 7. **Lenders** → flag Lender A (sanction toggle). Back to **Exit** → quote as A: refused, MLA 13(a).
    **Lenders** → A's payment eligibility: blocked, 13(c). *Nothing was redeployed. The same strategy stopped
    filling for that wallet, and the payment desk stopped paying it — from one oracle read.*

@@ -28,6 +28,7 @@ if (!key) throw new Error(`Set DEPLOYER_PRIVATE_KEY for chain ${chainId}`);
 const signer = new Wallet(key, provider);
 const canonical = { poolManager: process.env.POOL_MANAGER, aqua: process.env.AQUA, weth: process.env.WETH };
 const saved = process.env.DEPLOYMENT_PATH ? JSON.parse(await readFile(process.env.DEPLOYMENT_PATH, 'utf8')) : null;
+if (saved && saved.chainId !== Number(chainId)) console.warn(`DEPLOYMENT_PATH is for chain ${saved.chainId}, RPC is chain ${chainId}: deploying fresh`);
 const record = saved?.chainId === Number(chainId) ? saved : (await deployStack(signer, { borrower: process.env.BORROWER_ADDRESS, canonical, log: console.log })).record;
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);

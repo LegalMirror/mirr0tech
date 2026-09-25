@@ -36,6 +36,10 @@ test('on a public chain the demo wallets are derived from the operator key and f
   assert.equal((await venues.deposit('Lender A', '1000')).status, 'ok');
   assert.equal((await venues.wallet('Lender A')).balances.mDEMO, '1000.0');
   await assert.rejects(venues.signerFor('0x000000000000000000000000000000000000dEaD'), /NOT_LOCAL|derived demo wallet/);
+  venues.audit.push({ type: 'probe', amount: 1n });
+  await venues.persist();
   const reloaded = await new VenueService({ provider, signer, record: { ...record, chainId: 11155111 }, auditPath }).init();
-  assert.deepEqual(reloaded.audit.map((entry) => entry.type), ['attest', 'credit.deposit'], 'the audit survives a restart');
+  assert.deepEqual(reloaded.audit.map((entry) => entry.type), ['attest', 'credit.deposit', 'probe'], 'the audit survives a restart');
+  assert.equal(reloaded.audit.at(-1).amount, '1', 'bigint results persist as strings');
+  assert.equal(await (await reloaded.signerFor(lender.toLowerCase())).getAddress(), lender, 'derived wallets resolve case-insensitively');
 });

@@ -55,7 +55,7 @@ export class VenueService {
   async persist() {
     if (!this.auditPath) return;
     await mkdir(dirname(this.auditPath), { recursive: true });
-    await writeFile(this.auditPath, `${JSON.stringify(this.audit, null, 2)}\n`);
+    await writeFile(this.auditPath, `${JSON.stringify(this.audit, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2)}\n`);
   }
 
   // ---- helpers -------------------------------------------------------------------------------
@@ -73,7 +73,7 @@ export class VenueService {
     const address = this.address(wallet);
     if (address === this.wallets.Operator) return this.signer;
     if (this.record.chainId === 31337) return this.provider.getSigner(address);
-    const demo = this.demo?.find((wallet) => wallet.address === address);
+    const demo = this.demo?.find((wallet) => wallet.address.toLowerCase() === address.toLowerCase());
     if (!demo) throw new AppError(400, 'NOT_LOCAL', 'Acting as this wallet needs the local chain or a derived demo wallet');
     return demo;
   }

@@ -1,6 +1,6 @@
 // Serves the JSON written by `npm run ui:export` and keeps mock parties in memory, so the queue and
 // the lender list stay consistent for the length of a session.
-import type { AuditEvent, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
+import type { AuditEvent, Deployment, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
 import { mockAudit, mockParties } from "./mock";
 import type { DataSource } from "./types";
 
@@ -41,6 +41,10 @@ export const staticSource: DataSource = {
   },
   parties: async (profile) => structuredClone(partiesOf(profile)),
   audit: async (profile): Promise<AuditEvent[]> => mockAudit(profile),
+  deployment: async () => {
+    const response = await fetch("/data/deployment.json");
+    return response.ok ? ((await response.json()) as Deployment) : null;
+  },
   attest: async (profile, id, facts: Record<string, Tri>) =>
     update(profile, id, (party) => {
       Object.assign(party.facts, facts);

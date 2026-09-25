@@ -231,3 +231,13 @@ export type AuditEvent = {
   explorer?: string | null;
   venue: string;
 };
+
+/** Where the stack lives: the record `scripts/deploy-stack.js` writes, as `/v1/stack` serves it */
+export type Deployment = {
+  chainId: number;
+  attestor: string;
+  sanctions: string;
+  usdc: string;
+  rwa: { policyHash: string; oracle: string; token: string; hook: string; router: string; poolManager: string };
+  credit: { policyHash: string; oracle: string; roleProvider: string; market: string; router: string; aqua: string };
+};

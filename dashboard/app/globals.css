@@ -1696,3 +1696,18 @@ blockquote.quote {
 .doc-filtered .para + .para {
   margin-top: 0.7em;
 }
+
+/* Deployed contracts strip on the policy page */
+.deployed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 1rem;
+  padding: 0.6rem 1rem;
+}
+.deployed-item {
+  white-space: nowrap;
+}
+.deployed a {
+  text-decoration: none;
+}

@@ -1,4 +1,4 @@
-import type { AuditEvent, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
+import type { AuditEvent, Deployment, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
 
 /**
  * Everything a screen reads or changes. The static source serves exported JSON and mock parties; the
@@ -10,6 +10,8 @@ export interface DataSource {
   policy(profile: ProfileId): Promise<PolicyData>;
   parties(profile: ProfileId): Promise<Party[]>;
   audit(profile: ProfileId): Promise<AuditEvent[]>;
+  /** The deployed contracts, or null when nothing is deployed for this build */
+  deployment(): Promise<Deployment | null>;
   attest(profile: ProfileId, partyId: string, facts: Record<string, Tri>): Promise<Party>;
   resolve(profile: ProfileId, partyId: string, verdict: "approve" | "reject"): Promise<Party>;
   revoke(profile: ProfileId, partyId: string): Promise<Party>;

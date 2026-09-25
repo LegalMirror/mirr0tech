@@ -471,6 +471,7 @@ export async function exportAll(outDir = OUT) {
     console.log(`ui:export ${spec.profile.padEnd(15)} ${exported.rules.length} rules · ${exported.terms.length} terms · ${exported.unresolved.length} unresolved · paragraphs ${counts.compiled}/${counts.unresolved}/${counts['not-executable']} of ${total} · ${exported.policyHash}`);
   }
   await writeFile(`${outDir}/index.json`, `${JSON.stringify({ profiles }, null, 2)}\n`);
+  if (existsSync(at('deployments/sepolia.json'))) await writeFile(`${outDir}/deployment.json`, await readFile(at('deployments/sepolia.json'), 'utf8'));
   return profiles;
 }
 

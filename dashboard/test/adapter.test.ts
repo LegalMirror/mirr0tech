@@ -41,6 +41,14 @@ describe("staticSource", () => {
     await expect(staticSource.attest("wildcat-credit", "nobody", {})).rejects.toThrow(/Unknown party/);
   });
 
+  it("serves the exported deployment and null when the build has none", async () => {
+    const record = { chainId: 11155111, attestor: "0xa" };
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(record))));
+    expect(await staticSource.deployment()).toEqual(record);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    expect(await staticSource.deployment()).toBeNull();
+  });
+
   it("serves mock parties and audit events per profile", async () => {
     expect((await staticSource.parties("custodial-rwa")).every((party) => party.role !== "lender")).toBe(
       true
@@ -68,6 +76,7 @@ describe("gatewaySource", () => {
     await gateway.attest("wildcat-credit", "lender-b", { mlaCountersigned: true });
     await gateway.resolve("wildcat-credit", "lender-b", "reject");
     await gateway.revoke("wildcat-credit", "lender-a");
+    expect(await gateway.deployment()).toBeNull();
     expect(calls.map((call) => `${call.init.method ?? "GET"} ${call.url}`)).toEqual([
       "GET http://gw.test/v1/policy?profile=wildcat-credit",
       "GET http://gw.test/v1/lenders?profile=wildcat-credit",
@@ -75,6 +84,7 @@ describe("gatewaySource", () => {
       "PATCH http://gw.test/v1/lenders/lender-b/attestations?profile=wildcat-credit",
       "POST http://gw.test/v1/lenders/lender-b/reject?profile=wildcat-credit",
       "POST http://gw.test/v1/lenders/lender-a/revoke?profile=wildcat-credit",
+      "GET http://gw.test/v1/stack",
     ]);
     const headers = calls[3].init.headers as Record<string, string>;
     expect(headers["idempotency-key"]).toMatch(/[0-9a-f-]{36}/);

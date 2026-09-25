@@ -7,7 +7,7 @@ import { factKind, OBSERVABLE_SOURCE } from "@/lib/facts";
 import { fmtTime, short } from "@/lib/format";
 import { credentialExpiry, effectiveFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
-import { Failed, Loading, PageHead, TriChip } from "../_components/common";
+import { Failed, Loading, PageHead, Refusal, TriChip } from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
 
 const unix = (seconds: number) => fmtTime(new Date(seconds * 1000).toISOString());
@@ -18,7 +18,6 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
   const status = explain(policy, statusAction(policy), facts);
   const actions = [...new Set(policy.rules.map((rule) => rule.action))];
   const expiry = credentialExpiry(policy, party);
-  const failing = policy.clauseTable.find((entry) => entry.clauseId === status.onchain.clauseId);
   const attested = Object.entries(party.facts);
   const credit = policy.profile === "wildcat-credit";
   return (
@@ -48,14 +47,8 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
       </div>
 
       {!status.onchain.allowed && (
-        <p className="small">
-          {failing ? (
-            <>
-              <strong>{failing.clause}</strong> — “{failing.quote}”
-            </>
-          ) : (
-            <>No permit holds yet (clause 0).</>
-          )}
+        <p>
+          <Refusal policy={policy} action={statusAction(policy)} clauseId={status.onchain.clauseId} />
         </p>
       )}
 

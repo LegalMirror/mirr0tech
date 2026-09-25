@@ -7,6 +7,7 @@ import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
 import { AppError } from './errors.js';
+import { indexedEvents } from './multibaas.js';
 
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 const TICK_SPACING = 60;
@@ -14,8 +15,14 @@ const M = 1_000_000n;
 export const DEMO_WALLETS = ['Investor', 'Stranger', 'Lender A', 'Lender B', 'Lender C'];
 
 export class VenueService {
-  constructor({ provider, signer, record, log = () => {} }) {
-    Object.assign(this, { provider, signer, record, log, audit: [], orders: [] });
+  constructor({ provider, signer, record, multibaas = null, log = () => {} }) {
+    Object.assign(this, { provider, signer, record, multibaas, log, audit: [], orders: [] });
+  }
+
+  /// Indexed events from MultiBaas when a deployment is registered there; the local audit otherwise.
+  async events(contractLabel, eventSignature) {
+    if (!this.multibaas) return { source: 'local', events: this.audit };
+    return { source: 'multibaas', events: await indexedEvents(this.multibaas, { contractLabel, eventSignature }) };
   }
 
   async init() {

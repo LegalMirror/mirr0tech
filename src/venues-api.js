@@ -33,5 +33,6 @@ export function venueRoutes(venues) {
   router.post('/credit/buyback/dock', wrap(async () => venues.dock()));
 
   router.get('/audit', wrap(async () => venues.audit));
+  router.get('/events', wrap(async (req) => venues.events(req.query.contract, req.query.event)));
   return router;
 }

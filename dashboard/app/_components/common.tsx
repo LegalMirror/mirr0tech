@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { decodeRefusal } from "@/lib/decode";
 import { short } from "@/lib/format";
 import type { Effect, PolicyData, Tri } from "@/lib/types";
 import { clauseTableMatches } from "@/lib/verify";
@@ -90,4 +91,38 @@ export function ClauseTableBadge({ policy }: { policy: PolicyData }) {
 
 export function HexCopy({ value }: { value: string }) {
   return <CopyButton text={value} label="Copy hex" />;
+}
+
+/** A refusal rendered as the sentence behind it. */
+export function Refusal({
+  policy,
+  action,
+  clauseId,
+}: {
+  policy: PolicyData;
+  action: string;
+  clauseId: number;
+}) {
+  const decoded = decodeRefusal(policy, action, clauseId);
+  return (
+    <span className="small">
+      {decoded.kind === "no-permit" && (
+        <>
+          <code>clauseId 0</code> — no permit of <code>{action}</code> held
+          {decoded.clauses.length ? "; it is permitted only by " : ""}
+        </>
+      )}
+      {decoded.clauses.map((entry, index) => (
+        <span key={entry.clauseId}>
+          {index > 0 && " · "}
+          {decoded.kind === "clause" && (
+            <>
+              <code>clauseId {entry.clauseId}</code> →{" "}
+            </>
+          )}
+          <strong>{entry.clause}</strong> — “{entry.quote}”
+        </span>
+      ))}
+    </span>
+  );
 }

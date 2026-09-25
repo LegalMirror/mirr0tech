@@ -92,3 +92,22 @@ describe("gatewaySource", () => {
     );
   });
 });
+
+describe("enforcement map", () => {
+  it("names a venue with a refusal for every action a profile compiles", async () => {
+    const { venuesFor, renderRefusal } = await import("@/lib/enforcement");
+    expect(venuesFor("rwa-secondary", "transfer").map((venue) => venue.refusal?.name)).toEqual([
+      "LegalClauseViolation",
+      "TransferRefused",
+      "NoPolicyDoor",
+    ]);
+    expect(venuesFor("wildcat-credit", "transfer").map((venue) => venue.refusal?.name)).toContain(
+      "CounterpartyRefused"
+    );
+    expect(venuesFor("custodial-rwa", "deposit")).toEqual([]);
+    const [guard] = venuesFor("wildcat-credit", "transfer");
+    expect(renderRefusal(guard.refusal!, { clauseId: 14, policyHash: "0xabc", subject: "0x57" })).toBe(
+      "CounterpartyRefused(0x57, 14, 0xabc)"
+    );
+  });
+});

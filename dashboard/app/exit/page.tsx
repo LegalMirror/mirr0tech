@@ -5,7 +5,7 @@ import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
 import { effectiveFacts } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
-import { ClauseTableBadge, Failed, Hash, Loading, PageHead } from "../_components/common";
+import { ClauseTableBadge, Failed, Hash, Loading, PageHead, Refusal } from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
 import { useProfile } from "../providers";
 
@@ -51,9 +51,6 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
     : null;
   const termOf = (name: string) => policy.terms.find((term) => term.name === name);
   const refused = result && !result.ok && "subject" in result ? result : null;
-  const refusedClause = refused
-    ? policy.clauseTable.find((entry) => entry.clauseId === refused.clauseId)
-    : null;
 
   return (
     <>
@@ -198,13 +195,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
               </code>
               <span className="small">
                 {refused.subject.role === "borrower" ? "The maker" : "The taker"} was refused by{" "}
-                {refusedClause ? (
-                  <>
-                    <strong>{refusedClause.clause}</strong> — “{refusedClause.quote}”
-                  </>
-                ) : (
-                  <>clause 0 — no transfer permit holds</>
-                )}
+                <Refusal policy={policy} action="transfer" clauseId={refused.clauseId} />
               </span>
               <ClauseTableBadge policy={policy} />
             </div>
@@ -240,9 +231,10 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
       </p>
       {transferRules.length === 0 && (
         <p className="small">
-          <span className="chip chip-warn">no transfer permit</span> This custodial agreement compiles no
-          transfer rule yet, so every pool operation is refused with <code>clauseId 0</code> until a
-          secondary-trading profile adds one.
+          <span className="chip chip-warn">no transfer permit</span> The custodial reading compiles no
+          transfer rule, so every pool operation is refused with <code>clauseId 0</code> and the token itself
+          reverts <code>TransfersDisabled()</code>. The <strong>Trade on v4</strong> profile adds the transfer
+          rules the hook enforces.
         </p>
       )}
       <div className="tbl-wrap">
@@ -257,7 +249,6 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
           <tbody>
             {parties.map((party) => {
               const decision = explain(policy, "transfer", effectiveFacts(policy, party)).onchain;
-              const clause = policy.clauseTable.find((entry) => entry.clauseId === decision.clauseId);
               return (
                 <tr key={party.id}>
                   <td>{party.name}</td>
@@ -274,9 +265,7 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
                         <code className="revert">
                           LegalClauseViolation({decision.clauseId}, {short(policy.policyHash, 8, 4)})
                         </code>
-                        <span className="small muted">
-                          {clause ? `${clause.clause} — “${clause.quote}”` : "no matching permission"}
-                        </span>
+                        <Refusal policy={policy} action="transfer" clauseId={decision.clauseId} />
                       </>
                     )}
                   </td>
@@ -315,6 +304,14 @@ export default function ExitPage() {
         ) : (
           <HookCard policy={policy.data} parties={parties.data} />
         ))}
+      {profile === "custodial-rwa" && (
+        <p className="small muted">
+          <button className="linkish" onClick={() => setProfile("rwa-secondary")}>
+            Switch to Trade on v4
+          </button>{" "}
+          to see the hook admit an onboarded investor and quote Exhibit A to a stranger.
+        </p>
+      )}
       {!credit && (
         <p className="small muted">
           The lender exit lives in Act 2.{" "}

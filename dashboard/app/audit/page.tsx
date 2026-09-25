@@ -6,7 +6,7 @@ import { explain } from "@/lib/evaluate";
 import { fmtTime, short } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
 import type { AuditEvent, PolicyData } from "@/lib/types";
-import { EffectChip, Failed, Loading, PageHead, TriChip } from "../_components/common";
+import { EffectChip, Failed, Loading, PageHead, Refusal, TriChip } from "../_components/common";
 import { useProfile, usePolicy } from "../providers";
 
 const TONE: Record<string, string> = {
@@ -17,7 +17,6 @@ const TONE: Record<string, string> = {
 
 function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
   const result = explain(policy, event.action, event.facts);
-  const failing = policy.clauseTable.find((entry) => entry.clauseId === result.onchain.clauseId);
   return (
     <li style={{ "--tone": TONE[result.verdict] } as CSSProperties}>
       <details>
@@ -40,11 +39,11 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
                 PolicyEval.decide → ({String(result.onchain.allowed)}, {result.onchain.clauseId})
               </code>
             </dd>
-            {failing && (
+            {!result.onchain.allowed && (
               <>
                 <dt>Clause</dt>
                 <dd>
-                  <strong>{failing.clause}</strong> — “{failing.quote}”
+                  <Refusal policy={policy} action={event.action} clauseId={result.onchain.clauseId} />
                 </dd>
               </>
             )}

@@ -4,21 +4,22 @@ import type { ProfileId } from "@/lib/types";
 import { useProfile } from "./providers";
 
 const OPTIONS: { profile: ProfileId; act: string; label: string; doc: string }[] = [
+  { profile: "custodial-rwa", act: "Act 1", label: "Tokenize", doc: "Securitize transfer-agent agreement" },
   {
-    profile: "custodial-rwa",
+    profile: "rwa-secondary",
     act: "Act 1",
-    label: "Tokenize & trade",
-    doc: "Securitize transfer-agent agreement",
+    label: "Trade on v4",
+    doc: "Securitize agreement + the transfer rules the Uniswap v4 hook enforces",
   },
   {
     profile: "wildcat-credit",
     act: "Act 2",
-    label: "Lend it out",
+    label: "Lend",
     doc: "Wildcat MLA + Lender Check Policy + addendum",
   },
 ];
 
-/** One compiler, two documents: the switch every screen reads. */
+/** One compiler, several documents: the switch every screen reads. */
 export function ProfileSwitch() {
   const { profile, setProfile } = useProfile();
   return (

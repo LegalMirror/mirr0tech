@@ -19,8 +19,13 @@ const OPCODES = at('vendor/swap-vm/src/opcodes/LimitOpcodes.sol');
 
 export const PROFILES = [
   {
-    profile: 'custodial-rwa', act: 1, label: 'Tokenize & trade', venue: 'Fund token + Uniswap v4 hook',
+    profile: 'custodial-rwa', act: 1, label: 'Tokenize', venue: 'Permissioned fund token (custodial mint and burn)',
     documents: ['test/human_contracts/ea026411904ex10-9.htm'], config: 'examples/demo-config.json', fixture: sampleFixture,
+  },
+  {
+    profile: 'rwa-secondary', act: 1, label: 'Trade on Uniswap', venue: 'Fund token + Uniswap v4 policy hook',
+    documents: ['test/human_contracts/ea026411904ex10-9.htm'], config: 'examples/rwa-secondary-config.json',
+    fixture: (document) => sampleFixture(document, { secondary: true }),
   },
   {
     profile: 'wildcat-credit', act: 2, label: 'Lend it out', venue: 'Wildcat role provider + 1inch Aqua exit',

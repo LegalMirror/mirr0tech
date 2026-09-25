@@ -6,7 +6,7 @@ import { explain, factsForAction, factsOfCondition, hex, type Facts } from "@/li
 import { factKind } from "@/lib/facts";
 import { short } from "@/lib/format";
 import type { PolicyData, Tri } from "@/lib/types";
-import { EffectChip, TriChip } from "../_components/common";
+import { EffectChip, Refusal, TriChip } from "../_components/common";
 
 export type Preset = { name: string; facts: Facts };
 export type EvaluatorProps = {
@@ -68,7 +68,6 @@ export function Evaluator({
   const focusRule = policy.rules.find((rule) => rule.id === focus);
   const focusFacts = focusRule ? factsOfCondition(focusRule.condition) : new Set<string>();
   const result = explain(policy, action, facts);
-  const failing = policy.clauseTable.find((entry) => entry.clauseId === result.onchain.clauseId);
   const venues = venuesFor(policy.profile, action);
 
   return (
@@ -131,16 +130,9 @@ export function Evaluator({
         </div>
         {!result.onchain.allowed && (
           <>
-            {failing ? (
-              <div className="small">
-                failing clause <code>{failing.clauseId}</code> <strong>{failing.clause}</strong> (
-                {failing.ruleId}) — “{failing.quote}”
-              </div>
-            ) : (
-              <div className="small">
-                clause <code>0</code> — no permit of <code>{action}</code> holds (NO_MATCHING_PERMISSION)
-              </div>
-            )}
+            <div>
+              <Refusal policy={policy} action={action} clauseId={result.onchain.clauseId} />
+            </div>
             {venues
               .filter((venue) => venue.refusal)
               .map((venue) => (

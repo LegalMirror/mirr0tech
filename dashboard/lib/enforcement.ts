@@ -20,6 +20,23 @@ export type Venue = {
 const ROLE_PROVIDER = "contracts/MirrortechRoleProvider.sol";
 const MARKET = "contracts/MockWildcatMarket.sol";
 const HOOK = "contracts/MirrorPolicyHook.sol";
+const TOKEN = "contracts/MirrorToken.sol";
+
+const GATEWAY_MINT: Venue = {
+  contract: "Gateway → MirrorToken.mint",
+  file: "src/service.js",
+  calls: ["evaluatePolicy(ast, 'mint', facts)", "MirrorToken.mint(operationId, amount)"],
+  when: "before the custodial mint is signed",
+  refusal: null,
+  note: "HTTP 403 POLICY_DENIED with the failing rule ids; nothing reaches the chain",
+};
+
+const GATEWAY_BURN: Venue = {
+  ...GATEWAY_MINT,
+  contract: "Gateway → MirrorToken.burn",
+  calls: ["evaluatePolicy(ast, 'burn', facts)", "MirrorToken.burn(operationId, amount)"],
+  when: "before the redemption burn is signed",
+};
 
 const HOOK_VENUE: Venue = {
   contract: "MirrorPolicyHook (Uniswap v4)",
@@ -78,27 +95,39 @@ const VENUES: Record<ProfileId, Record<string, Venue[]>> = {
     ],
   },
   "custodial-rwa": {
-    mint: [
+    mint: [GATEWAY_MINT],
+    burn: [GATEWAY_BURN],
+    transfer: [
       {
-        contract: "Gateway → MirrorToken.mint",
-        file: "src/service.js",
-        calls: ["evaluatePolicy(ast, 'mint', facts)", "MirrorToken.mint(operationId, amount)"],
-        when: "before the custodial mint is signed",
-        refusal: null,
-        note: "HTTP 403 POLICY_DENIED with the failing rule ids; nothing reaches the chain",
+        contract: "MirrorToken",
+        file: TOKEN,
+        calls: ["_update(from, to, value)"],
+        when: "every peer transfer; this agreement compiles no transfer permit",
+        refusal: { name: "TransfersDisabled", params: [] },
       },
     ],
-    burn: [
+  },
+  "rwa-secondary": {
+    mint: [GATEWAY_MINT],
+    burn: [GATEWAY_BURN],
+    transfer: [
+      HOOK_VENUE,
       {
-        contract: "Gateway → MirrorToken.burn",
-        file: "src/service.js",
-        calls: ["evaluatePolicy(ast, 'burn', facts)", "MirrorToken.burn(operationId, amount)"],
-        when: "before the redemption burn is signed",
-        refusal: null,
-        note: "HTTP 403 POLICY_DENIED with the failing rule ids; nothing reaches the chain",
+        contract: "MirrorToken (transfer gate)",
+        file: TOKEN,
+        calls: ["_update → policyOracle.mayTransfer(to)"],
+        when: "a transfer out of custody to a wallet",
+        refusal: { name: "TransferRefused", params: ["subject", "clauseId"] },
+      },
+      {
+        contract: "MirrorToken (the only door into Uniswap)",
+        file: TOKEN,
+        calls: ["_update → venueHook.approvedSubject()"],
+        when: "any settlement with PoolManager from a pool that did not run the hook",
+        refusal: { name: "NoPolicyDoor", params: ["subject"] },
+        note: "a hookless pool initializes, then its first settlement reverts at the token",
       },
     ],
-    transfer: [HOOK_VENUE],
   },
 };
 

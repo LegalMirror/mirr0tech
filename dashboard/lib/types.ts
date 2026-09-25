@@ -1,6 +1,6 @@
 // Shapes written by scripts/export-ui.js. A gateway that serves GET /v1/policy returns the same shape.
 
-export type ProfileId = "custodial-rwa" | "wildcat-credit";
+export type ProfileId = "custodial-rwa" | "rwa-secondary" | "wildcat-credit";
 export type Effect = "permit" | "require" | "forbid";
 export type Tri = boolean | null;
 

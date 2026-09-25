@@ -173,7 +173,10 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
     if (!target) return;
     const box = scroller.current;
     const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
-    box.scrollTo({ top: Math.max(0, top - box.clientHeight / 3), behavior: "smooth" });
+    box.scrollTo({
+      top: Math.max(0, top - box.clientHeight / 3),
+      behavior: scrollKey === 1 ? "auto" : "smooth",
+    });
   }, [selected, scrollKey]);
 
   const stateOf = (line: Line) => {

@@ -5,7 +5,7 @@ import { canonical, clauseTableMatches, sha256Hex } from "@/lib/verify";
 import { anchorFor, annotateProgram, displayOf } from "../../scripts/export-ui.js";
 import { compiled } from "./fixtures";
 
-const PROFILES = ["custodial-rwa", "wildcat-credit"] as const;
+const PROFILES = ["custodial-rwa", "rwa-secondary", "wildcat-credit"] as const;
 const collapse = (text: string) => text.replace(/\s+/g, " ").trim();
 
 describe("displayOf", () => {

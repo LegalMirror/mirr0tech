@@ -16,7 +16,7 @@ import type { PolicyData } from "@/lib/types";
 import { evaluatePolicy as original } from "../../src/policy/evaluate.js";
 import { compiled } from "./fixtures";
 
-const PROFILES = ["custodial-rwa", "wildcat-credit"] as const;
+const PROFILES = ["custodial-rwa", "rwa-secondary", "wildcat-credit"] as const;
 
 /** Every three-valued assignment of `names`, as the compile-time proof enumerates them. */
 function* assignments(names: string[]): Generator<Facts> {
@@ -130,5 +130,37 @@ describe("verdictOf", () => {
     expect(names.map((name) => policy.factOrder.indexOf(name))).toEqual(
       [...names.map((name) => policy.factOrder.indexOf(name))].sort((a, b) => a - b)
     );
+  });
+});
+
+describe("the secondary RWA profile", () => {
+  it("admits an onboarded investor at the pool and refuses a stranger with the onboarding clause", async () => {
+    const policy = await compiled("rwa-secondary");
+    const onboarded: Facts = { kycApproved: true, amlApproved: true, sanctionsClear: true };
+    expect(explain(policy, "transfer", onboarded).onchain).toEqual({ allowed: true, clauseId: 0 });
+    const stranger = explain(policy, "transfer", {
+      kycApproved: false,
+      amlApproved: false,
+      sanctionsClear: true,
+    });
+    expect(stranger.onchain.allowed).toBe(false);
+    const clause = policy.clauseTable.find((entry) => entry.clauseId === stranger.onchain.clauseId);
+    expect(clause?.clause ?? "no permit").toMatch(/Exhibit A|no permit/);
+    const sanctioned = explain(policy, "transfer", { ...onboarded, sanctionsClear: false });
+    expect(sanctioned.verdict).toBe("deny");
+  });
+});
+
+describe("decodeRefusal", () => {
+  it("names a failing clause, or the permits a wallet failed to satisfy when clauseId is 0", async () => {
+    const { decodeRefusal } = await import("@/lib/decode");
+    const policy = await compiled("rwa-secondary");
+    const permits = decodeRefusal(policy, "transfer", 0);
+    expect(permits.kind).toBe("no-permit");
+    expect(permits.clauses.map((entry) => entry.ruleId)).toEqual(["transfer-onboarded-holder"]);
+    expect(permits.clauses[0].clause).toBe("Exhibit A — Investor Onboarding");
+    const forbid = policy.rules.find((rule) => rule.id === "transfer-sanctions-block")!;
+    const named = decodeRefusal(policy, "transfer", forbid.clauseId);
+    expect(named).toEqual({ kind: "clause", clauses: [expect.objectContaining({ ruleId: forbid.id })] });
   });
 });

@@ -27,9 +27,12 @@
     "deploy:stack": "node scripts/deploy-stack.js",
     "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js",
     "demo:golden": "node scripts/demo-golden.js",
-    "dev:stack": "node scripts/dev-stack.js"
+    "dev:stack": "node scripts/dev-stack.js",
+    "multibaas:sync": "node scripts/multibaas-sync.js",
+    "deploy:sepolia": "node scripts/deploy-stack.js && node scripts/multibaas-sync.js"
   },
   "dependencies": {
+    "@curvegrid/multibaas-sdk": "^1.1.1",
     "@openzeppelin/contracts": "5.6.1",
     "@uniswap/v4-core": "^1.0.2",
     "ajv": "8.20.0",

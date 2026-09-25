@@ -6,7 +6,7 @@ import { useResource, type Resource } from "@/lib/hooks";
 import type { PolicyData, ProfileId } from "@/lib/types";
 
 const KEY = "mirrortech.profile";
-const PROFILES: ProfileId[] = ["custodial-rwa", "wildcat-credit"];
+const PROFILES: ProfileId[] = ["custodial-rwa", "rwa-secondary", "wildcat-credit"];
 
 type ProfileState = { profile: ProfileId; setProfile: (profile: ProfileId) => void };
 const ProfileContext = createContext<ProfileState | null>(null);
@@ -27,6 +27,9 @@ export function usePolicy(): Resource<PolicyData> {
 export function Providers({ children }: { children: ReactNode }) {
   const [profile, set] = useState<ProfileId>("wildcat-credit");
   useEffect(() => {
+    // A link can name the profile (?profile=rwa-secondary); otherwise the last choice is remembered.
+    const linked = new URLSearchParams(window.location.search).get("profile") as ProfileId | null;
+    if (linked && PROFILES.includes(linked)) return set(linked);
     try {
       const saved = localStorage.getItem(KEY) as ProfileId | null;
       if (saved && PROFILES.includes(saved)) set(saved);

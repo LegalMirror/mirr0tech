@@ -607,7 +607,7 @@ dl.kv dd {
 /* ── profile switch ── */
 .pf-switch {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
   margin: 0 0 var(--sp-sm);
@@ -797,7 +797,7 @@ dl.kv dd {
   position: relative;
   overflow: auto;
   padding: var(--sp-md) var(--sp-lg) var(--sp-xl);
-  scroll-behavior: smooth;
+
 }
 .doc-part + .doc-part {
   margin-top: var(--sp-xl);

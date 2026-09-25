@@ -6,6 +6,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet } from 'ethers';
 import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { VenueService } from '../src/venues.js';
+import { multibaasClient } from '../src/multibaas.js';
 import { createApp } from '../src/app.js';
 
 let anvil = null;
@@ -27,7 +28,8 @@ const canonical = { poolManager: process.env.POOL_MANAGER, aqua: process.env.AQU
 const { record } = await deployStack(signer, { borrower: process.env.BORROWER_ADDRESS, canonical, log: console.log });
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
-const venues = await new VenueService({ provider, signer, record }).init();
+const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaasClient() : null;
+const venues = await new VenueService({ provider, signer, record, multibaas }).init();
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
 const server = createApp(null, apiKey, venues).listen(Number(process.env.PORT ?? 3000), host, () =>

@@ -14,9 +14,17 @@ npm --prefix dashboard run build # export + static site in dashboard/out/
 npm --prefix dashboard test      # vitest: evaluator port, segmentation, export, adapters
 ```
 
-`npm run ui:export` (repository root) compiles both profiles in-process with `{ demo: true }` and writes
-`dashboard/public/data/{index,custodial-rwa,wildcat-credit}.json`. It never touches `generated/`.
-The buyback program is decoded only when `vendor/swap-vm` exists (`npm run vendor`).
+`npm run ui:export` (repository root) compiles every profile in-process with `{ demo: true }` and writes
+`dashboard/public/data/{index,custodial-rwa,rwa-secondary,wildcat-credit}.json`. It never touches
+`generated/`. The buyback program is decoded only when `vendor/swap-vm` exists (`npm run vendor`).
+
+| Switch | Profile | Documents |
+|---|---|---|
+| Act 1 · Tokenize | `custodial-rwa` | Securitize/BlackRock transfer-agent agreement → custodial mint and burn |
+| Act 1 · Trade on v4 | `rwa-secondary` | the same agreement plus the transfer rules the Uniswap v4 hook enforces |
+| Act 2 · Lend | `wildcat-credit` | Wildcat MLA + Lender Check Policy + buyback addendum |
+
+A link can pick the profile: `/?profile=rwa-secondary`, `/exit?profile=wildcat-credit`.
 
 ## Screens
 

@@ -84,7 +84,13 @@ Developer feedback: the instruction/router split made adding an opcode a 40-line
 
 ## How we used Curvegrid MultiBaas
 
-Not on the local-chain path. Everything above runs on anvil through ethers; the deploy module is RPC-agnostic and takes canonical venue addresses from the environment, so a Sepolia deployment through MultiBaas (contract upload, TXM-signed attestations, event webhooks feeding the audit screen) is a configuration step, not a code change. See `docs/PRD.md` §7.5 for the intended usage and what we evaluated.
+`src/multibaas.js` registers a deployment with a MultiBaas instance: every contract's ABI and bytecode is uploaded under a label and a **policy-hash version** (`policy-<hash8>`), each address is aliased (`attestor`, `fund_token`, `fund_hook`, `role_provider`, `aqua`, `swapvm_router`, …) and linked, so MultiBaas indexes `Attested`/`Revoked`/`Overridden`, `CredentialDecision`, `PolicyChecked`, Aqua's `Pushed`/`Pulled` and the router's `Swapped`. The stack API serves them at `GET /v1/stack/events?contract=…&event=…` when configured, and the audit screen reads that; the transaction explorer decodes calls without Etherscan verification.
+
+```sh
+MULTIBAAS_URL=… MULTIBAAS_API_KEY=… RPC_URL=<sepolia> DEPLOYER_PRIVATE_KEY=… AQUA=0x1111113ccf1426a8e30e2bff5e005d929bf6a90a npm run deploy:sepolia
+```
+
+MultiBaas only sees chains it supports, so development and every test stay on anvil; the sync is a post-deploy step on Sepolia. `test/multibaas.test.js` covers the registration against a fake client. Feedback: the SDK's `createContract` / `setAddress` / `linkAddressContract` triple is exactly the right granularity for a compiler that emits versioned contracts — version = policy hash is a natural fit; we would have liked a supported-chain check in the SDK and an idempotent "upsert" so re-syncs need no conflict handling.
 
 ## Stack API — drive both acts without a terminal
 

@@ -29,7 +29,8 @@
     "demo:golden": "node scripts/demo-golden.js",
     "dev:stack": "node scripts/dev-stack.js",
     "multibaas:sync": "node scripts/multibaas-sync.js",
-    "deploy:sepolia": "node scripts/deploy-stack.js && node scripts/multibaas-sync.js"
+    "deploy:sepolia": "node scripts/deploy-stack.js && node scripts/multibaas-sync.js",
+    "seed:stack": "node scripts/seed-stack.js"
   },
   "dependencies": {
     "@curvegrid/multibaas-sdk": "^1.1.1",

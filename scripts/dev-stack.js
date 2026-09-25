@@ -36,6 +36,6 @@ const venues = await new VenueService({ provider, signer, record, multibaas, aud
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
-const server = createApp(null, apiKey, venues, policyData).listen(Number(process.env.PORT ?? 3000), host, () =>
+const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

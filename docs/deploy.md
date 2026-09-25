@@ -21,8 +21,8 @@ no host ports in the production compose, everything as environment.
 3. Attach domains to `api` (3200) and `dashboard` (3100). CORS is open; the bearer token is the gate.
 4. Deploy. `api` becomes healthy once `/health` reports both policy hashes (start period 120 s).
 
-`NEXT_PUBLIC_GATEWAY_KEY` is compiled into the browser bundle: anyone opening the dashboard can read it.
-Fine for the demo; do not reuse it as a production operator key.
+`NEXT_PUBLIC_GATEWAY_KEY` is compiled into the browser bundle, so a public dashboard gets `VIEWER_KEY`
+(GET routes only: policy, lenders, audit, quotes). The operator drives writes from a build carrying `API_KEY`.
 
 ## Locally
 

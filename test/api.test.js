@@ -34,3 +34,20 @@ test('REST API enforces operator auth, validation, policy and a full mint/redemp
   const response = await fetch(`${url}/v1/investors`, { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: '{' });
   assert.equal(response.status, 400);
 });
+
+test('a viewer key opens the GET routes only', async (t) => {
+  const { service } = await setup(t);
+  const key = 'a-test-operator-key-at-least-24-characters';
+  const viewer = 'a-test-viewer-key-at-least-24-characters!';
+  assert.throws(() => createApp(service, key, null, null, 'short'), /VIEWER_KEY/);
+  assert.throws(() => createApp(service, key, null, null, key), /different/);
+  const server = createApp(service, key, null, null, viewer).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  t.after(() => new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); }));
+  const url = `http://127.0.0.1:${server.address().port}`;
+  const as = (token, path, method = 'GET') => fetch(`${url}${path}`, { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(method === 'POST' ? { body: '{}' } : {}) });
+  assert.equal((await as(viewer, '/v1/policy')).status, 200);
+  assert.equal((await as(viewer, '/v1/investors', 'POST')).status, 401, 'a viewer cannot write');
+  assert.equal((await as('a-wrong-token-that-is-long-enough-too', '/v1/policy')).status, 401);
+  assert.equal((await as(key, '/v1/investors', 'POST')).status, 400, 'the operator key still writes');
+});

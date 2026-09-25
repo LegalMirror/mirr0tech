@@ -8,8 +8,10 @@ function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
 }
 // `service` is the custodial issuance ledger (optional); `venues` is the deployed two-act stack (optional).
-export function createApp(service, apiKey, venues = null, policyData = null) {
+/// `viewerKey`, when set, opens the GET routes only: a dashboard build can carry it without carrying the operator key.
+export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
+  if (viewerKey && (viewerKey.length < 24 || viewerKey === apiKey)) throw new Error('Set VIEWER_KEY to at least 24 characters, different from API_KEY');
   const app = express();
   app.disable('x-powered-by');
   app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
@@ -25,9 +27,9 @@ export function createApp(service, apiKey, venues = null, policyData = null) {
   }));
   app.use('/v1', (req, _res, next) => {
     const actual = Buffer.from(req.headers.authorization ?? '');
-    const expected = Buffer.from(`Bearer ${apiKey}`);
-    if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) return next(new AppError(401, 'UNAUTHORIZED', 'A valid operator bearer token is required'));
-    next();
+    const presents = (key) => { const expected = Buffer.from(`Bearer ${key}`); return actual.length === expected.length && timingSafeEqual(actual, expected); };
+    if (presents(apiKey) || (viewerKey && req.method === 'GET' && presents(viewerKey))) return next();
+    next(new AppError(401, 'UNAUTHORIZED', 'A valid operator bearer token is required'));
   });
   app.use(express.json({ limit: '32kb' }));
   if (venues) app.use('/v1/stack', venueRoutes(venues));

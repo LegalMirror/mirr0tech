@@ -33,6 +33,7 @@ services:
       HOST: 0.0.0.0
       RPC_URL: ${RPC_URL:-http://anvil:8545}
       API_KEY: ${API_KEY:-local-dev-stack-operator-key-only}
+      VIEWER_KEY: ${VIEWER_KEY:-}
       SEED: ${SEED:-true}
       DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
       DEPLOYMENT_PATH: ${DEPLOYMENT_PATH:-}

@@ -309,22 +309,22 @@ Verified from the live prize page, Sat 26 Sep 01:30 JST. Seven partners: World $
 
 **1inch — Build an Aqua App ($5,000: $2,500 / $1,500 / $1,000) — P0**
 Text: *"Create a custom Aqua app that implements a sophisticated DeFi position. If you use SwapVM, you may modify SwapVM opcodes and define your own instructions. The final positions must be demonstrated through tests scripts or a UI. Projects that utilize SwapVM will be scored higher."*
-- [ ] **Official Aqua/SwapVM contracts used** — Aqua registry redeployed unmodified from `@1inch/aqua` on Sepolia; our router is a *redeployment of a modified SwapVM contract*, which the rules allow verbatim; ⚠️ confirm the registry redeploy at the booth
-- [ ] **On-chain token transfers executed in the demo** — `pull`/`push` visible in the fill tx on Sepolia
-- [ ] **Proper git history** — no single-commit dump on the final day; Friday's prototype committed today in logical commits, then commit-as-you-go
-- [ ] SwapVM used, with a custom instruction (`PolicyGuard`; P1 `PoolPriceAdjuster` for the "sophisticated" axis)
-- [ ] Position demonstrated by **test scripts** (`test/chain/swapvm.test.js`) — the UI is a bonus for this track, not a requirement
-- [ ] `ship`/`dock` shown; capital never leaves the borrower's wallet; program decoded; `PolicyGuard` explained as "the MLA as an opcode"
-- [ ] README: how Aqua/SwapVM are used, files/lines, deployed addresses, developer-experience feedback
+- [x] **Official Aqua/SwapVM contracts used** — locally `Aqua.sol` deployed unmodified from the vendored source, on Sepolia the canonical registry via `AQUA=`; our router is a *redeployment of a modified SwapVM contract* (`LimitOpcodes` + two instructions), which the rules allow verbatim
+- [x] **On-chain token transfers executed in the demo** — `pull`/`push` in the fill tx (`npm run demo:golden`, `test/chain/swapvm.test.js`)
+- [x] **Proper git history** — 20+ logical commits across Fri/Sat
+- [x] SwapVM used, with two custom instructions (`PolicyGuard`, `FixedRateBalances`); P1 `PoolPriceAdjuster` open
+- [x] Position demonstrated by test scripts and the golden demo; the dashboard's Exit screen shows it
+- [x] `ship`/`dock` shown; capital never leaves the borrower's wallet; program disassembled by the API and the dashboard
+- [x] README: "How we used 1inch Aqua and SwapVM" with files/lines and feedback; addresses come from `generated/deployment.json`
 
 **Curvegrid — Best RWA Tokenization Project ($1,000) — P0** (⚠️ or Best Digital Asset Dashboard; one per company)
-- [ ] README: one-sentence summary · team intro with social handles · clear setup and testing instructions
-- [ ] README: how MultiBaas was used and feedback (challenges, wins) — if used; otherwise say it was evaluated and why not
-- [ ] Repo artifacts: contracts, tests, documentation — judged on idea and technical execution
+- [x] README: one-sentence summary · setup and testing instructions · ⚠️ team intro with handles still to fill
+- [x] README: "How we used Curvegrid MultiBaas" — registration sync built and unit-tested; runs post-deploy on a supported chain
+- [x] Repo artifacts: contracts, tests, documentation
 
 **Third slot, option C — Uniswap Foundation: Best Uniswap Stack Contribution ($6,000, 3 places) — P1, contingent on G2**
 The claim: **permissionless pools for a transfer-restricted token** — hook-address-in-`PoolKey` + transient storage + the token gate make the hook the token's only door into Uniswap, so anyone can create liquidity and every pool enforces the prospectus. That is a hook-native mechanism with no token-only equivalent, presented for the **fund token** (Securitize agreement), never for Wildcat positions. Needs G2 landed (~5–7h) plus the paperwork below.
-- [ ] `FEEDBACK.md` in the repo; Developer Feedback Form submitted with its link
+- [x] `FEEDBACK.md` in the repo · [ ] Developer Feedback Form submitted with its link
 - [ ] README points to `contracts/MirrorPolicyHook.sol`, `src/policy/hookAddress.js`, `test/chain/hook.test.js` with line references
 - [ ] Scope claimed: admission on `beforeAddLiquidity`/`beforeRemoveLiquidity`/`beforeSwap` against Uniswap's own `PoolManager`; no quota/lockup/fee/LVR claims
 - [ ] Custody answer ready: the pool is admitted as a venue; no value enters or leaves without an admitted party at the boundary

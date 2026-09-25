@@ -1,15 +1,21 @@
 import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { ensure, AppError } from './errors.js';
+import { venueRoutes } from './venues-api.js';
 
 function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
 }
-export function createApp(service, apiKey) {
+// `service` is the custodial issuance ledger (optional); `venues` is the deployed two-act stack (optional).
+export function createApp(service, apiKey, venues = null) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
   const app = express();
   app.disable('x-powered-by');
-  app.get('/health', (_req, res) => res.json({ status: service.pending() ? 'reconciliation_required' : 'ok', mode: service.chain.mode, policyHash: service.policy.hash }));
+  app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+  app.get('/health', (_req, res) => res.json({
+    status: service?.pending() ? 'reconciliation_required' : 'ok', mode: service?.chain.mode ?? 'stack',
+    policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,
+  }));
   app.use('/v1', (req, _res, next) => {
     const actual = Buffer.from(req.headers.authorization ?? '');
     const expected = Buffer.from(`Bearer ${apiKey}`);
@@ -17,6 +23,8 @@ export function createApp(service, apiKey) {
     next();
   });
   app.use(express.json({ limit: '32kb' }));
+  if (venues) app.use('/v1/stack', venueRoutes(venues));
+  if (service) {
   app.get('/v1/policy', (_req, res) => res.json(service.policy));
   app.get('/v1/investors', (_req, res) => res.json(Object.values(service.snapshot().investors)));
   app.get('/v1/investors/:id', (req, res) => res.json(service.investor(req.params.id)));
@@ -48,6 +56,7 @@ export function createApp(service, apiKey) {
     });
   }
   app.get('/v1/audit', (_req, res) => res.json(service.snapshot().audit));
+  }
   app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Endpoint not found')));
   app.use((error, _req, res, _next) => {
     const status = error.status >= 400 && error.status < 600 ? error.status : 500;

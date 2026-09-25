@@ -163,7 +163,7 @@ Built as `src/policy/components.js`: a registry where each component declares `c
 
 ## 7. Gateway (Node/Express, existing)
 
-Unchanged responsibilities: operator auth, idempotency keys, operation intents before signing, restart recovery, audit log. Additions (PRD §7.8): attestations written to chain, `explain` mirrored next to the off-chain decision, order building/signing (EIP-712, borrower-treasury wallet), static `quote` proxy that decodes `LegalClauseViolation`.
+Unchanged responsibilities for custodial issuance: operator auth, idempotency keys, operation intents before signing, restart recovery, audit log. **Built for the two-act stack** (`src/venues.js`, `src/venues-api.js`, mounted at `/v1/stack`): attest/revoke/override/sanction, Act 1 mint/release/pool actions, Act 2 deposit/withdraw and the Aqua buyback (ship, quote, fill, dock) with the program disassembled and the hash chain, `explain` for any wallet/action, and an in-memory audit of every action with tx hash or decoded refusal. Refusals are `403 POLICY_REFUSED` with the clause. `scripts/dev-stack.js` runs anvil + deployment + API in one process; `test/chain/gateway.test.js` drives both acts over HTTP.
 
 Wallet separation: deployer/admin · attestor · watcher · borrower-treasury (signs orders) · agent (P1). No wallet holds two roles.
 

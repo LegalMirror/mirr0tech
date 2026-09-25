@@ -10,8 +10,8 @@ export default function PolicyPage() {
   return (
     <>
       <PageHead eyebrow="Policy" title="Legal clause → smart contract">
-        Hover a highlighted sentence to find the rule it became; click it to follow the quote through the rule, its
-        logic, its bytes and the contract that enforces it.
+        Hover a highlighted sentence to find the rule it became; click it to follow the quote through the
+        rule, its logic, its bytes and the contract that enforces it.
       </PageHead>
       {error && <Failed error={error} />}
       {!policy && !error && <Loading what="compiled policy" />}

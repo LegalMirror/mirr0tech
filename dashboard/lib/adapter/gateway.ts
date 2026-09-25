@@ -18,7 +18,10 @@ export function gatewaySource(baseUrl: string): DataSource {
     return (await response.json()) as T;
   };
   const mutate = async <T>(path: string, method: string, body?: unknown): Promise<T> => {
-    const result = await call<T>(path, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+    const result = await call<T>(path, {
+      method,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
     listeners.forEach((listener) => listener());
     return result;
   };

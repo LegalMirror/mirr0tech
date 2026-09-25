@@ -31,7 +31,15 @@ export function Hash({ label, value, full = false }: { label: string; value: str
   );
 }
 
-export function PageHead({ eyebrow, title, children }: { eyebrow: string; title: string; children?: ReactNode }) {
+export function PageHead({
+  eyebrow,
+  title,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  children?: ReactNode;
+}) {
   return (
     <header className="page-head">
       <div>

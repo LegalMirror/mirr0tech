@@ -8,7 +8,19 @@ import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
 
-function Step({ n, title, hint, tone, children }: { n: number; title: string; hint?: string; tone?: string; children: ReactNode }) {
+function Step({
+  n,
+  title,
+  hint,
+  tone,
+  children,
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  tone?: string;
+  children: ReactNode;
+}) {
   return (
     <li className="step" style={{ "--tone": tone } as CSSProperties}>
       <span className="step-n" aria-hidden>
@@ -25,7 +37,13 @@ function Step({ n, title, hint, tone, children }: { n: number; title: string; hi
   );
 }
 
-function QuoteStep({ policy, quote, clause, locations, tone }: {
+function QuoteStep({
+  policy,
+  quote,
+  clause,
+  locations,
+  tone,
+}: {
   policy: PolicyData;
   quote: string;
   clause: string;
@@ -124,7 +142,15 @@ function HexWithRange({ hex, start, end }: { hex: string; start: number; end: nu
   );
 }
 
-function RuleSteps({ policy, rule, evaluator }: { policy: PolicyData; rule: Rule; evaluator: EvaluatorProps }) {
+function RuleSteps({
+  policy,
+  rule,
+  evaluator,
+}: {
+  policy: PolicyData;
+  rule: Rule;
+  evaluator: EvaluatorProps;
+}) {
   const tone = toneOf(rule.effect);
   const program = policy.programs.find((entry) => entry.action === rule.action)!;
   const segment = program.rules.find((entry) => entry.clauseId === rule.clauseId);
@@ -133,7 +159,13 @@ function RuleSteps({ policy, rule, evaluator }: { policy: PolicyData; rule: Rule
   const actionConst = `ACTION_${rule.action.toUpperCase()}`;
   return (
     <ol className="stepper">
-      <QuoteStep policy={policy} quote={rule.source.quote} clause={rule.source.clause} locations={rule.quotes} tone={tone} />
+      <QuoteStep
+        policy={policy}
+        quote={rule.source.quote}
+        clause={rule.source.clause}
+        locations={rule.quotes}
+        tone={tone}
+      />
 
       <Step n={2} title="Rule" hint="the structured reading" tone={tone}>
         <div className="row">
@@ -195,15 +227,18 @@ function RuleSteps({ policy, rule, evaluator }: { policy: PolicyData; rule: Rule
             <HexWithRange hex={program.hex} start={segment.byteStart} end={segment.byteEnd} />
             <div className="row small" style={{ marginTop: 6 }}>
               <span className="muted">
-                {program.byteLength} bytes · this rule is bytes [{segment.byteStart}, {segment.byteEnd}) · rule{" "}
-                {program.rules.indexOf(segment) + 1} of {program.rules.length}
+                {program.byteLength} bytes · this rule is bytes [{segment.byteStart}, {segment.byteEnd}) ·
+                rule {program.rules.indexOf(segment) + 1} of {program.rules.length}
               </span>
               <HexCopy value={program.hex} />
             </div>
             <table className="words">
               <tbody>
                 {segment.words.map((word) => (
-                  <tr key={word.offset} className={/^(effect|clauseId|pos\[|neg\[)/.test(word.label) ? "word-key" : ""}>
+                  <tr
+                    key={word.offset}
+                    className={/^(effect|clauseId|pos\[|neg\[)/.test(word.label) ? "word-key" : ""}
+                  >
                     <td>+{word.offset}</td>
                     <td>{word.label}</td>
                     <td>{word.hex.replace(/^0x0+(?=.)/, "0x")}</td>
@@ -228,7 +263,9 @@ function RuleSteps({ policy, rule, evaluator }: { policy: PolicyData; rule: Rule
       </Step>
 
       <Step n={5} title="Enforcement" hint="where these bytes run" tone={tone}>
-        {venues.length === 0 && <p className="muted small">No venue enforces {rule.action} in this profile.</p>}
+        {venues.length === 0 && (
+          <p className="muted small">No venue enforces {rule.action} in this profile.</p>
+        )}
         <div className="venues">
           {venues.map((venue) => (
             <div className="venue" key={`${venue.contract}${venue.calls[0]}`}>
@@ -255,12 +292,13 @@ function RuleSteps({ policy, rule, evaluator }: { policy: PolicyData; rule: Rule
           <span className="small muted">decoded</span>
           {rule.effect === "permit" ? (
             <span className="small">
-              A permit never names itself in a revert: when no permit of <code>{rule.action}</code> holds,
-              the venue refuses with <code>clauseId 0</code> — no matching permission.
+              A permit never names itself in a revert: when no permit of <code>{rule.action}</code> holds, the
+              venue refuses with <code>clauseId 0</code> — no matching permission.
             </span>
           ) : (
             <span className="small">
-              <code>clauseId {rule.clauseId}</code> → <strong>{rule.source.clause}</strong> — “{rule.source.quote}”
+              <code>clauseId {rule.clauseId}</code> → <strong>{rule.source.clause}</strong> — “
+              {rule.source.quote}”
             </span>
           )}
           <ClauseTableBadge policy={policy} />
@@ -292,8 +330,9 @@ function consumerOf(policy: PolicyData, term: Term): ReactNode {
   if (term.name === "rescreeningIntervalDays")
     return (
       <>
-        Bounds the deployment: <code>attestationValiditySeconds</code> ({String(policy.config.attestationValiditySeconds)})
-        must not exceed <code>rescreeningIntervalSeconds</code> ({String(policy.config.rescreeningIntervalSeconds)}); the
+        Bounds the deployment: <code>attestationValiditySeconds</code> (
+        {String(policy.config.attestationValiditySeconds)}) must not exceed{" "}
+        <code>rescreeningIntervalSeconds</code> ({String(policy.config.rescreeningIntervalSeconds)}); the
         compiler refuses a config that would let an attestation outlive the agreement.
       </>
     );
@@ -304,7 +343,13 @@ function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
   const tone = toneOf("term");
   return (
     <ol className="stepper">
-      <QuoteStep policy={policy} quote={term.source.quote} clause={term.source.clause} locations={term.quotes} tone={tone} />
+      <QuoteStep
+        policy={policy}
+        quote={term.source.quote}
+        clause={term.source.clause}
+        locations={term.quotes}
+        tone={tone}
+      />
       <Step n={2} title="Term" hint="a value, never a boolean" tone={tone}>
         <div className="row">
           <code className="mono">{term.name}</code>
@@ -314,7 +359,12 @@ function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
         </div>
         <p className="small">{term.rationale}</p>
       </Step>
-      <Step n={3} title="Consumed by" hint="terms fill template slots, they never enter the evaluator" tone={tone}>
+      <Step
+        n={3}
+        title="Consumed by"
+        hint="terms fill template slots, they never enter the evaluator"
+        tone={tone}
+      >
         <p className="small">{consumerOf(policy, term)}</p>
       </Step>
     </ol>

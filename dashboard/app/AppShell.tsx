@@ -16,7 +16,11 @@ import { useModalEscape } from "./useModalEscape";
 function nav(profile: ProfileId) {
   return [
     { href: "/", label: "Policy", hint: "clause → contract" },
-    { href: "/lenders", label: profile === "wildcat-credit" ? "Lenders" : "Investors", hint: "status & facts" },
+    {
+      href: "/lenders",
+      label: profile === "wildcat-credit" ? "Lenders" : "Investors",
+      hint: "status & facts",
+    },
     { href: "/queue", label: "Queue", hint: "review items" },
     { href: "/exit", label: profile === "wildcat-credit" ? "Exit" : "Trade", hint: "venue" },
     { href: "/audit", label: "Audit", hint: "timeline" },
@@ -125,8 +129,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sh-sideFoot">
           {!compact && <ThemeToggle />}
           <p className="sh-note muted">
-            {buildStamp(build.sha, build.builtAt)} · data: {source.kind === "static" ? "static export" : "gateway"}{" "}
-            · law is source, code is a build artifact
+            {buildStamp(build.sha, build.builtAt)} · data:{" "}
+            {source.kind === "static" ? "static export" : "gateway"} · law is source, code is a build artifact
           </p>
         </div>
       </aside>

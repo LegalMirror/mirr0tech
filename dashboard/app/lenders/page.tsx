@@ -73,7 +73,9 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
         <dl className="kv small">
           <dt>Sanctions oracle</dt>
           <dd>
-            <span className={`chip ${party.sanctions === "clear" ? "chip-ok" : "chip-bad"}`}>{party.sanctions}</span>{" "}
+            <span className={`chip ${party.sanctions === "clear" ? "chip-ok" : "chip-bad"}`}>
+              {party.sanctions}
+            </span>{" "}
             <span className="muted">{OBSERVABLE_SOURCE.sanctionsClear}</span>
           </dd>
           <dt>Screened</dt>
@@ -114,7 +116,8 @@ export default function LendersPage() {
     <>
       <PageHead eyebrow={credit ? "Lenders" : "Investors"} title={credit ? "Who may lend" : "Who may hold"}>
         Status is the compiled policy run on each wallet's facts — the same decision the{" "}
-        {credit ? "role provider" : "gateway"} makes. <span className="mock-note">mock parties · static adapter</span>
+        {credit ? "role provider" : "gateway"} makes.{" "}
+        <span className="mock-note">mock parties · static adapter</span>
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="parties" />}

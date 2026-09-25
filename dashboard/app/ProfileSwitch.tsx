@@ -4,8 +4,18 @@ import type { ProfileId } from "@/lib/types";
 import { useProfile } from "./providers";
 
 const OPTIONS: { profile: ProfileId; act: string; label: string; doc: string }[] = [
-  { profile: "custodial-rwa", act: "Act 1", label: "Tokenize & trade", doc: "Securitize transfer-agent agreement" },
-  { profile: "wildcat-credit", act: "Act 2", label: "Lend it out", doc: "Wildcat MLA + Lender Check Policy + addendum" },
+  {
+    profile: "custodial-rwa",
+    act: "Act 1",
+    label: "Tokenize & trade",
+    doc: "Securitize transfer-agent agreement",
+  },
+  {
+    profile: "wildcat-credit",
+    act: "Act 2",
+    label: "Lend it out",
+    doc: "Wildcat MLA + Lender Check Policy + addendum",
+  },
 ];
 
 /** One compiler, two documents: the switch every screen reads. */

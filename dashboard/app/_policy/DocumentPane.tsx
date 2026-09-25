@@ -56,11 +56,29 @@ type LineProps = {
   onSelect: (ref: string, fromDocument: boolean) => void;
 };
 
-const DocLine = memo(function DocLine({ line, display, markdown, tone, state, unresolved, onHover, onSelect }: LineProps) {
+const DocLine = memo(function DocLine({
+  line,
+  display,
+  markdown,
+  tone,
+  state,
+  unresolved,
+  onHover,
+  onSelect,
+}: LineProps) {
   const [openMarker, setOpenMarker] = useState<number | null>(null);
   const heading = markdown ? /^(#+) /.exec(display.slice(line.start, line.end)) : null;
-  const hot = new Set(state.split(" ").filter((s) => s.startsWith("h:")).map((s) => s.slice(2)));
-  const sel = state.split(" ").find((s) => s.startsWith("s:"))?.slice(2) ?? null;
+  const hot = new Set(
+    state
+      .split(" ")
+      .filter((s) => s.startsWith("h:"))
+      .map((s) => s.slice(2))
+  );
+  const sel =
+    state
+      .split(" ")
+      .find((s) => s.startsWith("s:"))
+      ?.slice(2) ?? null;
   return (
     <>
       {line.markers.map((index) => (
@@ -139,7 +157,11 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
         const markers = policy.unresolved.flatMap((entry, i) =>
           entry.anchor?.part === index ? [{ offset: entry.anchor.offset, index: i }] : []
         );
-        return { part, markdown: part.name.endsWith(".md"), lines: segmentLines(part.display, spans, markers) };
+        return {
+          part,
+          markdown: part.name.endsWith(".md"),
+          lines: segmentLines(part.display, spans, markers),
+        };
       }),
     [policy]
   );

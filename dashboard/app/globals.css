@@ -1541,3 +1541,15 @@ blockquote.quote {
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+/* A button that reads as a link: same action, no box. */
+.linkish {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--flame);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}

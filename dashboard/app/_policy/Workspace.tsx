@@ -31,7 +31,9 @@ function Header({ policy }: { policy: PolicyData }) {
         <Hash label="clauseTableHash" value={policy.clauseTableHash} />
       </div>
       <div className="stat-row">
-        <span className="chip chip-ok">✓ equivalence proved · {policy.equivalenceChecks.toLocaleString()} assignments</span>
+        <span className="chip chip-ok">
+          ✓ equivalence proved · {policy.equivalenceChecks.toLocaleString()} assignments
+        </span>
         <ClauseTableBadge policy={policy} />
         <span className="chip">{policy.rules.length} rules</span>
         <span className="chip chip-term">{policy.terms.length} terms</span>
@@ -89,7 +91,9 @@ function RulePicker({
       {policy.terms.length > 0 && (
         <div className="rule-group">
           <h3>terms</h3>
-          <div className="rule-list">{policy.terms.map((term) => button(termRef(term.name), term.name, toneOf("term")))}</div>
+          <div className="rule-list">
+            {policy.terms.map((term) => button(termRef(term.name), term.name, toneOf("term")))}
+          </div>
         </div>
       )}
     </div>
@@ -101,7 +105,9 @@ function TermsPanel({ policy, onSelect }: { policy: PolicyData; onSelect: (ref: 
     return (
       <section className="card">
         <h2>Terms</h2>
-        <p className="muted small">This agreement compiles to rules only; it carries no numeric or dated terms.</p>
+        <p className="muted small">
+          This agreement compiles to rules only; it carries no numeric or dated terms.
+        </p>
       </section>
     );
   return (
@@ -124,7 +130,8 @@ function TermsPanel({ policy, onSelect }: { policy: PolicyData; onSelect: (ref: 
                   <code>{term.name}</code>
                 </td>
                 <td>
-                  <span className="term-val">{term.value}</span> <span className="small muted">{term.unit}</span>
+                  <span className="term-val">{term.value}</span>{" "}
+                  <span className="small muted">{term.unit}</span>
                 </td>
                 <td className="small">{term.source.clause}</td>
                 <td className="small muted">“{term.source.quote}”</td>
@@ -142,8 +149,8 @@ function UnresolvedPanel({ policy }: { policy: PolicyData }) {
     <section className="card">
       <h2>Not compiled</h2>
       <p className="small muted">
-        What the compiler could not quote into a rule. Execution is refused while this list is non-empty unless the
-        build passes <code>--demo</code>.
+        What the compiler could not quote into a rule. Execution is refused while this list is non-empty
+        unless the build passes <code>--demo</code>.
       </p>
       <ul className="checks">
         {policy.unresolved.map((entry) => (
@@ -165,12 +172,18 @@ function UnresolvedPanel({ policy }: { policy: PolicyData }) {
 }
 
 export function Workspace({ policy }: { policy: PolicyData }) {
-  const [selected, setSelected] = useState<string | null>(policy.rules[0] ? ruleRef(policy.rules[0].id) : null);
+  const [selected, setSelected] = useState<string | null>(
+    policy.rules[0] ? ruleRef(policy.rules[0].id) : null
+  );
   const [hot, setHot] = useState<Set<string>>(new Set());
   const [scrollKey, setScrollKey] = useState(1);
   const parties = useResource(() => source.parties(policy.profile), [policy.profile]);
   const presets = useMemo(
-    () => (parties.data ?? []).map((party) => ({ name: party.name.split(" — ")[0], facts: effectiveFacts(policy, party) })),
+    () =>
+      (parties.data ?? []).map((party) => ({
+        name: party.name.split(" — ")[0],
+        facts: effectiveFacts(policy, party),
+      })),
     [parties.data, policy]
   );
   const [facts, setFacts] = useState<Facts | null>(null);
@@ -197,7 +210,13 @@ export function Workspace({ policy }: { policy: PolicyData }) {
         />
         <section className="card" aria-label="Compilation pipeline">
           <h2>Clause → contract</h2>
-          <RulePicker policy={policy} selected={selected} hot={hot} onHover={onHover} onSelect={selectFromPanel} />
+          <RulePicker
+            policy={policy}
+            selected={selected}
+            hot={hot}
+            onHover={onHover}
+            onSelect={selectFromPanel}
+          />
           <Pipeline
             policy={policy}
             selected={selected}

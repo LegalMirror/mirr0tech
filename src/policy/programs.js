@@ -98,3 +98,18 @@ export function buybackTermsFrom(policy) {
     deadlineTimestamp: Math.floor(Date.parse(`${deadline}T23:59:59Z`) / 1000),
   };
 }
+
+// Reads a program back into its instruction list for display: [{ pc, opcode, name, args }].
+export function disassemble(program, opcodes) {
+  const names = Object.fromEntries(Object.entries(opcodes).map(([name, opcode]) => [opcode, name]));
+  const bytes = getBytes(program);
+  const instructions = [];
+  for (let pc = 0; pc < bytes.length;) {
+    const opcode = bytes[pc];
+    const length = bytes[pc + 1];
+    const args = bytes.slice(pc + 2, pc + 2 + length);
+    instructions.push({ pc, opcode, name: names[opcode] ?? `opcode ${opcode}`, args: `0x${Buffer.from(args).toString('hex')}` });
+    pc += 2 + length;
+  }
+  return instructions;
+}

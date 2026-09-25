@@ -10,7 +10,8 @@ const listeners = new Set<() => void>();
 
 async function json<T>(path: string): Promise<T> {
   const response = await fetch(path);
-  if (!response.ok) throw new Error(`${path}: ${response.status}. Run \`npm run ui:export\` from the repository root.`);
+  if (!response.ok)
+    throw new Error(`${path}: ${response.status}. Run \`npm run ui:export\` from the repository root.`);
   return (await response.json()) as T;
 }
 

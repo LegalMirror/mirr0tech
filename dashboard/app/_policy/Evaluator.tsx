@@ -22,7 +22,15 @@ const VERDICT_TEXT = {
   deny: "✕ deny — refused; no reviewer can override a prohibition",
 };
 
-function TriToggle({ value, onChange, label }: { value: Tri | undefined; onChange: (v: Tri) => void; label: string }) {
+function TriToggle({
+  value,
+  onChange,
+  label,
+}: {
+  value: Tri | undefined;
+  onChange: (v: Tri) => void;
+  label: string;
+}) {
   const options: { v: Tri; text: string; cls: string }[] = [
     { v: true, text: "T", cls: "on-true" },
     { v: false, text: "F", cls: "on-false" },
@@ -48,7 +56,14 @@ function TriToggle({ value, onChange, label }: { value: Tri | undefined; onChang
   );
 }
 
-export function Evaluator({ policy, facts, setFacts, presets, action, focus }: EvaluatorProps & { action: string; focus?: string }) {
+export function Evaluator({
+  policy,
+  facts,
+  setFacts,
+  presets,
+  action,
+  focus,
+}: EvaluatorProps & { action: string; focus?: string }) {
   const names = factsForAction(policy, action);
   const focusRule = policy.rules.find((rule) => rule.id === focus);
   const focusFacts = focusRule ? factsOfCondition(focusRule.condition) : new Set<string>();
@@ -81,11 +96,7 @@ export function Evaluator({ policy, facts, setFacts, presets, action, focus }: E
                 bit {policy.factOrder.indexOf(name)} · {factKind(policy.profile, name)}
               </small>
             </span>
-            <TriToggle
-              label={name}
-              value={facts[name]}
-              onChange={(v) => setFacts({ ...facts, [name]: v })}
-            />
+            <TriToggle label={name} value={facts[name]} onChange={(v) => setFacts({ ...facts, [name]: v })} />
           </div>
         ))}
       </div>
@@ -97,7 +108,8 @@ export function Evaluator({ policy, facts, setFacts, presets, action, focus }: E
         </div>
         <div className="row small">
           <span>
-            interpreter <code>evaluatePolicy</code>: <strong>{result.interpretation.allowed ? "allowed" : "refused"}</strong>
+            interpreter <code>evaluatePolicy</code>:{" "}
+            <strong>{result.interpretation.allowed ? "allowed" : "refused"}</strong>
             {result.interpretation.reasons.length > 0 && (
               <span className="muted"> ({result.interpretation.reasons.join(", ")})</span>
             )}
@@ -110,7 +122,9 @@ export function Evaluator({ policy, facts, setFacts, presets, action, focus }: E
               ({String(result.onchain.allowed)}, {result.onchain.clauseId})
             </code>
           </span>
-          <span className={`chip ${result.agree ? "chip-ok" : "chip-bad"}`}>{result.agree ? "✓ agree" : "✗ disagree"}</span>
+          <span className={`chip ${result.agree ? "chip-ok" : "chip-bad"}`}>
+            {result.agree ? "✓ agree" : "✗ disagree"}
+          </span>
         </div>
         <div className="row small mono muted">
           known {hex(result.known)} · value {hex(result.value)}
@@ -119,8 +133,8 @@ export function Evaluator({ policy, facts, setFacts, presets, action, focus }: E
           <>
             {failing ? (
               <div className="small">
-                failing clause <code>{failing.clauseId}</code> <strong>{failing.clause}</strong> ({failing.ruleId}) — “
-                {failing.quote}”
+                failing clause <code>{failing.clauseId}</code> <strong>{failing.clause}</strong> (
+                {failing.ruleId}) — “{failing.quote}”
               </div>
             ) : (
               <div className="small">
@@ -151,10 +165,13 @@ export function Evaluator({ policy, facts, setFacts, presets, action, focus }: E
         <ul className="trace">
           {result.interpretation.trace.map((entry) => {
             const fails =
-              (entry.effect === "require" && entry.result !== true) || (entry.effect === "forbid" && entry.result !== false);
+              (entry.effect === "require" && entry.result !== true) ||
+              (entry.effect === "forbid" && entry.result !== false);
             return (
               <li key={entry.id} className={`${fails ? "fail" : ""} ${entry.id === focus ? "sel" : ""}`}>
-                <span aria-hidden>{fails ? "✕" : entry.effect === "permit" && entry.result !== true ? "·" : "✓"}</span>
+                <span aria-hidden>
+                  {fails ? "✕" : entry.effect === "permit" && entry.result !== true ? "·" : "✓"}
+                </span>
                 <EffectChip effect={entry.effect} />
                 <code>{entry.id}</code>
                 <TriChip value={entry.result} />

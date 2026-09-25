@@ -270,7 +270,7 @@ Narrow and deterministic: read market state, plan interest payouts, call `mayWit
 - **P0 Audit**: reverse-chronological stream, each row expandable to trace + tx.
 - **P1 Agent**: run payout cycle; paid / held with explanations.
 
-### 7.8 API changes (owner: Eng B)
+### 7.8 API changes (owner: Eng B) — built as `/v1/stack/*`, see README "Stack API"
 
 Keep conventions: decimal-string amounts, `Idempotency-Key`, operator bearer auth, typed errors.
 

@@ -1,6 +1,7 @@
 import type { ProfileId } from "./types";
 
-export type FactKind = "attested" | "observable" | "derived" | "override" | "operator" | "ledger" | "screening";
+export type FactKind =
+  "attested" | "observable" | "derived" | "override" | "operator" | "ledger" | "screening";
 
 export const FACT_KIND_LABEL: Record<FactKind, string> = {
   attested: "attested by the borrower's compliance function",

@@ -64,6 +64,7 @@ Terms the documents leave open (default remedies, governing law, sanctions dispu
 | `contracts/` | `PolicyEval`, `PolicyAttestor`, `PolicyOracle`, `MirrorToken`, `MirrortechRoleProvider`, `MirrorPolicyHook`, `swapvm/`, mocks (`MockSanctionsOracle`, `MockWildcatMarket`, `test/MockERC20`) |
 | `src/deploy.js`, `scripts/deploy-stack.js` | one call deploys both acts against any RPC (anvil default; canonical `POOL_MANAGER`/`AQUA`/`WETH` via env on a public chain) |
 | `src/refusal.js` | decodes a revert, through Uniswap's wrapper if needed, into the clause |
+| `src/venues.js`, `src/venues-api.js`, `scripts/dev-stack.js` | operator service and REST routes over the deployed stack; local runner |
 | `scripts/demo-golden.js`, `scripts/demo-credit.js`, `scripts/demo.js` | both acts · Act 2 lender lifecycle · the original custodial issuance demo (REST) |
 | `test/`, `test/chain/` | unit tests incl. the equivalence proof · anvil tests: `evm` (token + operator signer), `rwa-pool` (Act 1), `credit` (role provider), `swapvm` (Aqua strategy), `hook` (v4), `stack` |
 | `docs/` | `PRD.md`, `ARCHITECTURE.md`, `SWAPVM_INTEGRATION.md`, `MLA_CLAUSE_MAP.md` |
@@ -84,6 +85,25 @@ Developer feedback: the instruction/router split made adding an opcode a 40-line
 ## How we used Curvegrid MultiBaas
 
 Not on the local-chain path. Everything above runs on anvil through ethers; the deploy module is RPC-agnostic and takes canonical venue addresses from the environment, so a Sepolia deployment through MultiBaas (contract upload, TXM-signed attestations, event webhooks feeding the audit screen) is a configuration step, not a code change. See `docs/PRD.md` §7.5 for the intended usage and what we evaluated.
+
+## Stack API — drive both acts without a terminal
+
+```sh
+npm run dev:stack   # anvil + deployed stack + operator API at http://127.0.0.1:3000/v1/stack
+```
+
+Bearer token `local-dev-stack-operator-key-only` (or `API_KEY`). Demo wallets (`Investor`, `Stranger`, `Lender A/B/C`, `Operator`) are the local chain's unlocked accounts. Every action lands in `GET /v1/stack/audit` with its tx hash or its decoded refusal.
+
+| Method | Path | Does |
+| --- | --- | --- |
+| GET | `/v1/stack`, `/policies`, `/wallets`, `/wallets/:w` | deployment, both policies with clause tables, wallet balances and standing |
+| GET | `/wallets/:w/explain?policy=rwa\|credit&action=…` | the on-chain decision, the clause, the facts as known/true/false/unknown |
+| POST/DELETE | `/wallets/:w/facts` `{policy, facts}` | attest / revoke facts (`days` optional) |
+| POST | `/wallets/:w/sanction` `{sanctioned}`, `/wallets/:w/override`, `/wallets/:w/fund` `{amount}` | oracle designation, the borrower's §13(c)(y) override, mock funding + approvals |
+| POST | `/rwa/mint` `{amount}`, `/rwa/release` `{wallet, amount}`, `/rwa/pools` `{wallet, hooked}`, `/rwa/liquidity`, `/rwa/swap` | Act 1 |
+| POST/GET | `/credit/deposit`, `/credit/withdraw` `{wallet, amount}`; `/credit/buyback` (ship / read: program disassembled, hash chain, Aqua balances); `/credit/buyback/quote`, `/fill` `{wallet, amount}`, `/dock` | Act 2 |
+
+Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { name, clause: { clause, quote, ruleId } } } } }`.
 
 ## Operator API (custodial issuance)
 

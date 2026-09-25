@@ -5,7 +5,11 @@ export type Span = { start: number; end: number; ref: string };
 export type Piece = { start: number; end: number; refs: string[]; opens: string[] };
 export type Line = { start: number; end: number; pieces: Piece[]; markers: number[] };
 
-export function segmentLines(display: string, spans: Span[], markers: { offset: number; index: number }[] = []): Line[] {
+export function segmentLines(
+  display: string,
+  spans: Span[],
+  markers: { offset: number; index: number }[] = []
+): Line[] {
   const lines: Line[] = [];
   let start = 0;
   for (const text of display.split("\n")) {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { source } from "@/lib/adapter";
-import { explain, factsForAction } from "@/lib/evaluate";
+import { explain, factsForAction, factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
 import { effectiveFacts, statusAction } from "@/lib/parties";
@@ -66,9 +66,15 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
       </ul>
 
       <h3>Attest</h3>
-      {unknown.length === 0 && <p className="small muted">Nothing here can be attested; the unknown facts are read on chain.</p>}
+      {unknown.length === 0 && (
+        <p className="small muted">Nothing here can be attested; the unknown facts are read on chain.</p>
+      )}
       {unknown.map((name) => {
-        const rule = policy.rules.find((entry) => entry.action === action && JSON.stringify(entry.condition).includes(`"${name}"`));
+        // Cite the requirement the fact satisfies, not the permit that also mentions it.
+        const mentions = policy.rules.filter(
+          (entry) => entry.action === action && factsOfCondition(entry.condition).has(name)
+        );
+        const rule = mentions.find((entry) => entry.effect !== "permit") ?? mentions[0];
         return (
           <label key={name} className="switch">
             <input
@@ -129,15 +135,16 @@ export default function QueuePage() {
       ? parties.data.filter(
           (party) =>
             !party.resolution &&
-            explain(policy.data!, statusAction(policy.data!), effectiveFacts(policy.data!, party)).verdict === "review"
+            explain(policy.data!, statusAction(policy.data!), effectiveFacts(policy.data!, party)).verdict ===
+              "review"
         )
       : [];
   const resolved = parties.data?.filter((party) => party.resolution) ?? [];
   return (
     <>
       <PageHead eyebrow="Queue" title="Review items">
-        A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one can
-        approve a sanctioned wallet. <span className="mock-note">mock parties · static adapter</span>
+        A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one
+        can approve a sanctioned wallet. <span className="mock-note">mock parties · static adapter</span>
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="queue" />}

@@ -25,8 +25,9 @@
     "ui:export": "node scripts/export-ui.js",
     "build:secondary": "node scripts/compile.js --secondary --demo && node scripts/build-contracts.js",
     "deploy:stack": "node scripts/deploy-stack.js",
-    "test:chain:stack": "node --test test/chain/stack.test.js",
-    "demo:golden": "node scripts/demo-golden.js"
+    "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js",
+    "demo:golden": "node scripts/demo-golden.js",
+    "dev:stack": "node scripts/dev-stack.js"
   },
   "dependencies": {
     "@openzeppelin/contracts": "5.6.1",

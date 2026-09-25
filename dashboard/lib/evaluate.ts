@@ -32,7 +32,8 @@ export function evaluatePolicy(rules: Rule[], action: string, facts: Facts): Int
     }));
   const failures = trace.filter(
     (rule) =>
-      (rule.effect === "require" && rule.result !== true) || (rule.effect === "forbid" && rule.result !== false)
+      (rule.effect === "require" && rule.result !== true) ||
+      (rule.effect === "forbid" && rule.result !== false)
   );
   const permitted = trace.some((rule) => rule.effect === "permit" && rule.result === true);
   return {
@@ -109,7 +110,9 @@ export function factsOfCondition(node: Condition, found = new Set<string>()): Se
 /** Every fact the rules of one action mention, in bit order. */
 export function factsForAction(policy: PolicyData, action: string): string[] {
   const found = new Set<string>();
-  policy.rules.filter((rule) => rule.action === action).forEach((rule) => factsOfCondition(rule.condition, found));
+  policy.rules
+    .filter((rule) => rule.action === action)
+    .forEach((rule) => factsOfCondition(rule.condition, found));
   return policy.factOrder.filter((name) => found.has(name));
 }
 

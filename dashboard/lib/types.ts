@@ -42,7 +42,11 @@ export type Term = {
   quotes: QuoteLocation[];
 };
 
-export type Unresolved = { clause: string; description: string; anchor: { part: number; offset: number } | null };
+export type Unresolved = {
+  clause: string;
+  description: string;
+  anchor: { part: number; offset: number } | null;
+};
 
 export type DocumentPart = {
   name: string;
@@ -165,7 +169,16 @@ export type Party = {
 export type AuditEvent = {
   id: string;
   at: string;
-  kind: "Attested" | "Revoked" | "CredentialDecision" | "PolicyChecked" | "Fill" | "QuoteRefused" | "Shipped" | "Minted" | "Refused";
+  kind:
+    | "Attested"
+    | "Revoked"
+    | "CredentialDecision"
+    | "PolicyChecked"
+    | "Fill"
+    | "QuoteRefused"
+    | "Shipped"
+    | "Minted"
+    | "Refused";
   subject: string;
   action: string;
   summary: string;

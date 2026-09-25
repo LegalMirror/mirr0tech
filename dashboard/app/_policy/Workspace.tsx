@@ -5,6 +5,7 @@ import { source } from "@/lib/adapter";
 import type { Facts } from "@/lib/evaluate";
 import { useResource } from "@/lib/hooks";
 import { effectiveFacts } from "@/lib/parties";
+import { actionLabel, EFFECT_LABEL } from "@/lib/labels";
 import { pipelineRefs, ruleRef, termRef } from "@/lib/segments";
 import type { PolicyData } from "@/lib/types";
 import { short } from "@/lib/format";
@@ -20,10 +21,6 @@ function Intro({ policy }: { policy: PolicyData }) {
       <div className="meta">
         Act {policy.act} · {policy.parties.map((party) => `${party.name} (${party.role})`).join(" · ")} →{" "}
         {policy.venue}
-      </div>
-      <div className="meta">
-        {policy.rules.length} rules · {policy.terms.length} terms · {policy.unresolved.length} open items ·
-        equivalence proved over {policy.equivalenceChecks.toLocaleString()} assignments
       </div>
     </div>
   );
@@ -92,18 +89,18 @@ function RuleNav({
       </button>
       <select aria-label="Rule or term" value={selected ?? ""} onChange={(e) => onSelect(e.target.value)}>
         {actions.map((action) => (
-          <optgroup key={action} label={action}>
+          <optgroup key={action} label={actionLabel(action)}>
             {policy.rules
               .filter((rule) => rule.action === action)
               .map((rule) => (
                 <option key={rule.id} value={ruleRef(rule.id)}>
-                  {rule.effect} · {rule.id}
+                  {EFFECT_LABEL[rule.effect]} · {rule.source.clause}
                 </option>
               ))}
           </optgroup>
         ))}
         {policy.terms.length > 0 && (
-          <optgroup label="terms">
+          <optgroup label="Values">
             {policy.terms.map((term) => (
               <option key={term.name} value={termRef(term.name)}>
                 {term.name} = {term.value}
@@ -164,8 +161,8 @@ function UnresolvedPanel({ policy }: { policy: PolicyData }) {
   return (
     <>
       <p className="small muted">
-        What the compiler could not quote into a rule. Execution is refused while this list is non-empty
-        unless the build passes <code>--demo</code>.
+        Clauses that need a person's judgement before they can run. A production build refuses to ship while
+        this list is non-empty.
       </p>
       <ul className="checks">
         {policy.unresolved.map((entry) => (
@@ -218,7 +215,7 @@ export function Workspace({ policy }: { policy: PolicyData }) {
           onSelect={onSelect}
         />
         <section className="card" aria-label="Compilation pipeline">
-          <h2>Clause → contract</h2>
+          <h2>What this sentence does</h2>
           <RuleNav policy={policy} selected={selected} onSelect={selectFromPanel} />
           <Pipeline
             policy={policy}
@@ -228,13 +225,19 @@ export function Workspace({ policy }: { policy: PolicyData }) {
         </section>
       </div>
       <section className="card" style={{ marginTop: "var(--sp-md)" }} aria-label="More">
-        <Disclosure title="Terms" summary={`${policy.terms.length} values the templates consume`}>
+        <Disclosure title="Numbers in the agreement" summary={`${policy.terms.length} values the venues use`}>
           <TermsPanel policy={policy} onSelect={selectFromPanel} />
         </Disclosure>
-        <Disclosure title="Not compiled" summary={`${policy.unresolved.length} open items`}>
+        <Disclosure
+          title="Open items"
+          summary={`${policy.unresolved.length} clauses that still need a person`}
+        >
           <UnresolvedPanel policy={policy} />
         </Disclosure>
-        <Disclosure title="Deployment assumptions" summary={`${policy.config.assumptions.length} stated`}>
+        <Disclosure
+          title="Assumptions"
+          summary={`${policy.config.assumptions.length} stated for this deployment`}
+        >
           <ul className="small muted">
             {policy.config.assumptions.map((assumption) => (
               <li key={assumption}>{assumption}</li>

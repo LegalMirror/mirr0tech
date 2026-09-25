@@ -44,11 +44,11 @@ export function coverageSentence(coverage: Coverage): string {
   const { counts, total, rules, terms } = coverage;
   const into = [
     `${rules} rule${rules === 1 ? "" : "s"}`,
-    terms ? `${terms} term${terms === 1 ? "" : "s"}` : null,
+    terms ? `${terms} value${terms === 1 ? "" : "s"}` : null,
   ]
     .filter(Boolean)
     .join(" and ");
-  return `${counts.compiled} of ${total} paragraphs compile to ${into} · ${counts.unresolved} flagged unresolved · ${counts["not-executable"]} not executable`;
+  return `${counts.compiled} of ${total} paragraphs are enforced on-chain as ${into} · ${counts.unresolved} open items · ${counts["not-executable"]} not enforceable`;
 }
 
 export const NOT_EXECUTABLE =

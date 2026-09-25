@@ -4,6 +4,7 @@ import { useState } from "react";
 import { source } from "@/lib/adapter";
 import { explain, factsForAction, factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
+import { actionLabel, EFFECT_LABEL, factLabel, VERDICT_LABEL } from "@/lib/labels";
 import { short } from "@/lib/format";
 import { effectiveFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
@@ -51,23 +52,26 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
           <h2>{party.name}</h2>
           <code className="small muted">{short(party.address, 8, 6)}</code>
         </div>
-        <span className="chip chip-review">review · {action}</span>
+        <span className="chip chip-review">Needs review · {actionLabel(action)}</span>
       </div>
 
-      <h3>Trace</h3>
+      <h3>Checks</h3>
       <ul className="trace-line">
-        {now.interpretation.trace.map((entry) => (
-          <li key={entry.id}>
-            <span className="eff">{entry.effect}</span>
-            <span>{entry.id}</span>
-            <Glyph state={triState(entry.result)} />
-          </li>
-        ))}
+        {now.interpretation.trace.map((entry) => {
+          const rule = policy.rules.find((r) => r.id === entry.id);
+          return (
+            <li key={entry.id} title={entry.id}>
+              <span className="eff">{EFFECT_LABEL[entry.effect]}</span>
+              <span>{rule?.source.clause ?? entry.id}</span>
+              <Glyph state={triState(entry.result)} />
+            </li>
+          );
+        })}
       </ul>
 
-      <h3>Attest</h3>
+      <h3>Confirm</h3>
       {unknown.length === 0 && (
-        <p className="small muted">Nothing here can be attested; the unknown facts are read on chain.</p>
+        <p className="small muted">Nothing to confirm by hand; the missing facts are read from the chain.</p>
       )}
       {unknown.map((name) => {
         // Cite the requirement the fact satisfies, not the permit that also mentions it.
@@ -90,10 +94,9 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
               className="switch-text"
               title={rule ? `${rule.source.clause}: “${rule.source.quote}”` : undefined}
             >
-              <strong className="mono">{name}</strong>
+              <strong>{factLabel(name)}</strong>
               <small className="muted">
-                {FACT_KIND_LABEL[factKind(policy.profile, name)]}
-                {rule ? ` · ${rule.source.clause}` : ""}
+                {rule ? rule.source.clause : FACT_KIND_LABEL[factKind(policy.profile, name)]}
               </small>
             </span>
           </label>
@@ -101,8 +104,7 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
       })}
 
       <p className="meta" style={{ marginTop: 8 }}>
-        After attesting: <Glyph state={preview.verdict} /> {preview.verdict}
-        {preview.interpretation.reasons.length > 0 && ` · ${preview.interpretation.reasons.join(", ")}`}
+        If confirmed: <Glyph state={preview.verdict} /> {VERDICT_LABEL[preview.verdict]}
       </p>
 
       <div className="row" style={{ marginTop: 12 }}>
@@ -116,7 +118,7 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
             })
           }
         >
-          Attest &amp; approve
+          Confirm &amp; approve
         </button>
         <button disabled={busy} onClick={() => run(() => source.resolve(policy.profile, party.id, "reject"))}>
           Reject
@@ -142,8 +144,8 @@ export default function QueuePage() {
   return (
     <>
       <PageHead title="Review items">
-        A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one
-        can approve a sanctioned wallet.
+        Wallets a missing fact could still admit. A sanctioned wallet never appears here: nothing a person
+        confirms can approve it.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="queue" />}

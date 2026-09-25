@@ -16,15 +16,15 @@ import { useModalEscape } from "./useModalEscape";
 
 function nav(profile: ProfileId) {
   return [
-    { href: "/", label: "Policy", hint: "clause → contract" },
+    { href: "/", label: "Agreement", hint: "what runs on-chain" },
     {
       href: "/lenders",
       label: profile === "wildcat-credit" ? "Lenders" : "Investors",
       hint: "status & facts",
     },
-    { href: "/queue", label: "Queue", hint: "review items" },
+    { href: "/queue", label: "Decisions", hint: "waiting on a person" },
     { href: "/exit", label: profile === "wildcat-credit" ? "Exit" : "Trade", hint: "venue" },
-    { href: "/audit", label: "Audit", hint: "timeline" },
+    { href: "/audit", label: "History", hint: "every decision" },
   ];
 }
 

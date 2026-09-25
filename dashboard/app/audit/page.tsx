@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { source } from "@/lib/adapter";
 import { explain } from "@/lib/evaluate";
 import { fmtTime, short } from "@/lib/format";
+import { actionLabel, KIND_LABEL, plainSummary, VERDICT_LABEL } from "@/lib/labels";
 import { useResource } from "@/lib/hooks";
 import type { AuditEvent, PolicyData } from "@/lib/types";
 import { EffectChip, Failed, Loading, PageHead, Refusal, TriChip } from "../_components/common";
@@ -28,12 +29,12 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
       <details>
         <summary>
           <span className="when">{fmtTime(event.at)}</span>
-          <span className="chip chip-action">{event.kind}</span>
+          <span className="chip chip-action">{KIND_LABEL[event.kind] ?? event.kind}</span>
           <strong>{event.subject}</strong>
-          <span className="muted small">{event.summary}</span>
+          <span className="muted small">{plainSummary(event.summary)}</span>
           {decided ? (
             <span className={`chip chip-${verdict}`}>
-              {event.action}: {verdict}
+              {actionLabel(event.action)}: {VERDICT_LABEL[verdict]}
             </span>
           ) : (
             <span className="meta">facts</span>
@@ -45,9 +46,9 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
             <dd>{event.venue}</dd>
             <dt>Decision</dt>
             <dd>
-              <code>
-                {replay ? "PolicyEval.decide (replayed)" : "on chain"} → ({String(allowed)}, {clauseId})
-              </code>
+              {allowed ? "Allowed" : "Refused"}
+              {replay ? " (replayed from the facts)" : " on-chain"}
+              {!allowed && clauseId > 0 ? `, clause ${clauseId}` : ""}
             </dd>
             {!allowed && clauseId > 0 && (
               <>
@@ -61,7 +62,7 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
             <dd>
               {event.txHash && event.explorer ? (
                 <a href={event.explorer} target="_blank" rel="noreferrer">
-                  <code title={event.txHash}>{short(event.txHash, 10, 6)} ↗</code>
+                  View on Etherscan ↗
                 </a>
               ) : event.txHash ? (
                 <code title={event.txHash}>{short(event.txHash, 10, 6)}</code>
@@ -98,8 +99,8 @@ export default function AuditPage() {
   const sorted = [...(events.data ?? [])].sort((a, b) => b.at.localeCompare(a.at));
   return (
     <>
-      <PageHead title="Every decision, traceable to a sentence">
-        Newest first. Each row names the clause behind its decision.
+      <PageHead title="What happened">
+        Every decision, newest first, with the sentence of the agreement behind it.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

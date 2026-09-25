@@ -5,6 +5,7 @@ import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
 import { effectiveFacts } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
+import { instructionLabel } from "@/lib/labels";
 import {
   ClauseTableBadge,
   Disclosure,
@@ -92,31 +93,36 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
 
       <div className="grid-2">
         <section className="card">
-          <h2>Program</h2>
-          <p className="small muted">
-            Decoded instruction by instruction; opcodes from the vendored LimitOpcodes set.
-          </p>
+          <h2>What the venue checks on every trade</h2>
+          <p className="small muted">The program the borrower posted, one instruction at a time.</p>
           <ol className="program">
             {buyback.instructions.map((ins) => (
               <li key={ins.name} className={ins.name.startsWith("PolicyGuard") ? "guard" : ""}>
-                <span>
-                  <span className="ins-name">{ins.name}</span>{" "}
-                  <span className="chip">opcode {ins.opcode}</span>{" "}
-                  <span className="chip chip-term">{ins.source}</span>
+                <span title={`${ins.name} · opcode ${ins.opcode}`}>
+                  <span className="ins-name">{instructionLabel(ins.name)}</span>
+                  <span className="ins-plain">{plainInstruction(ins, buyback.terms, policy)}</span>
                 </span>
-                {Object.keys(ins.args).length > 0 && (
-                  <dl className="ins-args">
-                    {Object.entries(ins.args).map(([key, value]) => (
-                      <div key={key} style={{ display: "contents" }}>
-                        <dt>{key}</dt>
-                        <dd>{value.startsWith("0x") ? short(value, 10, 6) : value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-                <code className="small muted" style={{ gridColumn: 2, overflowWrap: "anywhere" }}>
-                  {short(ins.bytes, 18, 8)}
-                </code>
+                <details className="disc" style={{ gridColumn: 2 }}>
+                  <summary>
+                    <span className="meta">technical</span>
+                  </summary>
+                  <p className="meta">
+                    {ins.name} · opcode {ins.opcode} · from {ins.source}
+                  </p>
+                  {Object.keys(ins.args).length > 0 && (
+                    <dl className="ins-args">
+                      {Object.entries(ins.args).map(([key, value]) => (
+                        <div key={key} style={{ display: "contents" }}>
+                          <dt>{key}</dt>
+                          <dd>{value.startsWith("0x") ? short(value, 10, 6) : value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  <code className="small muted" style={{ overflowWrap: "anywhere" }}>
+                    {short(ins.bytes, 18, 8)}
+                  </code>
+                </details>
               </li>
             ))}
           </ol>
@@ -138,10 +144,10 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
         </section>
 
         <section className="card">
-          <h2>Quote as any wallet</h2>
+          <h2>Try a quote</h2>
           <p className="small muted">
-            <code>quote()</code> runs the program in a static call: a wallet the agreement refuses is refused
-            before any transaction is sent.
+            Ask for a price as any wallet. A wallet the agreement refuses is refused before any transaction is
+            sent.
           </p>
           <label>
             Taker
@@ -186,22 +192,23 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
                 ✓ {amount} position tokens → {fromMicro(result.amountOut)} asset
               </span>
               <span className="small muted">
-                PolicyGuard passed for maker and taker · FixedRateBalances at {buyback.terms.price}
+                Both sides passed the agreement · price {buyback.terms.price}
               </span>
             </div>
           )}
           {result && !result.ok && "deadline" in result && (
             <div className="verdict verdict-deny">
-              <code className="revert">revert Deadline — the addendum's offer has expired</code>
+              <span className="verdict-head">✕ the addendum's offer has expired</span>
             </div>
           )}
           {refused && (
             <div className="verdict verdict-deny">
-              <span className="verdict-head">✕ quote reverted</span>
-              <code className="revert">
-                CounterpartyRefused({short(refused.subject.address, 8, 6)}, {refused.clauseId},{" "}
-                {short(policy.policyHash, 8, 4)})
-              </code>
+              <span
+                className="verdict-head"
+                title={`CounterpartyRefused(${refused.subject.address}, ${refused.clauseId}, ${policy.policyHash})`}
+              >
+                ✕ refused before any transaction
+              </span>
               <span className="small">
                 {refused.subject.role === "borrower" ? "The maker" : "The taker"} was refused by{" "}
                 <Refusal policy={policy} action="transfer" clauseId={refused.clauseId} />
@@ -288,6 +295,25 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
   );
 }
 
+/** One line a reader can act on, per instruction of the buyback program. */
+function plainInstruction(
+  ins: { name: string; args: Record<string, string> },
+  terms: { price: string; cap: string; deadline: string },
+  policy: PolicyData
+): string {
+  if (ins.name.startsWith("Controls._deadline"))
+    return `The offer closes on ${ins.args.date ?? terms.deadline}.`;
+  if (ins.name.startsWith("PolicyGuard"))
+    return `Maker and taker are both checked against this agreement (policy ${short(policy.policyHash, 8, 4)}) on every quote and fill.`;
+  if (ins.name.startsWith("FixedRateBalances"))
+    return `${terms.price} per token, up to ${Number(terms.cap).toLocaleString()} tokens.`;
+  if (ins.name.startsWith("DutchAuction"))
+    return "The price improves from the floor to the ceiling over the window.";
+  if (ins.name.startsWith("LimitSwap")) return "The taker's tokens are swapped at that price.";
+  if (ins.name.startsWith("Invalidators")) return "Each fill counts against the cap; nothing beyond it.";
+  return "";
+}
+
 export default function ExitPage() {
   const { profile, policy, parties } = usePolicyAndParties();
   const { setProfile } = useProfile();
@@ -295,10 +321,10 @@ export default function ExitPage() {
   const credit = profile === "wildcat-credit";
   return (
     <>
-      <PageHead title={credit ? "A compliant exit on 1inch Aqua" : "The token's only door into Uniswap"}>
+      <PageHead title={credit ? "How a lender exits" : "How the token trades"}>
         {credit
-          ? "The borrower ships a buyback whose program carries the compiled agreement as an instruction."
-          : "The same agreement, enforced at the pool by a hook whose address is part of every PoolKey."}
+          ? "The borrower stands a bid for its own debt on 1inch Aqua; the agreement is checked on every quote and fill."
+          : "Anyone may open a pool, but only a pool that carries the agreement's hook can take the token."}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="venue" />}

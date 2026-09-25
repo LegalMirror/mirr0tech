@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { source } from "@/lib/adapter";
 import { explain } from "@/lib/evaluate";
-import { factKind, OBSERVABLE_SOURCE } from "@/lib/facts";
+import { factKind, FACT_KIND_LABEL, OBSERVABLE_SOURCE } from "@/lib/facts";
+import { actionLabel, factLabel, VERDICT_LABEL } from "@/lib/labels";
 import { fmtTime, short } from "@/lib/format";
 import { credentialExpiry, effectiveFacts, relevantFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
@@ -22,7 +23,7 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
   const shown = relevantFacts(policy)
     .map((name) => [name, facts[name]] as const)
     .sort((a, b) => Number(typeof b[1] === "boolean") - Number(typeof a[1] === "boolean"));
-  const label = status.verdict === "approve" ? "approved" : status.verdict === "review" ? "review" : "denied";
+  const label = VERDICT_LABEL[status.verdict];
   return (
     <section className={`card status-${status.verdict}`}>
       <div className="party-head">
@@ -50,7 +51,8 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
           const verdict = explain(policy, action, facts).verdict;
           return (
             <span key={action}>
-              {action} <Glyph state={verdict} title={`${action}: ${verdict}`} />
+              {actionLabel(action)}{" "}
+              <Glyph state={verdict} title={`${actionLabel(action)}: ${VERDICT_LABEL[verdict]}`} />
             </span>
           );
         })}
@@ -64,9 +66,9 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
 
       <ul className="facts-list" aria-label={credit ? "Facts the agreement reads" : "Onboarding facts"}>
         {shown.map(([name, value]) => (
-          <li key={name} title={factKind(policy.profile, name)}>
+          <li key={name} title={`${name} · ${FACT_KIND_LABEL[factKind(policy.profile, name)]}`}>
             <Glyph state={triState(value)} />
-            <span>{name}</span>
+            <span>{factLabel(name)}</span>
           </li>
         ))}
       </ul>
@@ -74,7 +76,7 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
       {credit && (
         <>
           <p className="meta" style={{ marginTop: 8 }} title={OBSERVABLE_SOURCE.sanctionsClear}>
-            Sanctions oracle: {party.sanctions}
+            Sanctions screening: {party.sanctions}
           </p>
           <p className="meta">
             {party.screenedAt
@@ -110,8 +112,7 @@ export default function LendersPage() {
   return (
     <>
       <PageHead title={credit ? "Who may lend" : "Who may hold"}>
-        Status is the compiled policy run on each wallet's facts — the same decision the{" "}
-        {credit ? "role provider" : "gateway"} makes.
+        Each wallet's standing under the agreement, decided the same way the chain decides it.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="parties" />}

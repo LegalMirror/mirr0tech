@@ -67,9 +67,9 @@ describe("coverage copy", () => {
       terms: 8,
     };
     expect(coverageSentence(coverage)).toBe(
-      "23 of 166 paragraphs compile to 14 rules and 8 terms · 44 flagged unresolved · 99 not executable"
+      "23 of 166 paragraphs are enforced on-chain as 14 rules and 8 values · 44 open items · 99 not enforceable"
     );
-    expect(coverageSentence({ ...coverage, terms: 0, rules: 1 })).toContain("compile to 1 rule ·");
+    expect(coverageSentence({ ...coverage, terms: 0, rules: 1 })).toContain("as 1 rule ·");
   });
 
   it("titles each status the way the reader needs it", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { decodeRefusal } from "@/lib/decode";
 import { short } from "@/lib/format";
+import { actionLabel } from "@/lib/labels";
 import type { Effect, PolicyData, Tri } from "@/lib/types";
 import { clauseTableMatches } from "@/lib/verify";
 import { CopyButton } from "./CopyButton";
@@ -137,18 +138,13 @@ export function Refusal({
     <span className="small">
       {decoded.kind === "no-permit" && (
         <>
-          <code>clauseId 0</code> — no permit of <code>{action}</code> held
-          {decoded.clauses.length ? "; it is permitted only by " : ""}
+          No rule allows {actionLabel(action).toLowerCase()} for this wallet
+          {decoded.clauses.length ? "; it is allowed only under " : "."}
         </>
       )}
       {decoded.clauses.map((entry, index) => (
-        <span key={entry.clauseId}>
+        <span key={entry.clauseId} title={`clauseId ${entry.clauseId}`}>
           {index > 0 && " · "}
-          {decoded.kind === "clause" && (
-            <>
-              <code>clauseId {entry.clauseId}</code> →{" "}
-            </>
-          )}
           <strong>{entry.clause}</strong> — “{entry.quote}”
         </span>
       ))}

@@ -1442,9 +1442,13 @@ blockquote.quote {
   background: color-mix(in srgb, var(--require) 8%, transparent);
 }
 .ins-name {
-  font-family: var(--font-mono);
-  font-weight: 700;
+  font-weight: 600;
   color: var(--flame);
+}
+.ins-plain {
+  display: block;
+  font-size: 13px;
+  margin: 2px 0 0;
 }
 .ins-args {
   grid-column: 2;
@@ -1839,8 +1843,7 @@ blockquote.quote {
   margin: 6px 0 0;
   padding: 0;
   list-style: none;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 .facts-list li {
   display: flex;
@@ -1859,8 +1862,7 @@ blockquote.quote {
   list-style: none;
   padding: 0;
   margin: 4px 0 0;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-size: 13px;
 }
 .trace-line li {
   display: flex;
@@ -1877,5 +1879,30 @@ blockquote.why {
   padding: 4px 10px;
   border-left: 2px solid var(--tone, var(--border));
   font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.plain-head {
+  margin: 0 0 4px;
+  font-size: 14px;
+}
+.plain {
+  font-size: 13px;
+}
+.plain-list {
+  margin: 2px 0 6px;
+  padding-left: 18px;
+}
+.plain-list li {
+  margin: 2px 0;
+}
+.plain-fact {
+  font-weight: 500;
+}
+.tech h4 {
+  margin: 14px 0 4px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   color: var(--text-secondary);
 }

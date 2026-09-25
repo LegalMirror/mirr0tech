@@ -144,9 +144,9 @@ const DocLine = memo(function DocLine({
 
 const FILTERS: { value: CoverageFilter; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "compiled", label: "Compiled" },
-  { value: "unresolved", label: "Unresolved" },
-  { value: "not-executable", label: "Not executable" },
+  { value: "compiled", label: "Enforced" },
+  { value: "unresolved", label: "Open items" },
+  { value: "not-executable", label: "Not enforceable" },
 ];
 
 function CoverageBar({
@@ -265,7 +265,7 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
   return (
     <section className="card doc-card" aria-label="Source document">
       <div className="doc-head">
-        <h2>Source document</h2>
+        <h2>The agreement</h2>
       </div>
       <CoverageBar policy={policy} filter={filter} setFilter={setFilter} />
       <div className="doc-scroll" ref={scroller}>

@@ -5,6 +5,7 @@ import { venuesFor, renderRefusal } from "@/lib/enforcement";
 import { factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
+import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel } from "@/lib/labels";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
@@ -77,12 +78,12 @@ function QuoteStep({
       (p) => p.part === first.part && first.displayStart < p.displayEnd && first.displayEnd > p.displayStart
     );
   return (
-    <Step n={1} title="Quote" hint="verbatim from the document" tone={tone}>
+    <Step n={1} title="The sentence" hint="verbatim from the agreement" tone={tone}>
       <blockquote className="quote">“{quote}”</blockquote>
       <div className="quote-meta">
         <span className="chip chip-action">{clause}</span>
         {paragraph?.label && (
-          <span className="chip" title="the paragraph this quote sits in">
+          <span className="chip" title="the paragraph this sentence sits in">
             ¶ {paragraph.label}
           </span>
         )}
@@ -101,6 +102,30 @@ function QuoteStep({
   );
 }
 
+/** The condition in words: facts by their plain names, "all of" / "any of" / "not". */
+function Plain({ node }: { node: Condition }) {
+  if (node.type === "fact") return <span className="plain-fact">{factLabel(node.name)}</span>;
+  if (node.type === "not")
+    return (
+      <span>
+        not <Plain node={node.child} />
+      </span>
+    );
+  return (
+    <span>
+      {node.type === "all" ? "all of" : "any of"}
+      <ul className="plain-list">
+        {node.children.map((child, index) => (
+          <li key={index}>
+            <Plain node={child} />
+          </li>
+        ))}
+      </ul>
+    </span>
+  );
+}
+
+/** The condition as the compiler sees it: identifiers, bit positions, fact kinds. */
 function Tree({ node, policy }: { node: Condition; policy: PolicyData }) {
   if (node.type === "fact") {
     return (
@@ -138,12 +163,6 @@ function Tree({ node, policy }: { node: Condition; policy: PolicyData }) {
   );
 }
 
-const EFFECT_MEANING = {
-  permit: "At least one permit of the action must be TRUE.",
-  require: "Must be TRUE. FALSE or unknown refuses with this clause.",
-  forbid: "Must be FALSE. TRUE or unknown refuses with this clause.",
-};
-
 function BitStrip({ policy, pos, neg }: { policy: PolicyData; pos: number[]; neg: number[] }) {
   return (
     <div className="bitrow" aria-label="fact bits">
@@ -171,6 +190,128 @@ function HexWithRange({ hex, start, end }: { hex: string; start: number; end: nu
   );
 }
 
+/** Everything an engineer would ask for: identifiers, logic, bytes, reverts. */
+function Technical({ policy, rule }: { policy: PolicyData; rule: Rule }) {
+  const program = policy.programs.find((entry) => entry.action === rule.action)!;
+  const segment = program.rules.find((entry) => entry.clauseId === rule.clauseId);
+  const venues = venuesFor(policy.profile, rule.action);
+  const refusalClause = rule.effect === "permit" ? 0 : rule.clauseId;
+  return (
+    <div className="tech">
+      <div className="row">
+        <code className="mono">{rule.id}</code>
+        <span className="chip chip-action">{rule.action}</span>
+        <EffectChip effect={rule.effect} />
+        <span className="chip">clauseId {rule.clauseId}</span>
+      </div>
+      <h4>Logic · NNF → DNF, one bitmask pair per term</h4>
+      <div className="tree">
+        <Tree node={rule.condition} policy={policy} />
+      </div>
+      <div className="dnf">
+        {rule.dnf.map((term, index) => (
+          <div key={index}>
+            {index > 0 && <div className="dnf-or">OR</div>}
+            <div className="dnf-term">
+              <div className="dnf-lits">
+                <span className="small muted">term {index + 1}</span>
+                {term.pos.map((bit) => (
+                  <span key={`p${bit}`} className="chip chip-true">
+                    {policy.factOrder[bit]} · bit {bit}
+                  </span>
+                ))}
+                {term.neg.map((bit) => (
+                  <span key={`n${bit}`} className="chip chip-false">
+                    ¬{policy.factOrder[bit]} · bit {bit}
+                  </span>
+                ))}
+              </div>
+              <BitStrip policy={policy} pos={term.pos} neg={term.neg} />
+              <dl className="masks">
+                <dt>pos</dt>
+                <dd>{term.posMask}</dd>
+                <dt>neg</dt>
+                <dd>{term.negMask}</dd>
+              </dl>
+            </div>
+          </div>
+        ))}
+      </div>
+      <p className="small muted">
+        ✓ Proved equal to the tree interpreter over {policy.equivalenceChecks.toLocaleString()} three-valued
+        assignments at compile time.
+      </p>
+      <h4>Bytes · CompiledPolicy.program(ACTION_{rule.action.toUpperCase()})</h4>
+      {segment ? (
+        <>
+          <p className="small muted">
+            {program.byteLength} bytes · this rule is bytes [{segment.byteStart}, {segment.byteEnd}) · rule{" "}
+            {program.rules.indexOf(segment) + 1} of {program.rules.length} <HexCopy value={program.hex} />
+          </p>
+          <details className="disc">
+            <summary>
+              <span className="disc-title">all bytes</span>
+            </summary>
+            <HexWithRange hex={program.hex} start={segment.byteStart} end={segment.byteEnd} />
+          </details>
+          <table className="words">
+            <tbody>
+              {segment.words.map((word) => (
+                <tr
+                  key={word.offset}
+                  className={/^(effect|clauseId|pos\[|neg\[)/.test(word.label) ? "word-key" : ""}
+                >
+                  <td>+{word.offset}</td>
+                  <td>{word.label}</td>
+                  <td>{word.hex.replace(/^0x0+(?=.)/, "0x")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        <p className="error">No program segment found for clause {rule.clauseId}.</p>
+      )}
+      <h4>Reverts</h4>
+      <div className="venues">
+        {venues.map((venue) => (
+          <div className="venue" key={`${venue.contract}${venue.calls[0]}`}>
+            <span className="venue-name">{venue.contract}</span>
+            <code className="small">{venue.calls.join(" · ")}</code>
+            <span className="small muted">
+              <code>{venue.file}</code>
+            </span>
+            {venue.refusal ? (
+              <code className="revert">
+                revert{" "}
+                {renderRefusal(venue.refusal, {
+                  clauseId: refusalClause,
+                  policyHash: short(policy.policyHash, 8, 4),
+                  subject: "0xSubject…",
+                })}
+              </code>
+            ) : null}
+            {venue.note && <span className="small muted">{venue.note}</span>}
+          </div>
+        ))}
+      </div>
+      <p className="small">
+        {rule.effect === "permit" ? (
+          <>
+            A permit never names itself in a revert: when no permit of <code>{rule.action}</code> holds, the
+            venue refuses with <code>clauseId 0</code>.
+          </>
+        ) : (
+          <>
+            <code>clauseId {rule.clauseId}</code> → <strong>{rule.source.clause}</strong>
+          </>
+        )}{" "}
+        <ClauseTableBadge policy={policy} />
+      </p>
+    </div>
+  );
+}
+
 function RuleSteps({
   policy,
   rule,
@@ -181,11 +322,11 @@ function RuleSteps({
   evaluator: EvaluatorProps;
 }) {
   const tone = toneOf(rule.effect);
-  const program = policy.programs.find((entry) => entry.action === rule.action)!;
-  const segment = program.rules.find((entry) => entry.clauseId === rule.clauseId);
   const venues = venuesFor(policy.profile, rule.action);
-  const refusalClause = rule.effect === "permit" ? 0 : rule.clauseId;
-  const actionConst = `ACTION_${rule.action.toUpperCase()}`;
+  const components = (policy.enforcedBy.rules[rule.id] ?? [])
+    .map((id) => policy.components.find((entry) => entry.id === id))
+    .filter(Boolean);
+  const factCount = factsOfCondition(rule.condition).size;
   return (
     <ol className="stepper">
       <QuoteStep
@@ -196,176 +337,49 @@ function RuleSteps({
         tone={tone}
       />
 
-      <Step n={2} title="Rule" hint="the structured reading" tone={tone}>
-        <div className="row" title={`clauseId ${rule.clauseId}`}>
-          <code className="mono">{rule.id}</code>
-          <span className="chip chip-action">{rule.action}</span>
-          <EffectChip effect={rule.effect} />
-        </div>
-        <p className="small muted">{EFFECT_MEANING[rule.effect]}</p>
-        <div className="tree">
-          <Tree node={rule.condition} policy={policy} />
+      <Step n={2} title="What it means" tone={tone}>
+        <p className="plain-head">
+          <strong>{EFFECT_LABEL[rule.effect]}</strong> · applies to{" "}
+          <strong>{actionLabel(rule.action)}</strong>
+        </p>
+        <div className="plain">
+          <Plain node={rule.condition} />
         </div>
         <p className="small">{rule.rationale}</p>
+        <p className="meta">{EFFECT_SENTENCE[rule.effect]}</p>
       </Step>
 
-      <Step
-        n={3}
-        title="Logic"
-        hint="NNF → DNF, one bitmask pair per term"
-        tone={tone}
-        folded={`${rule.dnf.length} term${rule.dnf.length === 1 ? "" : "s"} over ${factsOfCondition(rule.condition).size} facts · proved equal to the interpreter`}
-      >
-        <p className="small muted">
-          Holds when any term holds. A term holds when every <em>pos</em> fact is known TRUE and every{" "}
-          <em>neg</em> fact is known FALSE; if nothing refutes it but a fact is unknown, the term is unknown.
-        </p>
-        <div className="dnf">
-          {rule.dnf.map((term, index) => (
-            <div key={index}>
-              {index > 0 && <div className="dnf-or">OR</div>}
-              <div className="dnf-term">
-                <div className="dnf-lits">
-                  <span className="small muted">term {index + 1}</span>
-                  {term.pos.map((bit) => (
-                    <span key={`p${bit}`} className="chip chip-true">
-                      {policy.factOrder[bit]} · bit {bit}
-                    </span>
-                  ))}
-                  {term.neg.map((bit) => (
-                    <span key={`n${bit}`} className="chip chip-false">
-                      ¬{policy.factOrder[bit]} · bit {bit}
-                    </span>
-                  ))}
-                </div>
-                <BitStrip policy={policy} pos={term.pos} neg={term.neg} />
-                <dl className="masks">
-                  <dt>pos</dt>
-                  <dd>{term.posMask}</dd>
-                  <dt>neg</dt>
-                  <dd>{term.negMask}</dd>
-                </dl>
-              </div>
-            </div>
-          ))}
-        </div>
-        <p className="small muted">
-          ✓ Proved equal to the tree interpreter over {policy.equivalenceChecks.toLocaleString()} three-valued
-          assignments at compile time.
-        </p>
-      </Step>
-
-      <Step
-        n={4}
-        title="Bytes"
-        hint={`CompiledPolicy.program(${actionConst})`}
-        tone={tone}
-        folded={
-          segment
-            ? `rule ${program.rules.indexOf(segment) + 1} of ${program.rules.length} · ${program.byteLength}-byte program · offset ${segment.byteStart}`
-            : "no program segment"
-        }
-      >
-        {segment ? (
-          <>
-            <details className="disc">
-              <summary>
-                <span className="disc-title">all bytes</span>
-              </summary>
-              <HexWithRange hex={program.hex} start={segment.byteStart} end={segment.byteEnd} />
-            </details>
-            <div className="row small" style={{ marginTop: 6 }}>
-              <span className="muted">
-                {program.byteLength} bytes · this rule is bytes [{segment.byteStart}, {segment.byteEnd}) ·
-                rule {program.rules.indexOf(segment) + 1} of {program.rules.length}
-              </span>
-              <HexCopy value={program.hex} />
-            </div>
-            <table className="words">
-              <tbody>
-                {segment.words.map((word) => (
-                  <tr
-                    key={word.offset}
-                    className={/^(effect|clauseId|pos\[|neg\[)/.test(word.label) ? "word-key" : ""}
-                  >
-                    <td>+{word.offset}</td>
-                    <td>{word.label}</td>
-                    <td>{word.hex.replace(/^0x0+(?=.)/, "0x")}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
+      <Step n={3} title="Where it runs" tone={tone}>
+        {components.map((component) => (
+          <p className="small" key={component!.id}>
+            {component!.description}
+          </p>
+        ))}
+        {venues.length === 0 ? (
+          <p className="meta">No venue enforces {actionLabel(rule.action).toLowerCase()} in this profile.</p>
         ) : (
-          <p className="error">No program segment found for clause {rule.clauseId}.</p>
+          <ul className="plain-list">
+            {venues.map((venue) => (
+              <li key={`${venue.contract}${venue.calls[0]}`}>
+                <strong>{venue.contract.split(" (")[0]}</strong> — {venue.when}
+                {venue.refusal && "; a failure refuses the action and names this clause on-chain"}
+              </li>
+            ))}
+          </ul>
         )}
       </Step>
 
-      <Step n={5} title="Enforcement" hint="where these bytes run" tone={tone}>
-        <div className="venues" style={{ marginBottom: 8 }}>
-          {(policy.enforcedBy.rules[rule.id] ?? []).map((id) => {
-            const component = policy.components.find((entry) => entry.id === id);
-            return (
-              <div className="venue" key={id}>
-                <span>
-                  <span className="chip chip-action">component</span> <code>{id}</code>
-                  {component && <span className="small muted"> v{component.version}</span>}
-                </span>
-                {component && <span className="small muted">{component.description}</span>}
-              </div>
-            );
-          })}
-        </div>
-        {venues.length === 0 && (
-          <p className="muted small">No venue enforces {rule.action} in this profile.</p>
-        )}
-        <div className="venues">
-          {venues.map((venue) => (
-            <div className="venue" key={`${venue.contract}${venue.calls[0]}`}>
-              <span className="venue-name">{venue.contract}</span>
-              <code className="small">{venue.calls.join(" · ")}</code>
-              <span className="small muted">
-                {venue.when} — <code>{venue.file}</code>
-              </span>
-              {venue.refusal ? (
-                <code className="revert">
-                  revert{" "}
-                  {renderRefusal(venue.refusal, {
-                    clauseId: refusalClause,
-                    policyHash: short(policy.policyHash, 8, 4),
-                    subject: "0xSubject…",
-                  })}
-                </code>
-              ) : null}
-              {venue.note && <span className="small muted">{venue.note}</span>}
-            </div>
-          ))}
-        </div>
-        <div className="verdict" style={{ marginTop: 10 }}>
-          <span className="small muted">decoded</span>
-          {rule.effect === "permit" ? (
-            <span className="small">
-              A permit never names itself in a revert: when no permit of <code>{rule.action}</code> holds, the
-              venue refuses with <code>clauseId 0</code> — no matching permission.
-            </span>
-          ) : (
-            <span className="small">
-              <code>clauseId {rule.clauseId}</code> → <strong>{rule.source.clause}</strong> — “
-              {rule.source.quote}”
-            </span>
-          )}
-          <ClauseTableBadge policy={policy} />
-        </div>
+      <Step n={4} title="What if…" tone={tone} folded="try a wallet's facts">
+        <Evaluator {...evaluator} action={rule.action} focus={rule.id} />
       </Step>
 
       <Step
-        n={6}
-        title="What would happen"
-        hint="toggle a hypothetical wallet's facts"
+        n={5}
+        title="Technical details"
         tone={tone}
-        folded="try a wallet's facts"
+        folded={`${rule.id} · ${rule.dnf.length} term${rule.dnf.length === 1 ? "" : "s"} over ${factCount} facts · bytes and reverts`}
       >
-        <Evaluator {...evaluator} action={rule.action} focus={rule.id} />
+        <Technical policy={policy} rule={rule} />
       </Step>
     </ol>
   );
@@ -375,27 +389,17 @@ function consumerOf(policy: PolicyData, term: Term): ReactNode {
   const buyback = policy.buyback;
   if (buyback?.available) {
     const used = buyback.instructions.filter((ins) => ins.source.includes(term.name));
-    if (used.length)
-      return (
-        <>
-          Fills the SwapVM buyback template:{" "}
-          {used.map((ins) => (
-            <code key={ins.name}>{ins.name} </code>
-          ))}
-          — see the Exit screen.
-        </>
-      );
+    if (used.length) return <>Sets the buyback the borrower posts on 1inch Aqua — see the Exit screen.</>;
   }
   if (term.name === "rescreeningIntervalDays")
     return (
       <>
-        Bounds the deployment: <code>attestationValiditySeconds</code> (
-        {String(policy.config.attestationValiditySeconds)}) must not exceed{" "}
-        <code>rescreeningIntervalSeconds</code> ({String(policy.config.rescreeningIntervalSeconds)}); the
-        compiler refuses a config that would let an attestation outlive the agreement.
+        Caps how long an attestation may live ({String(policy.config.attestationValiditySeconds)} s ≤{" "}
+        {String(policy.config.rescreeningIntervalSeconds)} s); a deployment that would outlive the agreement
+        is refused at compile time.
       </>
     );
-  return <>Displayed only; not compiled to market parameters in this version.</>;
+  return <>Shown for reference; not wired to market parameters in this version.</>;
 }
 
 function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
@@ -409,22 +413,22 @@ function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
         locations={term.quotes}
         tone={tone}
       />
-      <Step n={2} title="Term" hint="a value, never a boolean" tone={tone}>
-        <div className="row">
-          <code className="mono">{term.name}</code>
+      <Step n={2} title="The value" tone={tone}>
+        <p className="plain-head">
           <span className="term-val">
             {term.value} <small className="muted">{term.unit}</small>
           </span>
-        </div>
+        </p>
         <p className="small">{term.rationale}</p>
       </Step>
-      <Step
-        n={3}
-        title="Consumed by"
-        hint="terms fill template slots, they never enter the evaluator"
-        tone={tone}
-      >
+      <Step n={3} title="Where it is used" tone={tone}>
         <p className="small">{consumerOf(policy, term)}</p>
+      </Step>
+      <Step n={4} title="Technical details" tone={tone} folded={`${term.name} · fills a template slot`}>
+        <p className="small">
+          <code>{term.name}</code> is a value, never a boolean: it fills a program template slot and never
+          enters the evaluator.
+        </p>
       </Step>
     </ol>
   );
@@ -444,5 +448,5 @@ export function Pipeline({
   const term = kind === "term" ? policy.terms.find((entry) => entry.name === name) : undefined;
   if (rule) return <RuleSteps policy={policy} rule={rule} evaluator={evaluator} />;
   if (term) return <TermSteps policy={policy} term={term} />;
-  return <p className="muted">Select a highlighted clause in the document, or a rule above.</p>;
+  return <p className="muted">Select a highlighted sentence in the agreement.</p>;
 }

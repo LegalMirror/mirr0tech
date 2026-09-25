@@ -9,8 +9,9 @@ export default function PolicyPage() {
   const { data: policy, error } = usePolicy();
   return (
     <>
-      <PageHead title="Legal clause → smart contract">
-        Click a highlighted sentence to follow it from quote to rule to the contract that enforces it.
+      <PageHead title="Which sentences run on-chain?">
+        The agreement, with every sentence that became an enforceable rule highlighted. Click one to see what
+        it does and where it runs.
       </PageHead>
       {error && <Failed error={error} />}
       {!policy && !error && <Loading what="compiled policy" />}

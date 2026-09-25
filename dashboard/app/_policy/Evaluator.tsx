@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { renderRefusal, venuesFor } from "@/lib/enforcement";
 import { explain, factsForAction, factsOfCondition, hex, type Facts } from "@/lib/evaluate";
 import { factKind } from "@/lib/facts";
+import { actionLabel, factLabel } from "@/lib/labels";
 import { short } from "@/lib/format";
 import type { PolicyData, Tri } from "@/lib/types";
 import { EffectChip, Refusal, TriChip } from "../_components/common";
@@ -89,11 +90,11 @@ export function Evaluator({
             className={`tri-row ${focusFacts.has(name) ? "hl" : ""}`}
             style={focusRule ? ({ "--tone": `var(--${focusRule.effect})` } as CSSProperties) : undefined}
           >
-            <span className="tri-name">
-              <span className="fact">{name}</span>
-              <small>
-                bit {policy.factOrder.indexOf(name)} · {factKind(policy.profile, name)}
-              </small>
+            <span
+              className="tri-name"
+              title={`${name} · bit ${policy.factOrder.indexOf(name)} · ${factKind(policy.profile, name)}`}
+            >
+              <span>{factLabel(name)}</span>
             </span>
             <TriToggle label={name} value={facts[name]} onChange={(v) => setFacts({ ...facts, [name]: v })} />
           </div>
@@ -102,32 +103,37 @@ export function Evaluator({
 
       <div className={`verdict verdict-${result.verdict}`} aria-live="polite">
         <div className="verdict-head">
-          <span className="chip chip-action">{action}</span>
+          <span className="chip chip-action">{actionLabel(action)}</span>
           <span>{VERDICT_TEXT[result.verdict]}</span>
         </div>
-        <div className="row small">
-          <span>
-            interpreter <code>evaluatePolicy</code>:{" "}
-            <strong>{result.interpretation.allowed ? "allowed" : "refused"}</strong>
-            {result.interpretation.reasons.length > 0 && (
-              <span className="muted"> ({result.interpretation.reasons.join(", ")})</span>
-            )}
-          </span>
-        </div>
-        <div className="row small">
-          <span>
-            on chain <code>PolicyEval.decide(program, known, value)</code> →{" "}
-            <code>
-              ({String(result.onchain.allowed)}, {result.onchain.clauseId})
-            </code>
-          </span>
-          <span className={`chip ${result.agree ? "chip-ok" : "chip-bad"}`}>
-            {result.agree ? "✓ agree" : "✗ disagree"}
-          </span>
-        </div>
-        <div className="row small mono muted">
-          known {hex(result.known)} · value {hex(result.value)}
-        </div>
+        <details className="disc">
+          <summary>
+            <span className="disc-title">technical</span>
+          </summary>
+          <div className="row small">
+            <span>
+              interpreter <code>evaluatePolicy</code>:{" "}
+              <strong>{result.interpretation.allowed ? "allowed" : "refused"}</strong>
+              {result.interpretation.reasons.length > 0 && (
+                <span className="muted"> ({result.interpretation.reasons.join(", ")})</span>
+              )}
+            </span>
+          </div>
+          <div className="row small">
+            <span>
+              on chain <code>PolicyEval.decide(program, known, value)</code> →{" "}
+              <code>
+                ({String(result.onchain.allowed)}, {result.onchain.clauseId})
+              </code>
+            </span>
+            <span className={`chip ${result.agree ? "chip-ok" : "chip-bad"}`}>
+              {result.agree ? "✓ agree" : "✗ disagree"}
+            </span>
+          </div>
+          <div className="row small mono muted">
+            known {hex(result.known)} · value {hex(result.value)}
+          </div>
+        </details>
         {!result.onchain.allowed && (
           <>
             <div>

@@ -367,7 +367,7 @@ Times are **JST**. Now ≈ **Sat 01:30**. ~31.5h to deadline, ~25.5h to freeze.
 | ~~Sat 10:00~~ **done Sat 03:00** | `PolicyGuard` + `FixedRateBalances` + router (23.0 KB) on anvil: ship, quote, fill, refusals, revocation, dock | `npm run test:chain` green (21) |
 | ~~Sat 14:00~~ **done Sat 04:00** | Act 1 token door + handshake; one-call deployment; golden path both acts; stack API over HTTP | `npm run demo:golden`, `test:chain:rwa` (26), `test:chain:stack` green |
 | **Sat 18:00** | Dashboard reads the stack API; clause highlighter live; go/no-go on the third slot (ENS / World / Uniswap) | Lam runs the golden path from the UI |
-| **Sat 24:00** | Dashboard P0 complete; hosted (Coolify pattern from the kjuis repo) or local recording plan settled; Sepolia only if it buys something the video needs | Lam runs the golden path from the UI 2× |
+| **Sat 24:00** | Dashboard P0 complete (paragraph coverage map in progress); hosting: Coolify compose written (`deploy/`, `docs/deploy.md`), image build blocked on a corrupted local Docker daemon — verify on a healthy host or record locally (`docs/DEMO_SCRIPT.md`); Sepolia only if it buys something the video needs | Lam runs the golden path from the UI 2× |
 | **Sun 03:00** | **Code freeze.** Bug fixes only | Tag `v0.2-freeze` |
 | **Sun 03:00–07:00** | Video, README team section, sponsor forms, screenshots | Video uploaded |
 | **Sun 08:00** | **Submit** (1h buffer) | Confirmed |

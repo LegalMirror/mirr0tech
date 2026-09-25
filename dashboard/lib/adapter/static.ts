@@ -3,6 +3,7 @@
 import type { AuditEvent, Deployment, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
 import { mockAudit, mockParties } from "./mock";
 import type { DataSource } from "./types";
+import { BASE } from "../base";
 
 const policies = new Map<ProfileId, Promise<PolicyData>>();
 const parties = new Map<ProfileId, Party[]>();
@@ -30,10 +31,10 @@ function update(profile: ProfileId, id: string, change: (party: Party) => void):
 
 export const staticSource: DataSource = {
   kind: "static",
-  profiles: async () => (await json<{ profiles: ProfileSummary[] }>("/data/index.json")).profiles,
+  profiles: async () => (await json<{ profiles: ProfileSummary[] }>(`${BASE}/data/index.json`)).profiles,
   policy(profile) {
     if (!policies.has(profile)) {
-      const load = json<PolicyData>(`/data/${profile}.json`);
+      const load = json<PolicyData>(`${BASE}/data/${profile}.json`);
       load.catch(() => policies.delete(profile));
       policies.set(profile, load);
     }
@@ -42,7 +43,7 @@ export const staticSource: DataSource = {
   parties: async (profile) => structuredClone(partiesOf(profile)),
   audit: async (profile): Promise<AuditEvent[]> => mockAudit(profile),
   deployment: async () => {
-    const response = await fetch("/data/deployment.json");
+    const response = await fetch(`${BASE}/data/deployment.json`);
     return response.ok ? ((await response.json()) as Deployment) : null;
   },
   attest: async (profile, id, facts: Record<string, Tri>) =>

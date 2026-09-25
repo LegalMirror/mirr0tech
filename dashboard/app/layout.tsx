@@ -1,3 +1,4 @@
+import { BASE } from "@/lib/base";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "./AppShell";
@@ -10,8 +11,8 @@ const PITCH =
 export const metadata: Metadata = {
   title: { default: `mirr0tech — ${TAGLINE}`, template: "%s · mirr0tech" },
   description: PITCH,
-  manifest: "/site.webmanifest",
-  icons: { icon: [{ url: "/mark.svg", type: "image/svg+xml" }] },
+  manifest: `${BASE}/site.webmanifest`,
+  icons: { icon: [{ url: `${BASE}/mark.svg`, type: "image/svg+xml" }] },
 };
 
 export const viewport: Viewport = {

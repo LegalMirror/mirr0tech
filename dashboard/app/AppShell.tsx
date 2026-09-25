@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BASE } from "@/lib/base";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import build from "@/lib/build-info.json";
@@ -91,7 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
         <Link href="/" className="sh-brand" onClick={close} aria-label="mirr0tech home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mark.svg" alt="" aria-hidden className="sh-logo" width={22} height={22} />
+          <img src={`${BASE}/mark.svg`} alt="" aria-hidden className="sh-logo" width={22} height={22} />
           <Wordmark />
         </Link>
         {compact && <ThemeToggle />}
@@ -109,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
         <Link href="/" className="sh-brand sh-brandSide" onClick={close} aria-label="mirr0tech home">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/mark.svg" alt="" aria-hidden className="sh-logo" width={26} height={26} />
+          <img src={`${BASE}/mark.svg`} alt="" aria-hidden className="sh-logo" width={26} height={26} />
           <Wordmark />
         </Link>
         <ProfileSwitch />

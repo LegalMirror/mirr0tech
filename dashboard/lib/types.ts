@@ -241,6 +241,20 @@ export type Deployment = {
   attestor: string;
   sanctions: string;
   usdc: string;
-  rwa: { policyHash: string; oracle: string; token: string; hook: string; router: string; poolManager: string };
-  credit: { policyHash: string; oracle: string; roleProvider: string; market: string; router: string; aqua: string };
+  rwa: {
+    policyHash: string;
+    oracle: string;
+    token: string;
+    hook: string;
+    router: string;
+    poolManager: string;
+  };
+  credit: {
+    policyHash: string;
+    oracle: string;
+    roleProvider: string;
+    market: string;
+    router: string;
+    aqua: string;
+  };
 };

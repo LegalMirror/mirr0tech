@@ -61,6 +61,8 @@ test('the dashboard adapter routes are served live from the stack', { timeout: 3
   assert.ok(audit.data[0].at >= audit.data.at(-1).at, 'newest first');
   const signed = audit.data.find((event) => event.txHash);
   assert.equal(signed.explorer, null, 'no explorer on a local chain');
+  assert.equal(signed.outcome, 'ok', 'the chain outcome travels with the event');
+  assert.ok(audit.data.every((event) => ['ok', 'refused'].includes(event.outcome)));
   venues.record.chainId = 11155111;
   const sepolia = (await call('/audit?profile=wildcat-credit')).data.find((event) => event.id === signed.id);
   assert.equal(sepolia.explorer, `https://sepolia.etherscan.io/tx/${signed.txHash}`);

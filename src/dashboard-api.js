@@ -91,9 +91,11 @@ export function dashboardRoutes(venues, policyData) {
       return {
         id: entry.id, at: entry.at,
         kind: refused ? (quoteRefused ? 'QuoteRefused' : 'Refused') : (entry.type === 'sanction' ? (entry.sanctioned ? 'Revoked' : 'Attested') : KINDS[entry.type] ?? 'PolicyChecked'),
-        subject: entry.wallet ?? entry.refusal?.subject ?? 'Operator', action: entry.type,
+        subject: entry.wallet ?? entry.refusal?.subject ?? 'Operator', action: ACTION[entry.type] ?? entry.type,
         summary: refused ? `${entry.refusal?.name ?? 'refused'}${entry.refusal?.clause ? ` — ${entry.refusal.clause.clause}: “${entry.refusal.clause.quote}”` : ''}` : summaryOf(entry),
         facts: entry.facts ?? {}, txHash: entry.txHash ?? null, venue: VENUE[entry.policy ?? kind] ?? 'attestor',
+        // What the chain decided; the browser shows this instead of replaying partial facts.
+        outcome: refused ? 'refused' : 'ok', clauseId: entry.refusal?.clause?.clauseId ?? entry.refusal?.clauseId ?? null,
         explorer: entry.txHash && EXPLORER[venues.record.chainId] ? `${EXPLORER[venues.record.chainId]}/tx/${entry.txHash}` : null,
       };
     }).reverse();
@@ -102,6 +104,11 @@ export function dashboardRoutes(venues, policyData) {
 }
 
 const EXPLORER = { 11155111: 'https://sepolia.etherscan.io' };
+// The policy action each venue call is decided under; facts-only entries have none.
+const ACTION = {
+  'rwa.mint': 'mint', 'rwa.release': 'transfer', 'rwa.pool.create': 'transfer', 'rwa.pool.addLiquidity': 'transfer', 'rwa.pool.swap': 'transfer',
+  'credit.deposit': 'deposit', 'credit.withdraw': 'withdraw', 'credit.buyback.ship': 'transfer', 'credit.buyback.quote': 'transfer', 'credit.buyback.fill': 'transfer', 'credit.buyback.dock': 'transfer',
+};
 
 function summaryOf(entry) {
   switch (entry.type) {

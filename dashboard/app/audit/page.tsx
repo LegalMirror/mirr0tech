@@ -16,17 +16,21 @@ const TONE: Record<string, string> = {
 };
 
 function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
-  const result = explain(policy, event.action, event.facts);
+  // The live gateway reports what the chain decided; the static build replays the mock facts.
+  const replay = event.outcome === undefined ? explain(policy, event.action, event.facts) : null;
+  const allowed = replay ? replay.onchain.allowed : event.outcome === "ok";
+  const clauseId = replay ? replay.onchain.clauseId : (event.clauseId ?? 0);
+  const verdict = replay ? replay.verdict : allowed ? "approve" : "deny";
   return (
-    <li style={{ "--tone": TONE[result.verdict] } as CSSProperties}>
+    <li style={{ "--tone": TONE[verdict] } as CSSProperties}>
       <details>
         <summary>
           <span className="when">{fmtTime(event.at)}</span>
           <span className="chip chip-action">{event.kind}</span>
           <strong>{event.subject}</strong>
           <span className="muted small">{event.summary}</span>
-          <span className={`chip chip-${result.verdict}`}>
-            {event.action}: {result.verdict}
+          <span className={`chip chip-${verdict}`}>
+            {event.action}: {verdict}
           </span>
         </summary>
         <div className="detail">
@@ -36,14 +40,14 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
             <dt>Decision</dt>
             <dd>
               <code>
-                PolicyEval.decide → ({String(result.onchain.allowed)}, {result.onchain.clauseId})
+                {replay ? "PolicyEval.decide (replayed)" : "on chain"} → ({String(allowed)}, {clauseId})
               </code>
             </dd>
-            {!result.onchain.allowed && (
+            {!allowed && clauseId > 0 && (
               <>
                 <dt>Clause</dt>
                 <dd>
-                  <Refusal policy={policy} action={event.action} clauseId={result.onchain.clauseId} />
+                  <Refusal policy={policy} action={event.action} clauseId={clauseId} />
                 </dd>
               </>
             )}
@@ -60,16 +64,20 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
               )}
             </dd>
           </dl>
-          <h3>Rule trace</h3>
-          <ul className="trace">
-            {result.interpretation.trace.map((entry) => (
-              <li key={entry.id}>
-                <EffectChip effect={entry.effect} />
-                <code>{entry.id}</code>
-                <TriChip value={entry.result} />
-              </li>
-            ))}
-          </ul>
+          {replay && (
+            <>
+              <h3>Rule trace</h3>
+              <ul className="trace">
+                {replay.interpretation.trace.map((entry) => (
+                  <li key={entry.id}>
+                    <EffectChip effect={entry.effect} />
+                    <code>{entry.id}</code>
+                    <TriChip value={entry.result} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       </details>
     </li>

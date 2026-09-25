@@ -229,6 +229,9 @@ export type AuditEvent = {
   txHash: string | null;
   /** Block-explorer link for the transaction on a public chain */
   explorer?: string | null;
+  /** Live gateway only: what the chain decided, and the clause it named when it refused */
+  outcome?: "ok" | "refused";
+  clauseId?: number | null;
   venue: string;
 };
 

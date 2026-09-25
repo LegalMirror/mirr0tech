@@ -11,7 +11,7 @@ interface IPolicyOracleTransfer {
 
 interface IVenueHook {
     function poolManager() external view returns (address);
-    function approvedSubject() external view returns (address);
+    function consumeApproval() external returns (address);
 }
 
 /// @notice Custodial by default: the signer authorizes policy decisions and all supply stays in
@@ -92,6 +92,11 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
         emit Released(operationId, investor, amount);
     }
 
+    function _admitted(address party) private view {
+        (bool allowed, uint16 clauseId) = policyOracle.mayTransfer(party);
+        if (!allowed) revert TransferRefused(party, clauseId);
+    }
+
     function _consume(bytes32 operationId, uint256 amount) private {
         if (operationId == bytes32(0) || amount == 0) revert InvalidOperation();
         if (processed[operationId]) revert AlreadyProcessed();
@@ -103,12 +108,14 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
             if (address(venueHook) == address(0)) revert TransfersDisabled();
             address poolManager = venueHook.poolManager();
             if (from == poolManager || to == poolManager) {
-                // The only door into Uniswap: a pool that ran the policy hook in this transaction.
+                // The only door into Uniswap: a pool that ran the policy hook in this transaction,
+                // and each admitted operation opens it for exactly one settlement leg.
                 address subject = from == poolManager ? to : from;
-                if (venueHook.approvedSubject() != subject) revert NoPolicyDoor(subject);
+                if (venueHook.consumeApproval() != subject) revert NoPolicyDoor(subject);
             } else {
-                (bool allowed, uint16 clauseId) = policyOracle.mayTransfer(to);
-                if (!allowed) revert TransferRefused(to, clauseId);
+                // Shares move neither to nor from a wallet the agreement refuses; custody is the issuer.
+                _admitted(to);
+                if (from != custodian) _admitted(from);
             }
         }
         super._update(from, to, value);

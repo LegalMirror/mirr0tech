@@ -91,6 +91,8 @@ Venue contracts assemble `(known, value)` by taking the attestor's words and OR-
 - `factsOf(subject, policyHash) → (known, value, issuedAt)` — returns zeros once expired
 - `override(subject, policyHash, bits, validUntil)` — `BORROWER_ROLE`, the MLA §13(c)(y) path; logged; expiring (to add)
 
+A fresh `attest` replaces the record, so a borrower override is reset by re-screening — the override lives and dies with the attestation window it was granted in.
+
 **Continuous screening is a property, not a feature.** Expiry zeroes `known`, every fact becomes unknown, the policy denies. Worst-case staleness = the attestation window, which the compiler bounds by the Lender Check Policy's re-screening interval.
 
 ### 4.2 Privacy
@@ -136,7 +138,7 @@ document sha256 ⊂ policyHash ⊂ program bytes ⊂ order.data ⊂ orderHash (E
 **The hook is the token's only door into Uniswap.** `PoolManager` is a singleton, so a token-level allowlist can only block it entirely or admit it wholesale — it cannot see which pool a transfer belongs to. The hook can, because its address is part of the `PoolKey`. Handshake:
 
 1. On a successful check the hook writes `tstore(APPROVED_SUBJECT, subject)` — EIP-1153 transient storage, gone at the end of the transaction.
-2. `MirrorToken._update`, for any transfer to or from `PoolManager`, requires `hook.approvedSubject()` to equal the non-`PoolManager` party.
+2. `MirrorToken._update`, for any transfer to or from `PoolManager`, calls `hook.consumeApproval()` (token-only) which returns the subject **and clears it**, so one admitted operation opens the door for exactly one settlement leg; a same-transaction hookless leg finds nothing.
 3. A pool created without the hook never sets the flag: `initialize` succeeds, the first settlement reverts at the token. A rogue router that moves tokens through itself fails the subject match — correct, since the hook trusts exactly one router.
 
 Result: anyone may create a pool for the token; only hooked pools can hold it; the issuer publishes one address and never operates a venue. This is the property Act 1 exists to demonstrate.
@@ -163,7 +165,7 @@ Built as `src/policy/components.js`: a registry where each component declares `c
 
 ## 7. Gateway (Node/Express, existing)
 
-Unchanged responsibilities for custodial issuance: operator auth, idempotency keys, operation intents before signing, restart recovery, audit log. **Built for the two-act stack** (`src/venues.js`, `src/venues-api.js`, mounted at `/v1/stack`): attest/revoke/override/sanction, Act 1 mint/release/pool actions, Act 2 deposit/withdraw and the Aqua buyback (ship, quote, fill, dock) with the program disassembled and the hash chain, `explain` for any wallet/action, and an in-memory audit of every action with tx hash or decoded refusal. Refusals are `403 POLICY_REFUSED` with the clause. `scripts/dev-stack.js` runs anvil + deployment + API in one process; `test/chain/gateway.test.js` drives both acts over HTTP.
+Unchanged responsibilities for custodial issuance: operator auth, idempotency keys, operation intents before signing, restart recovery, audit log. **Built for the two-act stack** (`src/venues.js`, `src/venues-api.js`, mounted at `/v1/stack`): attest/revoke/override/sanction, Act 1 mint/release/pool actions, Act 2 deposit/withdraw and the Aqua buyback (ship, quote, fill, dock) with the program disassembled and the hash chain, `explain` for any wallet/action, and an in-memory audit of every action with tx hash or decoded refusal. Refusals are `403 POLICY_REFUSED` with the clause. `scripts/dev-stack.js` runs anvil + deployment + API in one process; `test/chain/gateway.test.js` drives both acts over HTTP. With `MULTIBAAS_URL`/`MULTIBAAS_API_KEY` set on a supported chain, `src/multibaas.js` registers every deployed contract (ABI under a policy-hash version, aliased and linked) and `GET /v1/stack/events` serves MultiBaas-indexed events; locally it serves the in-memory audit.
 
 Wallet separation: deployer/admin · attestor · watcher · borrower-treasury (signs orders) · agent (P1). No wallet holds two roles.
 
@@ -198,6 +200,8 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `src/deploy.js`, `scripts/deploy-stack.js`, `test/chain/stack.test.js` | one-call deployment of both acts against any RPC; canonical venue addresses via env |
 | `src/refusal.js` | revert → clause decoder (unwraps Uniswap's `WrappedError`) |
 | `scripts/demo-golden.js` | both acts end to end on anvil — the demo script as a terminal run |
+| `src/venues.js`, `src/venues-api.js`, `scripts/dev-stack.js` | operator service and REST routes over the deployed stack; local runner |
+| `src/multibaas.js`, `scripts/multibaas-sync.js`, `test/multibaas.test.js` | MultiBaas registration of a deployment (post-deploy on a supported chain) |
 | `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
 | `contracts/PolicyEval.sol` | three-valued evaluator |
 | `contracts/PolicyAttestor.sol` | facts, expiry, revocation, EIP-712 relay |

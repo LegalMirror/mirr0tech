@@ -46,7 +46,7 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
   const poolManager = canonical.poolManager ? at(canonical.poolManager, rwa.artifacts.PoolManager) : await deploy(rwa.artifacts.PoolManager, 'PoolManager', deployer);
   const v4Router = await deploy(rwa.artifacts.MirrorLiquidityRouter, 'MirrorLiquidityRouter', await poolManager.getAddress());
   const initCode = concat([rwa.artifacts.MirrorPolicyHook.bytecode, AbiCoder.defaultAbiCoder().encode(
-    ['address', 'address', 'address'], [await poolManager.getAddress(), await rwaOracle.getAddress(), await v4Router.getAddress()])]);
+    ['address', 'address', 'address', 'address'], [await poolManager.getAddress(), await rwaOracle.getAddress(), await v4Router.getAddress(), await token.getAddress()])]);
   const mined = mineHookAddress(initCode);
   if (await provider.getCode(mined.address) === '0x') {
     await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait();

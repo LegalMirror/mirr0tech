@@ -87,12 +87,18 @@ contract MockWildcatMarket is ERC20 {
         asset.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    /// @dev Transferability level (ii): only to a wallet holding a valid credential.
+    /// @dev Transferability level (ii): only to a wallet holding a valid credential, and not from a
+    /// wallet the agreement has since refused. Settlement venues hold in transit and are exempt.
     function _update(address from, address to, uint256 value) internal override {
-        if (from != address(0) && to != address(0) && !venues[to]) {
-            (bool allowed, uint16 clauseId) = roleProvider.mayTransfer(to);
-            if (!allowed) revert TransferRefused(to, clauseId);
+        if (from != address(0) && to != address(0)) {
+            if (!venues[to]) _admitted(to);
+            if (!venues[from]) _admitted(from);
         }
         super._update(from, to, value);
+    }
+
+    function _admitted(address party) private view {
+        (bool allowed, uint16 clauseId) = roleProvider.mayTransfer(party);
+        if (!allowed) revert TransferRefused(party, clauseId);
     }
 }

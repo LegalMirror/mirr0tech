@@ -122,25 +122,22 @@ Each template ships with its **clause template** — the sentence the borrower a
 
 The router may wrap instruction reverts. Decode order: try `LegalClauseViolation(uint16,bytes32)` directly; if the data is a wrapper error, unwrap `reason` and retry. Then `clauseId → clause-table.json` after verifying `keccak/sha256(table) == CLAUSE_TABLE_HASH` read from the router's `CompiledPolicy`.
 
-## 7. Tests (anvil, `test/chain/swapvm.test.js`)
+## 7. Tests (`test/chain/swapvm.test.js`, green on anvil)
 
-1. Router deploys; `hash(order)` matches the gateway's EIP-712 digest.
-2. Admitted maker + admitted taker: `quote` returns amounts; `swap` moves USDC → lender, position tokens → borrower; `InvalidateTokenIn` caps cumulative fills.
-3. Unadmitted taker: `quote` reverts `LegalClauseViolation`; `clauseId` maps to a `transfer` rule.
-4. Admitted taker, then `revokeFacts(sanctionsClear)`: same order, `quote` now reverts; clause is the sanctions rule.
-5. Attestation expiry (`evm_increaseTime`): same order stops filling with no transaction.
-6. Maker's screening revoked: order unfillable for everyone.
-7. Wrong `policyHash` in the program: `PolicyMismatch`.
-8. `Deadline` passed: SwapVM's own revert.
+1. Router carries the policy and clause-table hashes; `PolicyGuard` opcode = size of the official set, `FixedRateBalances` the next; `router.hash(order) == keccak256(strategy)`.
+2. Borrower ships the buyback: no capital moves; Aqua reports the shipped balances.
+3. Admitted lender is quoted the compiled 0.96 and fills: USDC pulled from the borrower wallet, position pushed to the borrower.
+4. Stranger refused at quote time with `CounterpartyRefused(subject, clauseId, policyHash)` naming a `transfer` clause.
+5. Sanctions designation makes the same strategy unfillable for that lender; cleared, it fills again.
+6. Maker checked too: revoking the borrower's `lenderCheckPassed` stops every fill until re-attested.
+7. Cumulative cap and deadline hold.
+8. Docking withdraws the bid.
 
-## 8. Spike checklist (first 90 minutes, Eng A)
+`scripts/demo-golden.js` replays the same flow with the fund act in front of it; `test/chain/gateway.test.js` drives it over HTTP.
 
-- [ ] `npm i @1inch/swap-vm` at a pinned version; note the `swap` ABI it ships (`main` vs v1.0.x differ).
-- [ ] Locate `OpcodeList.sol`; choose an unused opcode; confirm `_dispatch` override pattern compiles with `Opcodes`.
-- [ ] Read `Context` / `TakerTraitsLib`: confirm `query.taker` semantics and whether `to` can differ from taker in signature mode.
-- [ ] `npm i @1inch/aqua`; deploy `Aqua.sol` on anvil; `ship` a trivial strategy and read `safeBalances` back.
-- [ ] Add a `solc-swapvm` (0.8.30) bundle to `scripts/build-contracts.js`.
-- [ ] Minimal `LimitSwap` order fills on anvil **without** the guard; then add the guard.
+## 8. Spike checklist — done
+
+Vendored `release/1.1` (`npm run vendor`), pinned solc 0.8.30 via IR, opcodes parsed from `LimitOpcodes.sol`, `query.taker` is `msg.sender` (custom receivers only affect the asset leg), Aqua deployed from source locally and reused canonically on Sepolia.
 
 ## 9. Open questions
 

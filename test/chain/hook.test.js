@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { ContractFactory, Contract, Interface, Wallet, AbiCoder, concat, id, MaxUint256 } from 'ethers';
+import { ContractFactory, Contract, Interface, Wallet, AbiCoder, concat, id, MaxUint256, ZeroAddress } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
 import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/policy/hookAddress.js';
 
@@ -40,8 +40,8 @@ test('the fund agreement gates a real Uniswap v4 pool: mined address, admission,
   const router = await deploy(routerArtifact, await manager.getAddress());
 
   const constructorArgs = AbiCoder.defaultAbiCoder().encode(
-    ['address', 'address', 'address'],
-    [await manager.getAddress(), await oracle.getAddress(), await router.getAddress()]);
+    ['address', 'address', 'address', 'address'],
+    [await manager.getAddress(), await oracle.getAddress(), await router.getAddress(), ZeroAddress]);
   const initCode = concat([hookArtifact.bytecode, constructorArgs]);
 
   await t.test('Anvil carries the deterministic deployer the hook address search depends on', async () => {
@@ -61,7 +61,7 @@ test('the fund agreement gates a real Uniswap v4 pool: mined address, admission,
   });
 
   await t.test('deploying the same hook to an address without those bits is refused', async () => {
-    await assert.rejects(deploy(hookArtifact, await manager.getAddress(), await oracle.getAddress(), await router.getAddress()));
+    await assert.rejects(deploy(hookArtifact, await manager.getAddress(), await oracle.getAddress(), await router.getAddress(), ZeroAddress));
   });
 
   // One signer, so deployments are sequential: concurrent sends reuse a nonce.

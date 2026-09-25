@@ -42,11 +42,15 @@ contract MirrorPolicyHook is IHooks {
     /// @notice The router permitted to assert who the subject of an operation is.
     address public immutable router;
 
+    /// @notice The restricted token whose only door this hook is; the only caller allowed to consume an approval.
+    address public immutable token;
+
     error NotPoolManager();
     error NotRouter(address caller);
     error HookNotImplemented();
     error MissingSubject();
     error InvalidHookAddress(address deployed, uint160 expected);
+    error NotToken(address caller);
 
     /// @notice A pool operation was refused by a clause of the source agreement.
     /// @param clauseId Index into the clause table; the front end renders the quote it names.
@@ -62,13 +66,14 @@ contract MirrorPolicyHook is IHooks {
     uint160 internal constant REQUIRED_FLAGS =
         Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG;
 
-    constructor(IPoolManager poolManager_, PolicyOracle oracle_, address router_) {
+    constructor(IPoolManager poolManager_, PolicyOracle oracle_, address router_, address token_) {
         if (uint160(address(this)) & Hooks.ALL_HOOK_MASK != REQUIRED_FLAGS) {
             revert InvalidHookAddress(address(this), REQUIRED_FLAGS);
         }
         poolManager = poolManager_;
         oracle = oracle_;
         router = router_;
+        token = token_;
         policyHash = CompiledPolicy.POLICY_HASH;
         clauseTableHash = CompiledPolicy.CLAUSE_TABLE_HASH;
     }
@@ -85,6 +90,17 @@ contract MirrorPolicyHook is IHooks {
         bytes32 slot = APPROVED_SUBJECT_SLOT;
         assembly ("memory-safe") {
             subject := tload(slot)
+        }
+    }
+
+    /// @notice Consume the current approval: returns the admitted subject and clears it, so one
+    /// admitted operation opens the door for exactly one settlement leg of the token.
+    function consumeApproval() external returns (address subject) {
+        if (msg.sender != token) revert NotToken(msg.sender);
+        bytes32 slot = APPROVED_SUBJECT_SLOT;
+        assembly ("memory-safe") {
+            subject := tload(slot)
+            tstore(slot, 0)
         }
     }
 

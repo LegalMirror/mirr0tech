@@ -180,6 +180,9 @@ test('the compiled agreement decides the same way on a real EVM as it does in Ja
     await attest(admitted, ATTESTED);
     await (await market.connect(lender).transfer(admitted, 1n)).wait();
     assert.equal(await market.balanceOf(admitted), 1n);
+    await (await sanctions.setSanctioned(lender.address, true)).wait();
+    await assert.rejects(market.connect(lender).transfer(admitted, 1n), revertsWith('TransferRefused(address,uint16)'), 'a designated holder cannot transfer out');
+    await (await sanctions.setSanctioned(lender.address, false)).wait();
   });
 
   await t.test('presenting a signed screening certificate admits a lender in one transaction', async () => {

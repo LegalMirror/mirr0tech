@@ -33,7 +33,7 @@ export class VenueService {
     const r = this.record;
     this.c = {
       attestor: at(r.attestor, rwa.artifacts.PolicyAttestor), sanctions: at(r.sanctions, rwa.artifacts.MockSanctionsOracle), usdc: at(r.usdc, rwa.artifacts.MockERC20),
-      token: at(r.rwa.token, rwa.artifacts.CompiledMirrorToken), hook: at(r.rwa.hook, rwa.artifacts.MirrorPolicyHook),
+      token: at(r.rwa.token, rwa.artifacts.CompiledMirrorToken), hook: at(r.rwa.hook, rwa.artifacts.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.artifacts.PolicyOracle),
       poolManager: at(r.rwa.poolManager, rwa.artifacts.PoolManager), v4Router: at(r.rwa.router, rwa.artifacts.MirrorLiquidityRouter),
       roleProvider: at(r.credit.roleProvider, credit.artifacts.MirrortechRoleProvider), market: at(r.credit.market, credit.artifacts.MockWildcatMarket),
       aqua: at(r.credit.aqua, credit.artifacts.Aqua), swapRouter: at(r.credit.router, credit.artifacts.MirrortechRouter),
@@ -100,7 +100,7 @@ export class VenueService {
     const index = policy.actionOrder.indexOf(action);
     if (index < 0) throw new AppError(400, 'UNKNOWN_ACTION', `Unknown action ${action}`);
     let allowed; let clauseId; let known = 0n; let value = 0n;
-    if (kind === 'rwa') [allowed, clauseId] = await this.c.hook.explain(address);
+    if (kind === 'rwa') { [allowed, clauseId] = await this.c.rwaOracle.decide(address, index); [known, value] = await this.c.rwaOracle.facts(address); }
     else [allowed, clauseId, , known, value] = await this.c.roleProvider.explain(address, index);
     const facts = Object.fromEntries(policy.factOrder.map((name, i) => [name, (known >> BigInt(i)) & 1n ? ((value >> BigInt(i)) & 1n ? true : false) : null]));
     const clause = this.clause(kind, clauseId);

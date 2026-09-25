@@ -61,7 +61,7 @@ test('the fund agreement compiles into the token and into the only door a pool c
   const router = await deploy('MirrorLiquidityRouter', await addr(manager));
 
   const initCode = concat([artifacts.MirrorPolicyHook.bytecode, AbiCoder.defaultAbiCoder().encode(
-    ['address', 'address', 'address'], [await addr(manager), await addr(oracle), await addr(router)])]);
+    ['address', 'address', 'address', 'address'], [await addr(manager), await addr(oracle), await addr(router), await addr(token)])]);
   const mined = mineHookAddress(initCode);
   await (await admin.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait();
   const hook = new Contract(mined.address, artifacts.MirrorPolicyHook.abi, admin);
@@ -131,9 +131,13 @@ test('the fund agreement compiles into the token and into the only door a pool c
     await assert.rejects(router.connect(stranger).modifyLiquidity(hookedKey, liquidity), (error) => decode(error)?.name === 'LegalClauseViolation');
   });
 
-  await t.test('a sanctions designation closes both the venue and the token to that investor', async () => {
+  await t.test('a sanctions designation closes the venue and the token to that investor, in both directions', async () => {
+    const other = Wallet.createRandom().address;
+    await attest(other, ONBOARDED);
+    await (await token.connect(investor).transfer(other, 1n)).wait();
     await (await sanctions.setSanctioned(await investor.getAddress(), true)).wait();
     await assert.rejects(router.connect(investor).modifyLiquidity(hookedKey, liquidity), (error) => decode(error)?.name === 'LegalClauseViolation');
     await assert.rejects(token.release(id('release-2'), await investor.getAddress(), 1n), (error) => decode(error)?.name === 'TransferRefused');
+    await assert.rejects(token.connect(investor).transfer(other, 1n), (error) => decode(error)?.name === 'TransferRefused', 'a refused holder cannot sell either');
   });
 });

@@ -102,7 +102,7 @@ export function plainSummary(text: string): string {
     out = out.replace(new RegExp(`\\b${name}\\b`, "g"), label);
   for (const [name, label] of Object.entries(FACT_LABEL))
     out = out.replace(new RegExp(`\\b${name}\\b`, "g"), label.toLowerCase());
-  return out;
+  return out.replace(/shipped buyback/g, "posted the buyback").replace(/\s*0x[0-9a-fA-F]{4,}…?/g, "");
 }
 
 /** Where a rule runs, named for the reader; the contract name stays in the technical fold. */

@@ -1,10 +1,18 @@
 import Ajv from 'ajv';
 
+// Bit index is the position in this array. The order is committed inside the policy hash,
+// so a reordering produces a different policy and a different deployment.
 export const FACTS = [
   'kycApproved', 'amlApproved', 'sanctionsClear', 'subscriptionAccepted',
   'issuerAuthorized', 'offeringCompliant', 'redemptionAuthorized',
   'depositConfirmed', 'depositAvailable', 'sufficientBalance',
+  // Private-credit facts. A lender is admitted under a Master Loan Agreement, not an offering.
+  'mlaExecuted', 'jurisdictionPermitted', 'accreditedInvestor', 'screeningCurrent',
+  'lenderCapacityAvailable', 'lockupElapsed', 'withdrawalWindowOpen', 'venueApproved',
 ];
+
+// Bit index is the position in this array; it is committed inside the policy hash.
+export const ACTIONS = ['mint', 'burn', 'transfer', 'deposit', 'withdraw', 'provideLiquidity', 'swap'];
 const object = (properties) => ({ type: 'object', properties, required: Object.keys(properties), additionalProperties: false });
 const string = { type: 'string', minLength: 1 };
 const array = (items) => ({ type: 'array', items });
@@ -17,7 +25,7 @@ export const astSchema = {
     parties: array(object({ name: string, role: string })),
     rules: array(object({
       id: { type: 'string', pattern: '^[a-z][a-z0-9-]{0,63}$' },
-      action: { type: 'string', enum: ['mint', 'burn', 'transfer'] },
+      action: { type: 'string', enum: ACTIONS },
       effect: { type: 'string', enum: ['permit', 'require', 'forbid'] },
       condition: { $ref: '#/$defs/expression' },
       source: object({ clause: string, quote: string }),

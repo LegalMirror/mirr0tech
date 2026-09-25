@@ -1,0 +1,15 @@
+{
+  "profile": "wildcat-credit",
+  "venue": "wildcat",
+  "market": "sample Wildcat V2 open-term market",
+  "attestationValiditySeconds": 2592000,
+  "rescreeningIntervalSeconds": 2592000,
+  "credentialTimeToLiveSeconds": 2592000,
+  "assumptions": [
+    "Screening results, jurisdiction, professional status and executed-agreement status arrive as attested facts signed by the borrower's compliance function; this repository does not perform the screening itself.",
+    "The re-screening interval of 30 days is read from clause 3.1 of the sample agreement. Attestations are issued with a matching validity window, so a lapse makes every fact unknown and denies the deposit.",
+    "Allocated lender capacity is set by the borrower outside the agreement and supplied as an attested fact.",
+    "The minimum commitment period and withdrawal cycle come from the market's terms, not the agreement text, and are supplied as attested facts.",
+    "This provider grants or withholds Wildcat deposit credentials. It does not move funds, set rates, or alter any market parameter."
+  ]
+}

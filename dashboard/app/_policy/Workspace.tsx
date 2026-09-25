@@ -5,7 +5,7 @@ import { source } from "@/lib/adapter";
 import type { Facts } from "@/lib/evaluate";
 import { useResource } from "@/lib/hooks";
 import { effectiveFacts } from "@/lib/parties";
-import { actionLabel, EFFECT_LABEL } from "@/lib/labels";
+import { actionLabel, EFFECT_LABEL, termLabel } from "@/lib/labels";
 import { pipelineRefs, ruleRef, termRef } from "@/lib/segments";
 import type { PolicyData } from "@/lib/types";
 import { short } from "@/lib/format";
@@ -103,7 +103,7 @@ function RuleNav({
           <optgroup label="Values">
             {policy.terms.map((term) => (
               <option key={term.name} value={termRef(term.name)}>
-                {term.name} = {term.value}
+                {termLabel(term.name)} = {term.value}
               </option>
             ))}
           </optgroup>
@@ -141,7 +141,7 @@ function TermsPanel({ policy, onSelect }: { policy: PolicyData; onSelect: (ref: 
           {policy.terms.map((term) => (
             <tr key={term.name} className="clickable" onClick={() => onSelect(termRef(term.name))}>
               <td>
-                <code>{term.name}</code>
+                <span title={term.name}>{termLabel(term.name)}</span>
               </td>
               <td>
                 <span className="term-val">{term.value}</span>{" "}

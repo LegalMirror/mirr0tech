@@ -5,7 +5,7 @@ import { venuesFor, renderRefusal } from "@/lib/enforcement";
 import { factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
-import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel } from "@/lib/labels";
+import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel, termLabel } from "@/lib/labels";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
@@ -415,6 +415,7 @@ function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
       />
       <Step n={2} title="The value" tone={tone}>
         <p className="plain-head">
+          <strong>{termLabel(term.name)}</strong>:{" "}
           <span className="term-val">
             {term.value} <small className="muted">{term.unit}</small>
           </span>

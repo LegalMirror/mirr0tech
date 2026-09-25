@@ -5,7 +5,7 @@ import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
 import { effectiveFacts } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
-import { instructionLabel } from "@/lib/labels";
+import { instructionLabel, termLabel } from "@/lib/labels";
 import {
   ClauseTableBadge,
   Disclosure,
@@ -75,7 +75,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
             return term ? (
               <div key={name} className="venue">
                 <span className="small muted">
-                  {term.source.clause} · <code>{name}</code>
+                  {term.source.clause} · {termLabel(name)}
                 </span>
                 <span className="term-val">
                   {term.value} <small className="muted">{term.unit}</small>

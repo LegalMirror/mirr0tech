@@ -23,6 +23,20 @@ export const FACT_LABEL: Record<string, string> = {
 };
 export const factLabel = (name: string) => FACT_LABEL[name] ?? name;
 
+export const TERM_LABEL: Record<string, string> = {
+  rescreeningIntervalDays: "Re-screening interval",
+  buybackPrice: "Buyback price",
+  buybackCap: "Buyback cap",
+  buybackDeadline: "Buyback deadline",
+  buybackCeiling: "Buyback ceiling",
+  buybackWindowHours: "Buyback window",
+  capacity: "Market capacity",
+  baseAprBps: "Base APR",
+  reserveRatioBps: "Reserve ratio",
+  withdrawalCycleDays: "Withdrawal cycle",
+};
+export const termLabel = (name: string) => TERM_LABEL[name] ?? name;
+
 export const ACTION_LABEL: Record<string, string> = {
   mint: "Issue shares",
   burn: "Redeem shares",

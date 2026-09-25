@@ -16,7 +16,8 @@ import { useModalEscape } from "./useModalEscape";
 
 function nav(profile: ProfileId) {
   return [
-    { href: "/", label: "Agreement", hint: "what runs on-chain" },
+    { href: "/", label: "Overview", hint: "the story" },
+    { href: "/agreement", label: "Agreement", hint: "what runs on-chain" },
     {
       href: "/lenders",
       label: profile === "wildcat-credit" ? "Lenders" : "Investors",

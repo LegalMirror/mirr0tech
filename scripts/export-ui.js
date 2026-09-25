@@ -467,7 +467,8 @@ export async function exportAll(outDir = OUT) {
   for (const spec of PROFILES) {
     const exported = await exportProfile(spec);
     await writeFile(`${outDir}/${spec.profile}.json`, `${JSON.stringify(exported)}\n`);
-    profiles.push({ profile: exported.profile, act: exported.act, label: exported.label, venue: exported.venue, title: exported.title, policyHash: exported.policyHash });
+    const { paragraphs: _paragraphs, ...coverage } = exported.coverage;
+    profiles.push({ profile: exported.profile, act: exported.act, label: exported.label, venue: exported.venue, title: exported.title, policyHash: exported.policyHash, coverage });
     const { counts, total } = exported.coverage;
     console.log(`ui:export ${spec.profile.padEnd(15)} ${exported.rules.length} rules · ${exported.terms.length} terms · ${exported.unresolved.length} unresolved · paragraphs ${counts.compiled}/${counts.unresolved}/${counts['not-executable']} of ${total} · ${exported.policyHash}`);
   }

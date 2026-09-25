@@ -51,7 +51,10 @@ export function dashboardRoutes(venues, policyData) {
 
   router.get('/policy/profiles', wrap(async () => {
     const data = await policyData;
-    return PROFILES.map(({ profile, act, label, venue }) => ({ profile, act, label, venue, title: data.get(profile).title, policyHash: data.get(profile).policyHash }));
+    return PROFILES.map(({ profile, act, label, venue }) => {
+      const { paragraphs: _paragraphs, ...coverage } = data.get(profile).coverage;
+      return { profile, act, label, venue, title: data.get(profile).title, policyHash: data.get(profile).policyHash, coverage };
+    });
   }));
   router.get('/policy', wrap(async (req) => (await policyData).get(profileOf(req))));
   router.get('/lenders', wrap(async (req) => { const profile = profileOf(req); return Promise.all(WALLETS_FOR[KIND[profile]].map((name) => party(profile, name))); }));

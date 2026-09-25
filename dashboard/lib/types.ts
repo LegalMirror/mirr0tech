@@ -192,6 +192,8 @@ export type ProfileSummary = {
   venue: string;
   title: string;
   policyHash: string;
+  /** Paragraph counts without the paragraphs themselves, for the overview */
+  coverage?: Omit<Coverage, "paragraphs">;
 };
 
 /** A wallet the policy decides about: a lender (credit) or an investor (custodial). */

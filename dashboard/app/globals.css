@@ -1906,3 +1906,22 @@ blockquote.why {
   letter-spacing: 0.04em;
   color: var(--text-secondary);
 }
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--sp-md);
+}
+.act-card h2 {
+  margin: 4px 0 2px;
+  font-size: 17px;
+}
+.standings {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.standings li {
+  padding: 1px 0;
+}

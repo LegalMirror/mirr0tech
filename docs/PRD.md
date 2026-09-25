@@ -363,13 +363,13 @@ Times are **JST**. Now ≈ **Sat 01:30**. ~31.5h to deadline, ~25.5h to freeze.
 
 | When (JST) | Milestone | Exit check |
 | --- | --- | --- |
-| **Sat 05:00** | MLA docs committed; fact set + terms in schema; fixture compiles with quotes verified; contracts (oracle, mock market, attestor/provider changes) pass locally | `npm test` green |
-| **Sat 10:00** | `PolicyGuard` + router + template pass on anvil: admitted fill, refused quote, revocation | `npm run test:chain` green |
-| **Sat 14:00** | Everything on Sepolia through MultiBaas, verified; onboarding + exit path works via API/curl | Investor minted + pooled; Lender A admitted and exits via Aqua, on Sepolia |
-| **Sat 18:00** | Dashboard skeleton reads live API; go/no-go on P1s (ENS, MultiBaas, agent) | Full golden path via API; Lam decides P1s |
-| **Sat 24:00** | Dashboard P0 complete; public URL | Lam runs golden path from UI 2× |
+| ~~Sat 05:00~~ **done Sat 04:00** | Real MLA + Lender Check Policy + addendum committed; facts and terms in the schema; fixture quotes verified; oracle, attestor override, mock market; component compiler | `npm test` green (26) |
+| ~~Sat 10:00~~ **done Sat 03:00** | `PolicyGuard` + `FixedRateBalances` + router (23.0 KB) on anvil: ship, quote, fill, refusals, revocation, dock | `npm run test:chain` green (21) |
+| ~~Sat 14:00~~ **done Sat 04:00** | Act 1 token door + handshake; one-call deployment; golden path both acts; stack API over HTTP | `npm run demo:golden`, `test:chain:rwa` (26), `test:chain:stack` green |
+| **Sat 18:00** | Dashboard reads the stack API; clause highlighter live; go/no-go on the third slot (ENS / World / Uniswap) | Lam runs the golden path from the UI |
+| **Sat 24:00** | Dashboard P0 complete; hosted (Coolify pattern from the kjuis repo) or local recording plan settled; Sepolia only if it buys something the video needs | Lam runs the golden path from the UI 2× |
 | **Sun 03:00** | **Code freeze.** Bug fixes only | Tag `v0.2-freeze` |
-| **Sun 03:00–07:00** | Video, README, sponsor sections, screenshots | Video uploaded |
+| **Sun 03:00–07:00** | Video, README team section, sponsor forms, screenshots | Video uploaded |
 | **Sun 08:00** | **Submit** (1h buffer) | Confirmed |
 
 Rules of engagement: small PRs to `main`, **commit at least every couple of hours — the 1inch rules disqualify a single final-day commit**, any P0 slipping > 2h → tell Lam, cut using §11. Friday's uncommitted prototype lands today as separate commits (compiler · contracts · tests · docs).
@@ -420,8 +420,8 @@ Rules of engagement: small PRs to `main`, **commit at least every couple of hour
 
 1. ⚠️ Curvegrid: RWA Tokenization or Digital Asset Dashboard? Does mirr0tech qualify for Continuity Track prizes? (Lam, Sat am)
 2. ⚠️ Third company: ENS, World ID for Agents, or Uniswap (via G2)? Depends on Q3 and on whether G2 lands. (Lam, Sat am; revisit Sat 18:00)
-3. ⚠️ Which v1 Fri-night spikes landed: ENSv2 subname, MultiBaas deployment? (Eng B / Eng A)
-4. ⚠️ Confirm at the 1inch booth: redeployed (unmodified) Aqua registry on Sepolia counts as official. (Eng A, Sat)
+3. ⚠️ Which v1 Fri-night spikes landed: ENSv2 subname, MultiBaas deployment? (Eng B / Eng A) — nothing in the repo depends on either
+4. ~~Aqua registry redeploy~~ — the canonical registry exists on Sepolia (`0x1111113ccf…`); `AQUA=` in `.env` reuses it, nothing redeployed. Locally the vendored `Aqua.sol` is deployed unmodified
 5. ⚠️ Template MLA license — full text or excerpts? (Lam)
 6. Parent ENS name, if ENS is the third slot. (Eng B)
 7. Hosting: gateway (Render/Fly/Railway) + dashboard (Vercel). (Eng A)

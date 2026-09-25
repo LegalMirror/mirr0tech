@@ -797,7 +797,6 @@ dl.kv dd {
   position: relative;
   overflow: auto;
   padding: var(--sp-md) var(--sp-lg) var(--sp-xl);
-
 }
 .doc-part + .doc-part {
   margin-top: var(--sp-xl);
@@ -1552,4 +1551,148 @@ blockquote.quote {
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* ── paragraph coverage: every paragraph says what it compiled to ── */
+:root {
+  --cov-compiled: var(--consensus);
+  --cov-unresolved: var(--unresolved);
+  --cov-none: color-mix(in srgb, var(--text-secondary) 45%, transparent);
+}
+.cov {
+  display: grid;
+  gap: 6px;
+  padding: 8px var(--sp-md) 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.cov-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.cov-bar > span {
+  flex-basis: 0;
+  min-width: 2px;
+}
+.cov-compiled {
+  background: var(--cov-compiled);
+}
+.cov-unresolved {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--cov-unresolved) 0 5px,
+    color-mix(in srgb, var(--cov-unresolved) 55%, transparent) 5px 10px
+  );
+}
+.cov-not-executable {
+  background: var(--cov-none);
+}
+.cov-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+.cov-filters {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cov-filter {
+  min-height: 0;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: transparent;
+}
+.cov-filter.on {
+  background: var(--panel-2);
+  color: var(--flame);
+  border-color: var(--text-secondary);
+}
+.cov-f-compiled.on {
+  border-color: var(--cov-compiled);
+}
+.cov-f-unresolved.on {
+  border-color: var(--cov-unresolved);
+}
+
+.para {
+  position: relative;
+  margin-left: -15px;
+  padding: 1px 0 1px 12px;
+  border-left: 3px solid transparent;
+  border-radius: 0 4px 4px 0;
+  cursor: default;
+}
+.para-compiled {
+  border-left-color: var(--cov-compiled);
+  background: color-mix(in srgb, var(--cov-compiled) 6%, transparent);
+  cursor: pointer;
+}
+.para-compiled:hover {
+  background: color-mix(in srgb, var(--cov-compiled) 11%, transparent);
+}
+.para-unresolved {
+  border-left: 3px dashed var(--cov-unresolved);
+  background: color-mix(in srgb, var(--cov-unresolved) 7%, transparent);
+  cursor: pointer;
+}
+.para-unresolved:hover {
+  background: color-mix(in srgb, var(--cov-unresolved) 12%, transparent);
+}
+.para-not-executable {
+  border-left: 3px dotted var(--cov-none);
+}
+.para-not-executable:not(.para-k-heading) {
+  color: color-mix(in srgb, var(--text-primary) 78%, var(--text-secondary));
+}
+/* Definitions and page furniture are quieter still: they define words, they do not oblige anyone. */
+.para-k-definition.para-not-executable {
+  color: var(--text-secondary);
+  font-size: 0.95em;
+}
+.para-k-boilerplate {
+  opacity: 0.45;
+  font-size: 0.85em;
+  border-left-color: transparent;
+}
+.para[data-tag]:hover::after {
+  content: attr(data-tag);
+  position: absolute;
+  top: 2px;
+  right: 0;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 16px;
+  font-weight: 400;
+  pointer-events: none;
+}
+.para-reason {
+  margin: 6px 0 8px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px dashed var(--cov-unresolved);
+  background: var(--panel);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  display: grid;
+  gap: 4px;
+}
+.para-reason strong {
+  color: var(--cov-unresolved);
+}
+.doc-filtered .para + .para {
+  margin-top: 0.7em;
 }

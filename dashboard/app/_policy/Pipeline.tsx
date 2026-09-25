@@ -52,12 +52,22 @@ function QuoteStep({
 }) {
   const first = locations[0];
   const verbatim = first && policy.text.slice(first.start, first.end) === quote;
+  const paragraph =
+    first &&
+    policy.coverage.paragraphs.find(
+      (p) => p.part === first.part && first.displayStart < p.displayEnd && first.displayEnd > p.displayStart
+    );
   return (
     <Step n={1} title="Quote" hint="verbatim from the document" tone={tone}>
       <blockquote className="quote">“{quote}”</blockquote>
       <div className="quote-meta">
         <span className="chip chip-action">{clause}</span>
         {first && <span className="chip">{policy.documents[first.part]?.name}</span>}
+        {paragraph?.label && (
+          <span className="chip chip-ok" title="the paragraph this quote sits in">
+            ¶ {paragraph.label}
+          </span>
+        )}
         {first && (
           <span className="chip" title="offsets into the normalized text the compiler hashed">
             chars [{first.start.toLocaleString()}, {first.end.toLocaleString()})
@@ -263,6 +273,20 @@ function RuleSteps({
       </Step>
 
       <Step n={5} title="Enforcement" hint="where these bytes run" tone={tone}>
+        <div className="venues" style={{ marginBottom: 8 }}>
+          {(policy.enforcedBy.rules[rule.id] ?? []).map((id) => {
+            const component = policy.components.find((entry) => entry.id === id);
+            return (
+              <div className="venue" key={id}>
+                <span>
+                  <span className="chip chip-action">component</span> <code>{id}</code>
+                  {component && <span className="small muted"> v{component.version}</span>}
+                </span>
+                {component && <span className="small muted">{component.description}</span>}
+              </div>
+            );
+          })}
+        </div>
         {venues.length === 0 && (
           <p className="muted small">No venue enforces {rule.action} in this profile.</p>
         )}

@@ -1,8 +1,16 @@
 "use client";
 
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  coverageSentence,
+  groupLines,
+  nextRef,
+  paragraphTitle,
+  visibleUnder,
+  type CoverageFilter,
+} from "@/lib/coverage";
 import { ruleRef, segmentLines, termRef, type Line, type Span } from "@/lib/segments";
-import type { Effect, PolicyData } from "@/lib/types";
+import type { Effect, Paragraph, PolicyData } from "@/lib/types";
 
 type Props = {
   policy: PolicyData;
@@ -86,7 +94,10 @@ const DocLine = memo(function DocLine({
           <button
             type="button"
             className="nc"
-            onClick={() => setOpenMarker(openMarker === index ? null : index)}
+            onClick={(event) => {
+              event.stopPropagation();
+              setOpenMarker(openMarker === index ? null : index);
+            }}
             aria-expanded={openMarker === index}
           >
             ⚠ not compiled · {unresolved[index].clause}
@@ -115,7 +126,8 @@ const DocLine = memo(function DocLine({
               title={piece.refs.map((ref) => ref.replace(/^(rule|term):/, "")).join(" · ")}
               onMouseEnter={() => onHover(piece.refs)}
               onMouseLeave={() => onHover([])}
-              onClick={() => {
+              onClick={(event) => {
+                event.stopPropagation();
                 // A second click on a shared sentence moves to the next rule quoting it.
                 const at = sel ? piece.refs.indexOf(sel) : -1;
                 onSelect(piece.refs[(at + 1) % piece.refs.length], true);
@@ -130,8 +142,56 @@ const DocLine = memo(function DocLine({
   );
 });
 
+const FILTERS: { value: CoverageFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "compiled", label: "Compiled" },
+  { value: "unresolved", label: "Unresolved" },
+  { value: "not-executable", label: "Not executable" },
+];
+
+function CoverageBar({
+  policy,
+  filter,
+  setFilter,
+}: {
+  policy: PolicyData;
+  filter: CoverageFilter;
+  setFilter: (filter: CoverageFilter) => void;
+}) {
+  const { counts } = policy.coverage;
+  return (
+    <div className="cov">
+      <div className="cov-bar" aria-hidden>
+        <span className="cov-compiled" style={{ flexGrow: counts.compiled }} />
+        <span className="cov-unresolved" style={{ flexGrow: counts.unresolved }} />
+        <span className="cov-not-executable" style={{ flexGrow: counts["not-executable"] }} />
+      </div>
+      <div className="cov-row">
+        <span className="small">{coverageSentence(policy.coverage)}</span>
+        <span className="cov-filters" role="radiogroup" aria-label="Show paragraphs">
+          {FILTERS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="radio"
+              aria-checked={filter === option.value}
+              className={`cov-filter cov-f-${option.value} ${filter === option.value ? "on" : ""}`}
+              onClick={() => setFilter(option.value)}
+            >
+              {option.label}
+              {option.value !== "all" && <span className="muted"> {counts[option.value]}</span>}
+            </button>
+          ))}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSelect }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
+  const [filter, setFilter] = useState<CoverageFilter>("all");
+  const [reason, setReason] = useState<number | null>(null);
   const tone = useMemo(() => {
     const map: Record<string, Effect | "term"> = {};
     policy.rules.forEach((rule) => (map[ruleRef(rule.id)] = rule.effect));
@@ -157,11 +217,11 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
         const markers = policy.unresolved.flatMap((entry, i) =>
           entry.anchor?.part === index ? [{ offset: entry.anchor.offset, index: i }] : []
         );
-        return {
-          part,
-          markdown: part.name.endsWith(".md"),
-          lines: segmentLines(part.display, spans, markers),
-        };
+        const lines = segmentLines(part.display, spans, markers);
+        const paragraphs = policy.coverage.paragraphs
+          .map((paragraph, i) => ({ index: i, paragraph }))
+          .filter(({ paragraph }) => paragraph.part === index);
+        return { part, markdown: part.name.endsWith(".md"), lines, blocks: groupLines(lines, paragraphs) };
       }),
     [policy]
   );
@@ -170,14 +230,26 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
   useEffect(() => {
     if (!selected || !scroller.current || scrollKey === 0) return;
     const target = scroller.current.querySelector<HTMLElement>(`[data-open~="${CSS.escape(selected)}"]`);
-    if (!target) return;
+    if (!target) {
+      // The quote sits in a paragraph the filter hides: show everything and try again.
+      if (filter !== "all") setFilter("all");
+      return;
+    }
     const box = scroller.current;
     const top = target.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop;
     box.scrollTo({
       top: Math.max(0, top - box.clientHeight / 3),
       behavior: scrollKey === 1 ? "auto" : "smooth",
     });
-  }, [selected, scrollKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected, scrollKey, filter === "all"]);
+
+  const onParagraph = (index: number, paragraph: Paragraph) => {
+    if (paragraph.status === "compiled") {
+      const ref = nextRef(paragraph, selected);
+      if (ref) onSelect(ref, true);
+    } else if (paragraph.status === "unresolved") setReason(reason === index ? null : index);
+  };
 
   const stateOf = (line: Line) => {
     const refs = new Set(line.pieces.flatMap((piece) => piece.refs));
@@ -202,6 +274,7 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
           <span className="chip chip-review">not compiled</span>
         </div>
       </div>
+      <CoverageBar policy={policy} filter={filter} setFilter={setFilter} />
       <div className="doc-scroll" ref={scroller}>
         {unanchored.length > 0 && (
           <div className="doc-unanchored">
@@ -213,7 +286,7 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
             ))}
           </div>
         )}
-        {parts.map(({ part, markdown, lines }, index) => (
+        {parts.map(({ part, markdown, blocks }, index) => (
           <article className="doc-part" key={part.name}>
             <div className="doc-partHead">
               <strong>{part.name}</strong>
@@ -224,20 +297,50 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
                 chars {part.start.toLocaleString()}–{part.end.toLocaleString()} of the bundle
               </span>
             </div>
-            <div className="doc-text" lang="en">
-              {lines.map((line) => (
-                <DocLine
-                  key={`${index}:${line.start}`}
-                  line={line}
-                  display={part.display}
-                  markdown={markdown}
-                  tone={tone}
-                  state={stateOf(line)}
-                  unresolved={policy.unresolved}
-                  onHover={onHover}
-                  onSelect={onSelect}
-                />
-              ))}
+            <div className={`doc-text ${filter !== "all" ? "doc-filtered" : ""}`} lang="en">
+              {blocks.map((block) => {
+                const lineViews = block.lines.map((line) => (
+                  <DocLine
+                    key={`${index}:${line.start}`}
+                    line={line}
+                    display={part.display}
+                    markdown={markdown}
+                    tone={tone}
+                    state={stateOf(line)}
+                    unresolved={policy.unresolved}
+                    onHover={onHover}
+                    onSelect={onSelect}
+                  />
+                ));
+                if (block.paragraph === null)
+                  return filter === "all" ? (
+                    <div key={`${index}:${block.lines[0].start}`}>{lineViews}</div>
+                  ) : null;
+                const paragraph = policy.coverage.paragraphs[block.paragraph];
+                if (!visibleUnder(filter, paragraph)) return null;
+                const clauses = paragraph.unresolved.map((i) => policy.unresolved[i].clause);
+                return (
+                  <div
+                    key={`${index}:${block.lines[0].start}`}
+                    className={`para para-${paragraph.status} para-k-${paragraph.kind}`}
+                    data-tag={paragraph.label || undefined}
+                    title={paragraphTitle(paragraph, clauses)}
+                    onClick={() => onParagraph(block.paragraph!, paragraph)}
+                  >
+                    {lineViews}
+                    {reason === block.paragraph && paragraph.status === "unresolved" && (
+                      <div className="para-reason">
+                        {paragraph.unresolved.map((i) => (
+                          <div key={i}>
+                            <strong>Not compiled · {policy.unresolved[i].clause}.</strong>{" "}
+                            {policy.unresolved[i].description}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </article>
         ))}

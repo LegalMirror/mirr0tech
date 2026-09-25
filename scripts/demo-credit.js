@@ -46,6 +46,10 @@ const admin = new Wallet(DEV_KEY, provider);
 const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
 const attestorArtifact = await load('PolicyAttestor');
 const providerArtifact = await load('MirrortechRoleProvider');
+const oracleArtifact = await load('PolicyOracle');
+const sanctionsArtifact = await load('MockSanctionsOracle');
+const marketArtifact = await load('MockWildcatMarket');
+const tokenArtifact = await load('MockERC20');
 if (providerArtifact.policyHash !== compiled.policy.hash) {
   console.error('Build the credit artifacts first: npm run build:credit');
   process.exit(1);
@@ -55,12 +59,22 @@ const attestor = await new ContractFactory(attestorArtifact.abi, attestorArtifac
 await attestor.waitForDeployment();
 await (await attestor.grantRole(id('ATTESTOR_ROLE'), admin.address)).wait();
 await (await attestor.grantRole(id('WATCHER_ROLE'), admin.address)).wait();
-const roleProvider = await new ContractFactory(providerArtifact.abi, providerArtifact.bytecode, admin).deploy(await attestor.getAddress());
+const sanctions = await new ContractFactory(sanctionsArtifact.abi, sanctionsArtifact.bytecode, admin).deploy(admin.address);
+await sanctions.waitForDeployment();
+const oracle = await new ContractFactory(oracleArtifact.abi, oracleArtifact.bytecode, admin).deploy(await attestor.getAddress(), await sanctions.getAddress());
+await oracle.waitForDeployment();
+const roleProvider = await new ContractFactory(providerArtifact.abi, providerArtifact.bytecode, admin).deploy(await oracle.getAddress());
 await roleProvider.waitForDeployment();
+const usdc = await new ContractFactory(tokenArtifact.abi, tokenArtifact.bytecode, admin).deploy('Mock USD Coin', 'mUSDC');
+await usdc.waitForDeployment();
+const market = await new ContractFactory(marketArtifact.abi, marketArtifact.bytecode, admin).deploy(await usdc.getAddress(), await roleProvider.getAddress(), admin.address);
+await market.waitForDeployment();
+await (await oracle.bindMarket(await market.getAddress())).wait();
 
 step('Deployed');
 say(`  PolicyAttestor          ${await attestor.getAddress()}`);
 say(`  MirrortechRoleProvider  ${await roleProvider.getAddress()}`);
+say(`  MockWildcatMarket       ${await market.getAddress()} (mock; the provider interface is Wildcat's real one)`);
 say('  A borrower registers this with addRoleProvider(provider, timeToLive). Nothing else changes.');
 
 const lender = Wallet.createRandom().address;
@@ -107,14 +121,14 @@ await attest(ADMITTED);
 await report('After re-screening:');
 
 step('A sanctions hit lands between scheduled screenings');
-await (await attestor.revokeFacts(lender, compiled.policy.hash, bit('sanctionsClear'), 'OFAC SDN match')).wait();
-await report('Immediately after the watcher clears one fact:');
+await (await sanctions.setSanctioned(lender, true)).wait();
+await report('Immediately after the oracle designates the wallet:');
 
 step('The lender is owed interest — is the borrower allowed to pay?');
 await attest(ADMITTED);
 let [mayPay] = await roleProvider.mayWithdraw(lender);
 say(`  With screening current:      ${mayPay ? 'payment permitted' : 'payment blocked'}`);
-await (await attestor.revokeFacts(lender, compiled.policy.hash, bit('sanctionsClear'), 'OFAC SDN match')).wait();
+await (await sanctions.setSanctioned(lender, true)).wait();
 let clauseId;
 [mayPay, clauseId] = await roleProvider.mayWithdraw(lender);
 const payClause = clauses[Number(clauseId) - 1];

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IRoleProvider} from "./wildcat/IRoleProvider.sol";
 import {PolicyAttestor} from "./PolicyAttestor.sol";
+import {PolicyOracle} from "./PolicyOracle.sol";
 import {PolicyEval} from "./PolicyEval.sol";
 import {CompiledPolicy} from "../generated/CompiledPolicy.sol";
 
@@ -15,21 +16,17 @@ import {CompiledPolicy} from "../generated/CompiledPolicy.sol";
 /// Two expiries apply and the tighter one wins: the attestation's own validity window, and the
 /// time-to-live the borrower set when registering this provider.
 contract MirrortechRoleProvider is IRoleProvider {
-    /// @notice The compiled agreement this provider speaks for.
     bytes32 public immutable policyHash;
-
-    /// @notice Hash of the clause table that turns a `clauseId` back into a verbatim quote.
     bytes32 public immutable clauseTableHash;
-
-    PolicyAttestor public immutable attestor;
+    PolicyOracle public immutable oracle;
 
     error PolicyDenied(uint16 clauseId, bytes32 policyHash);
 
     /// @notice Emitted on every credential decision so the audit trail is the chain itself.
     event CredentialDecision(address indexed account, bool allowed, uint16 clauseId, uint32 screenedAt);
 
-    constructor(PolicyAttestor attestor_) {
-        attestor = attestor_;
+    constructor(PolicyOracle oracle_) {
+        oracle = oracle_;
         policyHash = CompiledPolicy.POLICY_HASH;
         clauseTableHash = CompiledPolicy.CLAUSE_TABLE_HASH;
     }
@@ -52,7 +49,7 @@ contract MirrortechRoleProvider is IRoleProvider {
         if (data.length > 0) {
             (uint256 known, uint256 value, uint32 issuedAt, uint32 validUntil, uint256 nonce, bytes memory signature) =
                 abi.decode(data, (uint256, uint256, uint32, uint32, uint256, bytes));
-            attestor.attestWithSignature(account, policyHash, known, value, issuedAt, validUntil, nonce, signature);
+            oracle.attestor().attestWithSignature(account, policyHash, known, value, issuedAt, validUntil, nonce, signature);
         }
         (bool allowed, uint16 clauseId, uint32 screenedAt) = _decide(account, CompiledPolicy.ACTION_DEPOSIT);
         emit CredentialDecision(account, allowed, clauseId, screenedAt);
@@ -61,26 +58,23 @@ contract MirrortechRoleProvider is IRoleProvider {
     }
 
     /// @notice Why was this wallet allowed, blocked or paid? One call, for any action.
-    /// @dev This is the answer that currently takes a compliance team days to reconstruct. The
-    /// returned `clauseId` indexes the clause table whose hash is committed above, so the quote a
-    /// front end renders cannot be swapped for a different sentence.
+    /// @dev The returned `clauseId` indexes the clause table whose hash is committed above, so the
+    /// quote a front end renders cannot be swapped for a different sentence.
     function explain(address account, uint8 action)
         external
         view
         returns (bool allowed, uint16 clauseId, uint32 screenedAt, uint256 known, uint256 value)
     {
-        (known, value, screenedAt) = attestor.factsOf(account, policyHash);
+        (known, value, screenedAt) = oracle.facts(account);
         (allowed, clauseId) = PolicyEval.decide(CompiledPolicy.program(action), known, value);
     }
 
-    /// @notice Whether this lender may still withdraw, evaluated fresh at the moment of payment.
-    /// @dev A lender screened at onboarding can be sanctioned later. Repayments are gated on the
-    /// agreement's withdrawal terms at withdrawal time, not on a credential granted months ago.
+    /// @notice Whether this lender may be paid, evaluated fresh at the moment of payment.
     function mayWithdraw(address account) external view returns (bool allowed, uint16 clauseId) {
         (allowed, clauseId, ) = _decide(account, CompiledPolicy.ACTION_WITHDRAW);
     }
 
-    /// @notice Whether a market-token transfer to or from this wallet is permitted.
+    /// @notice Whether market tokens may move to this wallet.
     function mayTransfer(address account) external view returns (bool allowed, uint16 clauseId) {
         (allowed, clauseId, ) = _decide(account, CompiledPolicy.ACTION_TRANSFER);
     }
@@ -92,7 +86,7 @@ contract MirrortechRoleProvider is IRoleProvider {
     {
         uint256 known;
         uint256 value;
-        (known, value, screenedAt) = attestor.factsOf(account, policyHash);
+        (known, value, screenedAt) = oracle.facts(account);
         (allowed, clauseId) = PolicyEval.decide(CompiledPolicy.program(action), known, value);
     }
 }

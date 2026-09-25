@@ -8,8 +8,8 @@ import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOO
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
 const load = async (name) => JSON.parse(await readFile(`artifacts/${name}.json`, 'utf8'));
-const [attestorArtifact, hookArtifact, routerArtifact, tokenArtifact, managerArtifact] =
-  await Promise.all(['PolicyAttestor', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'MockERC20', 'PoolManager'].map(load));
+const [attestorArtifact, oracleArtifact, sanctionsArtifact, hookArtifact, routerArtifact, tokenArtifact, managerArtifact] =
+  await Promise.all(['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'MockERC20', 'PoolManager'].map(load));
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
@@ -36,11 +36,13 @@ test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, as
   const attestor = await deploy(attestorArtifact, admin.address);
   await (await attestor.grantRole(id('ATTESTOR_ROLE'), admin.address)).wait();
   await (await attestor.grantRole(id('WATCHER_ROLE'), admin.address)).wait();
+  const sanctions = await deploy(sanctionsArtifact, admin.address);
+  const oracle = await deploy(oracleArtifact, await attestor.getAddress(), await sanctions.getAddress());
   const router = await deploy(routerArtifact, await manager.getAddress());
 
   const constructorArgs = AbiCoder.defaultAbiCoder().encode(
     ['address', 'address', 'address'],
-    [await manager.getAddress(), await attestor.getAddress(), await router.getAddress()]);
+    [await manager.getAddress(), await oracle.getAddress(), await router.getAddress()]);
   const initCode = concat([hookArtifact.bytecode, constructorArgs]);
 
   await t.test('Anvil carries the deterministic deployer the hook address search depends on', async () => {
@@ -60,7 +62,7 @@ test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, as
   });
 
   await t.test('deploying the same hook to an address without those bits is refused', async () => {
-    await assert.rejects(deploy(hookArtifact, await manager.getAddress(), await attestor.getAddress(), await router.getAddress()));
+    await assert.rejects(deploy(hookArtifact, await manager.getAddress(), await oracle.getAddress(), await router.getAddress()));
   });
 
   // One signer, so deployments are sequential: concurrent sends reuse a nonce.
@@ -123,7 +125,7 @@ test('the same agreement gates a real Uniswap v4 pool', { timeout: 240_000 }, as
   });
 
   await t.test('a sanctions hit closes the venue to that wallet immediately', async () => {
-    await (await attestor.revokeFacts(lender.address, policy.hash, bit('sanctionsClear'), 'OFAC SDN match')).wait();
+    await (await sanctions.setSanctioned(lender.address, true)).wait();
     const [allowed, clauseId] = await hook.explain(lender.address);
     assert.equal(allowed, false);
     assert.equal(clauseTable.clauses[Number(clauseId) - 1].ruleId, 'transfer-sanctions');

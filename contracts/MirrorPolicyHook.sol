@@ -9,7 +9,7 @@ import {PoolId, PoolIdLibrary} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {BalanceDelta} from "@uniswap/v4-core/src/types/BalanceDelta.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
-import {PolicyAttestor} from "./PolicyAttestor.sol";
+import {PolicyOracle} from "./PolicyOracle.sol";
 import {PolicyEval} from "./PolicyEval.sol";
 import {CompiledPolicy} from "../generated/CompiledPolicy.sol";
 
@@ -31,7 +31,7 @@ contract MirrorPolicyHook is IHooks {
     using PoolIdLibrary for PoolKey;
 
     IPoolManager public immutable poolManager;
-    PolicyAttestor public immutable attestor;
+    PolicyOracle public immutable oracle;
 
     /// @notice The agreement this hook speaks for.
     bytes32 public immutable policyHash;
@@ -58,12 +58,12 @@ contract MirrorPolicyHook is IHooks {
     uint160 internal constant REQUIRED_FLAGS =
         Hooks.BEFORE_ADD_LIQUIDITY_FLAG | Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | Hooks.BEFORE_SWAP_FLAG;
 
-    constructor(IPoolManager poolManager_, PolicyAttestor attestor_, address router_) {
+    constructor(IPoolManager poolManager_, PolicyOracle oracle_, address router_) {
         if (uint160(address(this)) & Hooks.ALL_HOOK_MASK != REQUIRED_FLAGS) {
             revert InvalidHookAddress(address(this), REQUIRED_FLAGS);
         }
         poolManager = poolManager_;
-        attestor = attestor_;
+        oracle = oracle_;
         router = router_;
         policyHash = CompiledPolicy.POLICY_HASH;
         clauseTableHash = CompiledPolicy.CLAUSE_TABLE_HASH;
@@ -76,7 +76,7 @@ contract MirrorPolicyHook is IHooks {
 
     /// @notice Evaluate without transacting, so a front end can explain a refusal before it happens.
     function explain(address subject) external view returns (bool allowed, uint16 clauseId) {
-        (uint256 known, uint256 value,) = attestor.factsOf(subject, policyHash);
+        (uint256 known, uint256 value,) = oracle.facts(subject);
         return PolicyEval.decide(CompiledPolicy.program(CompiledPolicy.ACTION_TRANSFER), known, value);
     }
 
@@ -111,7 +111,7 @@ contract MirrorPolicyHook is IHooks {
         if (sender != router) revert NotRouter(sender);
         if (hookData.length < 32) revert MissingSubject();
         address subject = abi.decode(hookData, (address));
-        (uint256 known, uint256 value,) = attestor.factsOf(subject, policyHash);
+        (uint256 known, uint256 value,) = oracle.facts(subject);
         (bool allowed, uint16 clauseId) =
             PolicyEval.decide(CompiledPolicy.program(CompiledPolicy.ACTION_TRANSFER), known, value);
         emit PolicyChecked(key.toId(), subject, CompiledPolicy.ACTION_TRANSFER, allowed, clauseId);

@@ -8,13 +8,15 @@ const credit = policy.profile === 'wildcat-credit';
 
 // The venue contracts are pinned to the compiler Uniswap v4 requires; everything else builds on the
 // repository's own compiler. Source keys are repository paths so relative imports resolve.
-const support = ['contracts/PolicyEval.sol', 'contracts/wildcat/IRoleProvider.sol', 'generated/CompiledPolicy.sol', 'contracts/PolicyAttestor.sol'];
+const support = ['contracts/PolicyEval.sol', 'contracts/wildcat/IRoleProvider.sol', 'generated/CompiledPolicy.sol', 'contracts/PolicyAttestor.sol', 'contracts/PolicyOracle.sol'];
 
 const bundles = [
   {
     compiler: solcLatest, evmVersion: 'cancun',
     targets: credit
-      ? [['contracts/PolicyAttestor.sol', 'PolicyAttestor'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider']]
+      ? [['contracts/PolicyAttestor.sol', 'PolicyAttestor'], ['contracts/PolicyOracle.sol', 'PolicyOracle'],
+         ['contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], ['contracts/MockWildcatMarket.sol', 'MockWildcatMarket'],
+         ['contracts/test/MockERC20.sol', 'MockERC20'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider']]
       : [['contracts/MirrorToken.sol', 'MirrorToken'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
          ['contracts/PolicyAttestor.sol', 'PolicyAttestor']],
   },

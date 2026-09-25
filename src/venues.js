@@ -1,8 +1,8 @@
 // Operator service over the deployed two-act stack. Every action here is what the golden demo does
 // in a terminal, exposed for the dashboard: attest facts, mint and release shares, drive the pool,
-// admit lenders, ship and fill the buyback. Demo wallets are the local chain's unlocked accounts,
-// so "act as Lender A" needs no keys; on a public chain only the operator key acts.
-import { Contract, MaxUint256, id, keccak256, formatUnits, parseUnits } from 'ethers';
+// admit lenders, ship and fill the buyback. Demo wallets are the local chain's unlocked accounts;
+// on a public chain they are derived from the operator key and topped up with gas when funded.
+import { Contract, MaxUint256, Wallet, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
@@ -41,6 +41,9 @@ export class VenueService {
     this.wallets = { Operator: await this.signer.getAddress() };
     if (this.record.chainId === 31337) {
       for (const [index, name] of DEMO_WALLETS.entries()) this.wallets[name] = await (await this.provider.getSigner(index + 1)).getAddress();
+    } else if (this.signer.privateKey) {
+      this.demo = DEMO_WALLETS.map((name) => new Wallet(keccak256(toUtf8Bytes(`mirr0tech-demo:${this.signer.privateKey}:${name}`)), this.provider));
+      for (const [index, name] of DEMO_WALLETS.entries()) this.wallets[name] = this.demo[index].address;
     }
     this.opcodes = loadOpcodes();
     return this;
@@ -60,8 +63,10 @@ export class VenueService {
   async signerFor(wallet) {
     const address = this.address(wallet);
     if (address === this.wallets.Operator) return this.signer;
-    if (this.record.chainId !== 31337) throw new AppError(400, 'NOT_LOCAL', 'Acting as a demo wallet needs the local chain');
-    return this.provider.getSigner(address);
+    if (this.record.chainId === 31337) return this.provider.getSigner(address);
+    const demo = this.demo?.find((wallet) => wallet.address === address);
+    if (!demo) throw new AppError(400, 'NOT_LOCAL', 'Acting as this wallet needs the local chain or a derived demo wallet');
+    return demo;
   }
   name(address) { return Object.entries(this.wallets).find(([, value]) => value.toLowerCase() === address.toLowerCase())?.[0] ?? address; }
   pack(kind, facts) {
@@ -144,6 +149,9 @@ export class VenueService {
   // ---- Act 1 -------------------------------------------------------------------------------------
   async fund(wallet, amount) {
     const address = this.address(wallet);
+    if (this.record.chainId !== 31337 && address !== this.wallets.Operator && await this.provider.getBalance(address) < parseEther('0.01')) {
+      await (await this.signer.sendTransaction({ to: address, value: parseEther('0.02') })).wait();
+    }
     await (await this.c.usdc.mint(address, parseUnits(amount, 6))).wait();
     const signer = await this.signerFor(wallet);
     for (const spender of [this.record.rwa.router, this.record.credit.market, this.record.credit.router, this.record.credit.aqua]) {

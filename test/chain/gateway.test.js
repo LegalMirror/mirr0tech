@@ -13,7 +13,8 @@ test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t)
   const { record } = await deployStack(signer);
   const venues = await new VenueService({ provider, signer, record }).init();
   const apiKey = 'test-stack-operator-key-only-24';
-  const server = createApp(null, apiKey, venues).listen(0, '127.0.0.1');
+  const viewerKey = 'test-stack-viewer-key-only-24-chars';
+  const server = createApp(null, apiKey, venues, null, viewerKey).listen(0, '127.0.0.1');
   await once(server, 'listening');
   t.after(() => server.close());
   const url = `http://127.0.0.1:${server.address().port}/v1/stack`;
@@ -65,6 +66,9 @@ test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t)
   assert.equal(quote.data.amountOut, '96000.0');
   assert.equal((await call('/credit/buyback/fill', { wallet: 'Lender A', amount: '100000' })).status, 200);
   const strangerQuote = await call('/credit/buyback/quote', { wallet: 'Stranger', amount: '10' });
+  const asViewer = (path, body) => fetch(url + path, { method: 'POST', headers: { Authorization: `Bearer ${viewerKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  assert.equal((await asViewer('/credit/buyback/quote', { wallet: 'Lender A', amount: '100000' })).status, 200, 'a viewer may quote');
+  assert.equal((await asViewer('/credit/deposit', { wallet: 'Lender A', amount: '1' })).status, 401, 'a viewer may not move funds');
   assert.equal(strangerQuote.status, 403);
   assert.equal(strangerQuote.data.error.details.refusal.name, 'CounterpartyRefused');
   assert.equal((await call('/wallets/Lender%20A/sanction', { sanctioned: true })).status, 200);

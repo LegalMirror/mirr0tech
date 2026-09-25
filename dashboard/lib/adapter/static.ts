@@ -41,7 +41,10 @@ export const staticSource: DataSource = {
     return policies.get(profile)!;
   },
   parties: async (profile) => structuredClone(partiesOf(profile)),
-  audit: async (profile): Promise<AuditEvent[]> => mockAudit(profile),
+  audit: async (profile): Promise<AuditEvent[]> => {
+    const response = await fetch(`${BASE}/data/audit-${profile}.json`);
+    return response.ok ? ((await response.json()) as AuditEvent[]) : mockAudit(profile);
+  },
   deployment: async () => {
     const response = await fetch(`${BASE}/data/deployment.json`);
     return response.ok ? ((await response.json()) as Deployment) : null;

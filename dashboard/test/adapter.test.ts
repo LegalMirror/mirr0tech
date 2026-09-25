@@ -43,15 +43,39 @@ describe("staticSource", () => {
 
   it("serves the exported deployment and null when the build has none", async () => {
     const record = { chainId: 11155111, attestor: "0xa" };
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(record))));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(record)))
+    );
     expect(await staticSource.deployment()).toEqual(record);
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("", { status: 404 })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 404 }))
+    );
     expect(await staticSource.deployment()).toBeNull();
+  });
+
+  it("serves the exported timeline when the build has one and mock events otherwise", async () => {
+    const exported = [{ id: "x", at: "2026-09-25T19:50:00Z", kind: "Fill", outcome: "ok" }];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(exported)))
+    );
+    expect(await staticSource.audit("wildcat-credit")).toEqual(exported);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 404 }))
+    );
+    expect((await staticSource.audit("wildcat-credit"))[0].outcome).toBeUndefined();
   });
 
   it("serves mock parties and audit events per profile", async () => {
     expect((await staticSource.parties("custodial-rwa")).every((party) => party.role !== "lender")).toBe(
       true
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 404 }))
     );
     expect((await staticSource.audit("wildcat-credit")).length).toBeGreaterThan(0);
   });

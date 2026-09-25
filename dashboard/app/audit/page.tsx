@@ -94,7 +94,9 @@ export default function AuditPage() {
     <>
       <PageHead eyebrow="Audit" title="Every decision, traceable to a sentence">
         Newest first. Each row replays its decision through the compiled policy and names the clause.{" "}
-        {!live && <span className="mock-note">mock events · the gateway build streams the live audit</span>}
+        {!live && events.data?.[0]?.outcome === undefined && (
+          <span className="mock-note">mock events · the gateway build streams the live audit</span>
+        )}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

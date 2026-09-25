@@ -4,13 +4,13 @@
 import { Router } from 'express';
 import { PROFILES, exportProfile } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
+import { auditEvents } from './audit-events.js';
 
 const KIND = { 'custodial-rwa': 'rwa', 'rwa-secondary': 'rwa', 'wildcat-credit': 'credit' };
 const ROLE = { Investor: 'investor', Stranger: 'stranger', 'Lender A': 'lender', 'Lender B': 'lender', 'Lender C': 'lender', Operator: 'borrower' };
 const WALLETS_FOR = { rwa: ['Investor', 'Stranger', 'Operator'], credit: ['Lender A', 'Lender B', 'Lender C', 'Stranger', 'Operator'] };
 const LABEL = { Operator: 'Demo MM Ltd — issuer and borrower treasury', Stranger: 'Stranger — unscreened wallet' };
 const slug = (name) => name.toLowerCase().replace(/\s+/g, '-');
-const VENUE = { rwa: 'token / uniswap-v4', credit: 'wildcat / aqua' };
 
 export async function loadPolicyData() {
   const entries = await Promise.all(PROFILES.map(async (spec) => [spec.profile, await exportProfile(spec)]));
@@ -79,54 +79,6 @@ export function dashboardRoutes(venues, policyData) {
   router.post('/lenders/:id/reject', wrap(async (req) => { const profile = profileOf(req); const name = walletOf(profile, req.params.id); await clearAll(profile, name); resolutions.set(`${profile}:${req.params.id}`, 'rejected'); return party(profile, name); }));
   router.post('/lenders/:id/revoke', wrap(async (req) => { const profile = profileOf(req); const name = walletOf(profile, req.params.id); await clearAll(profile, name); resolutions.delete(`${profile}:${req.params.id}`); return party(profile, name); }));
 
-  const KINDS = { attest: 'Attested', override: 'Attested', revoke: 'Revoked', 'rwa.mint': 'Minted', 'rwa.release': 'PolicyChecked', 'rwa.pool.create': 'PolicyChecked',
-    'rwa.pool.addLiquidity': 'PolicyChecked', 'rwa.pool.swap': 'PolicyChecked', 'credit.deposit': 'CredentialDecision', 'credit.withdraw': 'CredentialDecision',
-    'credit.buyback.ship': 'Shipped', 'credit.buyback.quote': 'PolicyChecked', 'credit.buyback.fill': 'Fill', 'credit.buyback.dock': 'Shipped' };
-  router.get('/audit', wrap(async (req) => {
-    const profile = profileOf(req);
-    const kind = KIND[profile];
-    return venues.audit.filter((entry) => !entry.policy || entry.policy === kind).map((entry) => {
-      const refused = entry.status === 'refused';
-      const quoteRefused = refused && entry.type === 'credit.buyback.quote';
-      return {
-        id: entry.id, at: entry.at,
-        kind: refused ? (quoteRefused ? 'QuoteRefused' : 'Refused') : (entry.type === 'sanction' ? (entry.sanctioned ? 'Revoked' : 'Attested') : KINDS[entry.type] ?? 'PolicyChecked'),
-        subject: entry.wallet ?? entry.refusal?.subject ?? 'Operator', action: ACTION[entry.type] ?? entry.type,
-        summary: refused ? `${entry.refusal?.name ?? 'refused'}${entry.refusal?.clause ? ` — ${entry.refusal.clause.clause}: “${entry.refusal.clause.quote}”` : ''}` : summaryOf(entry),
-        facts: entry.facts ?? {}, txHash: entry.txHash ?? null, venue: VENUE[entry.policy ?? kind] ?? 'attestor',
-        // What the chain decided; the browser shows this instead of replaying partial facts.
-        outcome: refused ? 'refused' : 'ok', clauseId: entry.refusal?.clause?.clauseId ?? entry.refusal?.clauseId ?? null,
-        explorer: entry.txHash && EXPLORER[venues.record.chainId] ? `${EXPLORER[venues.record.chainId]}/tx/${entry.txHash}` : null,
-      };
-    }).reverse();
-  }));
+  router.get('/audit', wrap(async (req) => auditEvents(venues.audit, profileOf(req), venues.record.chainId)));
   return router;
-}
-
-const EXPLORER = { 11155111: 'https://sepolia.etherscan.io' };
-// The policy action each venue call is decided under; facts-only entries have none.
-const ACTION = {
-  'rwa.mint': 'mint', 'rwa.release': 'transfer', 'rwa.pool.create': 'transfer', 'rwa.pool.addLiquidity': 'transfer', 'rwa.pool.swap': 'transfer',
-  'credit.deposit': 'deposit', 'credit.withdraw': 'withdraw', 'credit.buyback.ship': 'transfer', 'credit.buyback.quote': 'transfer', 'credit.buyback.fill': 'transfer', 'credit.buyback.dock': 'transfer',
-};
-
-function summaryOf(entry) {
-  switch (entry.type) {
-    case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
-    case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;
-    case 'override': return 'borrower override under MLA 13(c)(y)';
-    case 'sanction': return entry.sanctioned ? 'designated by the sanctions oracle' : 'designation lifted';
-    case 'rwa.mint': return `minted ${entry.amount} to custody`;
-    case 'rwa.release': return `released ${entry.amount}`;
-    case 'rwa.pool.create': return `created a ${entry.hooked ? 'hooked' : 'hookless'} pool`;
-    case 'rwa.pool.addLiquidity': return `added liquidity to the ${entry.hooked ? 'hooked' : 'hookless'} pool`;
-    case 'rwa.pool.swap': return `swapped in the ${entry.hooked ? 'hooked' : 'hookless'} pool`;
-    case 'credit.deposit': return `deposited ${entry.amount}`;
-    case 'credit.withdraw': return `withdrew ${entry.amount}`;
-    case 'credit.buyback.ship': return `shipped buyback ${entry.strategyHash?.slice(0, 10)}…`;
-    case 'credit.buyback.quote': return `quoted ${entry.amount} → ${entry.result?.amountOut} at ${entry.result?.price}`;
-    case 'credit.buyback.fill': return `filled ${entry.amount}`;
-    case 'credit.buyback.dock': return 'docked the buyback';
-    default: return entry.type;
-  }
 }

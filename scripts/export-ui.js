@@ -473,6 +473,10 @@ export async function exportAll(outDir = OUT) {
   }
   await writeFile(`${outDir}/index.json`, `${JSON.stringify({ profiles }, null, 2)}\n`);
   if (existsSync(at('deployments/sepolia.json'))) await writeFile(`${outDir}/deployment.json`, await readFile(at('deployments/sepolia.json'), 'utf8'));
+  if (existsSync(at('deployments/sepolia-parties.json'))) {
+    const parties = JSON.parse(await readFile(at('deployments/sepolia-parties.json'), 'utf8'));
+    for (const spec of PROFILES) if (parties[spec.profile]) await writeFile(`${outDir}/parties-${spec.profile}.json`, `${JSON.stringify(parties[spec.profile])}\n`);
+  }
   if (existsSync(at('deployments/sepolia-audit.json'))) {
     const entries = JSON.parse(await readFile(at('deployments/sepolia-audit.json'), 'utf8'));
     for (const spec of PROFILES) await writeFile(`${outDir}/audit-${spec.profile}.json`, `${JSON.stringify(auditEvents(entries, spec.profile, 11155111))}\n`);

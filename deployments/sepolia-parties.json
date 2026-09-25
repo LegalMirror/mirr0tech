@@ -1,0 +1,398 @@
+{
+  "custodial-rwa": [
+    {
+      "id": "investor",
+      "name": "Investor",
+      "address": "0x55da01025ea2F709f746eA32dB8444596B0d78EC",
+      "role": "investor",
+      "facts": {
+        "kycApproved": true,
+        "amlApproved": true,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": true,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790364924,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": true,
+        "clause": null
+      }
+    },
+    {
+      "id": "stranger",
+      "name": "Stranger — unscreened wallet",
+      "address": "0x082d4eE464fEDa33426253B5CF2A11E837F8535f",
+      "role": "stranger",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": null,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": null,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 5,
+          "ruleId": "transfer-onboarded-holder",
+          "action": "transfer",
+          "effect": "permit",
+          "clause": "Exhibit A — Investor Onboarding",
+          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        }
+      }
+    },
+    {
+      "id": "operator",
+      "name": "Demo MM Ltd — issuer and borrower treasury",
+      "address": "0xF0121f93b1a1bAd73AdDC316B57684bD93D3254e",
+      "role": "borrower",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": null,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": null,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 5,
+          "ruleId": "transfer-onboarded-holder",
+          "action": "transfer",
+          "effect": "permit",
+          "clause": "Exhibit A — Investor Onboarding",
+          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        }
+      }
+    }
+  ],
+  "rwa-secondary": [
+    {
+      "id": "investor",
+      "name": "Investor",
+      "address": "0x55da01025ea2F709f746eA32dB8444596B0d78EC",
+      "role": "investor",
+      "facts": {
+        "kycApproved": true,
+        "amlApproved": true,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": true,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790364924,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": true,
+        "clause": null
+      }
+    },
+    {
+      "id": "stranger",
+      "name": "Stranger — unscreened wallet",
+      "address": "0x082d4eE464fEDa33426253B5CF2A11E837F8535f",
+      "role": "stranger",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": null,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": null,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 5,
+          "ruleId": "transfer-onboarded-holder",
+          "action": "transfer",
+          "effect": "permit",
+          "clause": "Exhibit A — Investor Onboarding",
+          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        }
+      }
+    },
+    {
+      "id": "operator",
+      "name": "Demo MM Ltd — issuer and borrower treasury",
+      "address": "0xF0121f93b1a1bAd73AdDC316B57684bD93D3254e",
+      "role": "borrower",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": null,
+        "openTermState": null,
+        "borrowerOverride": null
+      },
+      "screenedAt": null,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 5,
+          "ruleId": "transfer-onboarded-holder",
+          "action": "transfer",
+          "effect": "permit",
+          "clause": "Exhibit A — Investor Onboarding",
+          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        }
+      }
+    }
+  ],
+  "wildcat-credit": [
+    {
+      "id": "lender-a",
+      "name": "Lender A",
+      "address": "0x93016e80D5c4760340346793B06D3F1F3796a2f4",
+      "role": "lender",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": true,
+        "lenderCheckPassed": true,
+        "amlKycProvided": true,
+        "notInsolvent": true,
+        "screeningCurrent": true,
+        "openTermState": true,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790365656,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": true,
+        "clause": null
+      }
+    },
+    {
+      "id": "lender-b",
+      "name": "Lender B",
+      "address": "0xb7898B0667b6218683eD4dF2F78DdfE15b24759B",
+      "role": "lender",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": true,
+        "amlKycProvided": true,
+        "notInsolvent": true,
+        "screeningCurrent": true,
+        "openTermState": true,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790365692,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 2,
+          "ruleId": "deposit-countersigned",
+          "action": "deposit",
+          "effect": "require",
+          "clause": "Lender Check Policy 2.1",
+          "quote": "has countersigned the Master Loan Agreement and Term Sheet for the Market from the Specified Wallet Address"
+        }
+      }
+    },
+    {
+      "id": "lender-c",
+      "name": "Lender C",
+      "address": "0xAcbFbcE260589de2b5b8918E1a5702283F1109f8",
+      "role": "lender",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": false,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": true,
+        "lenderCheckPassed": true,
+        "amlKycProvided": true,
+        "notInsolvent": true,
+        "screeningCurrent": true,
+        "openTermState": true,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790365704,
+      "sanctions": "flagged",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 7,
+          "ruleId": "deposit-sanctions",
+          "action": "deposit",
+          "effect": "forbid",
+          "clause": "MLA 13) b)",
+          "quote": "the Oracle shall serve as the definitive source for determining whether any Wallet Address associated with a Party is subject to sanctions"
+        }
+      }
+    },
+    {
+      "id": "stranger",
+      "name": "Stranger — unscreened wallet",
+      "address": "0x082d4eE464fEDa33426253B5CF2A11E837F8535f",
+      "role": "stranger",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": null,
+        "lenderCheckPassed": null,
+        "amlKycProvided": null,
+        "notInsolvent": null,
+        "screeningCurrent": null,
+        "openTermState": true,
+        "borrowerOverride": null
+      },
+      "screenedAt": null,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": false,
+        "clause": {
+          "clauseId": 2,
+          "ruleId": "deposit-countersigned",
+          "action": "deposit",
+          "effect": "require",
+          "clause": "Lender Check Policy 2.1",
+          "quote": "has countersigned the Master Loan Agreement and Term Sheet for the Market from the Specified Wallet Address"
+        }
+      }
+    },
+    {
+      "id": "operator",
+      "name": "Demo MM Ltd — issuer and borrower treasury",
+      "address": "0xF0121f93b1a1bAd73AdDC316B57684bD93D3254e",
+      "role": "borrower",
+      "facts": {
+        "kycApproved": null,
+        "amlApproved": null,
+        "sanctionsClear": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
+        "redemptionAuthorized": null,
+        "depositConfirmed": null,
+        "depositAvailable": null,
+        "sufficientBalance": null,
+        "mlaCountersigned": true,
+        "lenderCheckPassed": true,
+        "amlKycProvided": true,
+        "notInsolvent": true,
+        "screeningCurrent": true,
+        "openTermState": true,
+        "borrowerOverride": null
+      },
+      "screenedAt": 1790365740,
+      "sanctions": "clear",
+      "decision": {
+        "allowed": true,
+        "clause": null
+      }
+    }
+  ]
+}

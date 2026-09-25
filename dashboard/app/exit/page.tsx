@@ -295,7 +295,7 @@ export default function ExitPage() {
         {credit
           ? "The borrower ships a buyback whose program carries the compiled agreement as an instruction."
           : "The same agreement, enforced at the pool by a hook whose address is part of every PoolKey."}{" "}
-        {!live && <span className="mock-note">mock wallets · static adapter</span>}
+        {!live && <span className="mock-note">static build · quotes are simulated</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="venue" />}

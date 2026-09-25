@@ -16,13 +16,23 @@ async function json<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-function partiesOf(profile: ProfileId): Party[] {
-  if (!parties.has(profile)) parties.set(profile, mockParties(profile));
+/** The exported snapshot (a Sepolia run) when the build has one, mock parties otherwise; kept in memory after that. */
+async function partiesOf(profile: ProfileId): Promise<Party[]> {
+  if (!parties.has(profile)) {
+    let loaded: Party[] | null = null;
+    try {
+      const response = await fetch(`${BASE}/data/parties-${profile}.json`);
+      if (response.ok) loaded = (await response.json()) as Party[];
+    } catch {
+      loaded = null;
+    }
+    parties.set(profile, loaded ?? mockParties(profile));
+  }
   return parties.get(profile)!;
 }
 
-function update(profile: ProfileId, id: string, change: (party: Party) => void): Party {
-  const party = partiesOf(profile).find((entry) => entry.id === id);
+async function update(profile: ProfileId, id: string, change: (party: Party) => void): Promise<Party> {
+  const party = (await partiesOf(profile)).find((entry) => entry.id === id);
   if (!party) throw new Error(`Unknown party ${id}`);
   change(party);
   listeners.forEach((listener) => listener());
@@ -40,7 +50,7 @@ export const staticSource: DataSource = {
     }
     return policies.get(profile)!;
   },
-  parties: async (profile) => structuredClone(partiesOf(profile)),
+  parties: async (profile) => structuredClone(await partiesOf(profile)),
   audit: async (profile): Promise<AuditEvent[]> => {
     const response = await fetch(`${BASE}/data/audit-${profile}.json`);
     return response.ok ? ((await response.json()) as AuditEvent[]) : mockAudit(profile);

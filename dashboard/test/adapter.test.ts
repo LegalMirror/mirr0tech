@@ -55,6 +55,15 @@ describe("staticSource", () => {
     expect(await staticSource.deployment()).toBeNull();
   });
 
+  it("seeds parties from the exported snapshot when the build has one", async () => {
+    const snapshot = [{ id: "lender-a", name: "Lender A", role: "lender", facts: {}, screenedAt: 1 }];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(snapshot)))
+    );
+    expect((await staticSource.parties("rwa-secondary")).map((party) => party.id)).toEqual(["lender-a"]);
+  });
+
   it("serves the exported timeline when the build has one and mock events otherwise", async () => {
     const exported = [{ id: "x", at: "2026-09-25T19:50:00Z", kind: "Fill", outcome: "ok" }];
     vi.stubGlobal(

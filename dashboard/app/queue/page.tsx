@@ -145,7 +145,7 @@ export default function QueuePage() {
       <PageHead eyebrow="Queue" title="Review items">
         A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one
         can approve a sanctioned wallet.{" "}
-        {!live && <span className="mock-note">mock parties · static adapter</span>}
+        {!live && <span className="mock-note">static build · snapshot or mock parties</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="queue" />}

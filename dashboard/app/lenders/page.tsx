@@ -110,7 +110,7 @@ export default function LendersPage() {
       <PageHead eyebrow={credit ? "Lenders" : "Investors"} title={credit ? "Who may lend" : "Who may hold"}>
         Status is the compiled policy run on each wallet's facts — the same decision the{" "}
         {credit ? "role provider" : "gateway"} makes.{" "}
-        {!live && <span className="mock-note">mock parties · static adapter</span>}
+        {!live && <span className="mock-note">static build · snapshot or mock parties</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="parties" />}

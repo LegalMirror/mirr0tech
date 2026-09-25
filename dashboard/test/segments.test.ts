@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { segmentLines } from "@/lib/segments";
+import { pipelineRefs, segmentLines } from "@/lib/segments";
 
 describe("segmentLines", () => {
   const text = "alpha beta gamma\ndelta epsilon\n\nzeta";
@@ -55,5 +55,12 @@ describe("segmentLines", () => {
   it("ignores empty spans", () => {
     const lines = segmentLines("abc", [{ start: 1, end: 1, ref: "rule:z" }]);
     expect(lines[0].pieces).toHaveLength(1);
+  });
+});
+
+describe("pipelineRefs", () => {
+  it("walks rules in the agreement's order, then terms", () => {
+    const policy = { rules: [{ id: "b" }, { id: "a" }], terms: [{ name: "t" }] };
+    expect(pipelineRefs(policy)).toEqual(["rule:b", "rule:a", "term:t"]);
   });
 });

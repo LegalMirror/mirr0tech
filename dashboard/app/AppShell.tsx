@@ -130,8 +130,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="sh-sideFoot">
           {!compact && <ThemeToggle />}
           <p className="sh-note muted">
-            {buildStamp(build.sha, build.builtAt)} · data:{" "}
-            {source.kind === "static" ? "static export" : "gateway"} · law is source, code is a build artifact
+            {buildStamp(build.sha, build.builtAt)} ·{" "}
+            {source.kind === "static" ? "static export · snapshot or mock parties" : "live gateway"}
           </p>
         </div>
       </aside>

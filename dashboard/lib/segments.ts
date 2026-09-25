@@ -48,3 +48,8 @@ export function segmentLines(
 
 export const ruleRef = (id: string) => `rule:${id}`;
 export const termRef = (name: string) => `term:${name}`;
+
+/** Everything the pipeline can show, in the order the agreement introduces it: rules, then terms. */
+export function pipelineRefs(policy: { rules: { id: string }[]; terms: { name: string }[] }): string[] {
+  return [...policy.rules.map((rule) => ruleRef(rule.id)), ...policy.terms.map((term) => termRef(term.name))];
+}

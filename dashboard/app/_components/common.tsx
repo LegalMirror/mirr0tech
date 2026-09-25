@@ -32,25 +32,54 @@ export function Hash({ label, value, full = false }: { label: string; value: str
   );
 }
 
-export function PageHead({
-  eyebrow,
-  title,
-  children,
-}: {
-  eyebrow: string;
-  title: string;
-  children?: ReactNode;
-}) {
+/** Title and a one-line lead. The nav already says where the reader is, so there is no eyebrow. */
+export function PageHead({ title, children }: { eyebrow?: string; title: string; children?: ReactNode }) {
   return (
     <header className="page-head">
       <div>
-        <div className="eyebrow">{eyebrow}</div>
         <h1>{title}</h1>
         {children && <p>{children}</p>}
       </div>
     </header>
   );
 }
+
+/** A closed-by-default section: the title, a one-line summary, and the detail on click. */
+export function Disclosure({
+  title,
+  summary,
+  open = false,
+  card = false,
+  children,
+}: {
+  title: string;
+  summary?: ReactNode;
+  open?: boolean;
+  card?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details className={`disc ${card ? "card" : ""}`} open={open}>
+      <summary>
+        <span className="disc-title">{title}</span>
+        {summary && <span className="meta">{summary}</span>}
+      </summary>
+      <div className="disc-body">{children}</div>
+    </details>
+  );
+}
+
+const GLYPH = { approve: "✓", true: "✓", review: "?", unknown: "?", deny: "✗", false: "✗" } as const;
+/** One character for a verdict or a three-valued fact, coloured by its class. */
+export function Glyph({ state, title }: { state: keyof typeof GLYPH; title?: string }) {
+  return (
+    <span className={`glyph g-${state}`} title={title} aria-label={state}>
+      {GLYPH[state]}
+    </span>
+  );
+}
+export const triState = (value: Tri | undefined) =>
+  value === true ? "true" : value === false ? "false" : "unknown";
 
 export function Loading({ what }: { what: string }) {
   return <p className="loading">loading {what}…</p>;

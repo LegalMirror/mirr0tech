@@ -266,13 +266,6 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
     <section className="card doc-card" aria-label="Source document">
       <div className="doc-head">
         <h2>Source document</h2>
-        <div className="doc-legend">
-          <span className="chip chip-permit">permit</span>
-          <span className="chip chip-require">require</span>
-          <span className="chip chip-forbid">forbid</span>
-          {policy.terms.length > 0 && <span className="chip chip-term">term</span>}
-          <span className="chip chip-review">not compiled</span>
-        </div>
       </div>
       <CoverageBar policy={policy} filter={filter} setFilter={setFilter} />
       <div className="doc-scroll" ref={scroller}>
@@ -289,13 +282,9 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
         {parts.map(({ part, markdown, blocks }, index) => (
           <article className="doc-part" key={part.name}>
             <div className="doc-partHead">
-              <strong>{part.name}</strong>
-              <span className="small muted mono" title={part.sha256}>
-                sha256 {part.sha256.slice(0, 12)}…
-              </span>
-              <span className="small muted">
-                chars {part.start.toLocaleString()}–{part.end.toLocaleString()} of the bundle
-              </span>
+              <strong title={`sha256 ${part.sha256} · chars ${part.start}–${part.end} of the bundle`}>
+                {part.name}
+              </strong>
             </div>
             <div className={`doc-text ${filter !== "all" ? "doc-filtered" : ""}`} lang="en">
               {blocks.map((block) => {

@@ -1,7 +1,6 @@
 "use client";
 
 import { Failed, Loading, PageHead } from "./_components/common";
-import { Deployed } from "./_components/Deployed";
 import { Workspace } from "./_policy/Workspace";
 import { usePolicy } from "./providers";
 
@@ -10,13 +9,11 @@ export default function PolicyPage() {
   const { data: policy, error } = usePolicy();
   return (
     <>
-      <PageHead eyebrow="Policy" title="Legal clause → smart contract">
-        Hover a highlighted sentence to find the rule it became; click it to follow the quote through the
-        rule, its logic, its bytes and the contract that enforces it.
+      <PageHead title="Legal clause → smart contract">
+        Click a highlighted sentence to follow it from quote to rule to the contract that enforces it.
       </PageHead>
       {error && <Failed error={error} />}
       {!policy && !error && <Loading what="compiled policy" />}
-      {policy && <Deployed profile={policy.profile} />}
       {policy && <Workspace key={policy.profile} policy={policy} />}
     </>
   );

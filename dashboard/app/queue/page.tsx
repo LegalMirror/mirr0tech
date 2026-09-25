@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { live, source } from "@/lib/adapter";
+import { source } from "@/lib/adapter";
 import { explain, factsForAction, factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
 import { effectiveFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
-import { EffectChip, Failed, Loading, PageHead, TriChip } from "../_components/common";
+import { Failed, Glyph, Loading, PageHead, triState } from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
 
 /** Only facts a person attests can be ticked; the oracle, the market and expiry are read. */
@@ -55,12 +55,12 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
       </div>
 
       <h3>Trace</h3>
-      <ul className="trace">
+      <ul className="trace-line">
         {now.interpretation.trace.map((entry) => (
           <li key={entry.id}>
-            <EffectChip effect={entry.effect} />
-            <code>{entry.id}</code>
-            <TriChip value={entry.result} />
+            <span className="eff">{entry.effect}</span>
+            <span>{entry.id}</span>
+            <Glyph state={triState(entry.result)} />
           </li>
         ))}
       </ul>
@@ -86,25 +86,24 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
             <span className="switch-track" aria-hidden>
               <span className="switch-dot" />
             </span>
-            <span className="switch-text">
+            <span
+              className="switch-text"
+              title={rule ? `${rule.source.clause}: “${rule.source.quote}”` : undefined}
+            >
               <strong className="mono">{name}</strong>
               <small className="muted">
                 {FACT_KIND_LABEL[factKind(policy.profile, name)]}
-                {rule ? ` — ${rule.source.clause}: “${rule.source.quote}”` : ""}
+                {rule ? ` · ${rule.source.clause}` : ""}
               </small>
             </span>
           </label>
         );
       })}
 
-      <div className={`verdict verdict-${preview.verdict}`}>
-        <span className="small">
-          after attesting: <strong>{preview.verdict}</strong>
-          {preview.interpretation.reasons.length > 0 && (
-            <span className="muted"> ({preview.interpretation.reasons.join(", ")})</span>
-          )}
-        </span>
-      </div>
+      <p className="meta" style={{ marginTop: 8 }}>
+        After attesting: <Glyph state={preview.verdict} /> {preview.verdict}
+        {preview.interpretation.reasons.length > 0 && ` · ${preview.interpretation.reasons.join(", ")}`}
+      </p>
 
       <div className="row" style={{ marginTop: 12 }}>
         <button
@@ -142,10 +141,9 @@ export default function QueuePage() {
   const resolved = parties.data?.filter((party) => party.resolution) ?? [];
   return (
     <>
-      <PageHead eyebrow="Queue" title="Review items">
+      <PageHead title="Review items">
         A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one
-        can approve a sanctioned wallet.{" "}
-        {!live && <span className="mock-note">static build · snapshot or mock parties</span>}
+        can approve a sanctioned wallet.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="queue" />}

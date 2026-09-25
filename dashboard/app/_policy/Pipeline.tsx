@@ -2,23 +2,27 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { venuesFor, renderRefusal } from "@/lib/enforcement";
+import { factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
 
+/** A pipeline step. With `folded`, it renders closed with that one-line summary and opens on click. */
 function Step({
   n,
   title,
   hint,
   tone,
+  folded,
   children,
 }: {
   n: number;
   title: string;
   hint?: string;
   tone?: string;
+  folded?: string;
   children: ReactNode;
 }) {
   return (
@@ -27,11 +31,26 @@ function Step({
         {n}
       </span>
       <div className="step-body">
-        <div className="step-title">
-          <h3>{title}</h3>
-          {hint && <small>{hint}</small>}
-        </div>
-        {children}
+        {folded ? (
+          <details>
+            <summary>
+              <h3>{title}</h3>
+              <small className="meta">{folded}</small>
+            </summary>
+            <div className="step-detail">
+              {hint && <p className="meta">{hint}</p>}
+              {children}
+            </div>
+          </details>
+        ) : (
+          <>
+            <div className="step-title">
+              <h3>{title}</h3>
+              {hint && <small>{hint}</small>}
+            </div>
+            {children}
+          </>
+        )}
       </div>
     </li>
   );
@@ -62,21 +81,21 @@ function QuoteStep({
       <blockquote className="quote">“{quote}”</blockquote>
       <div className="quote-meta">
         <span className="chip chip-action">{clause}</span>
-        {first && <span className="chip">{policy.documents[first.part]?.name}</span>}
         {paragraph?.label && (
-          <span className="chip chip-ok" title="the paragraph this quote sits in">
+          <span className="chip" title="the paragraph this quote sits in">
             ¶ {paragraph.label}
           </span>
         )}
-        {first && (
-          <span className="chip" title="offsets into the normalized text the compiler hashed">
-            chars [{first.start.toLocaleString()}, {first.end.toLocaleString()})
-          </span>
-        )}
-        <span className={`chip ${verbatim ? "chip-ok" : "chip-bad"}`}>
-          {verbatim ? "✓ substring of the hashed text" : "✗ not found in the text"}
+        <span
+          className={`chip ${verbatim ? "chip-ok" : "chip-bad"}`}
+          title={
+            first
+              ? `${policy.documents[first.part]?.name} · chars [${first.start}, ${first.end}) of the hashed text${locations.length > 1 ? ` · ${locations.length} occurrences` : ""}`
+              : undefined
+          }
+        >
+          {verbatim ? "✓ verbatim" : "✗ not found in the text"}
         </span>
-        {locations.length > 1 && <span className="chip">{locations.length} occurrences</span>}
       </div>
     </Step>
   );
@@ -178,11 +197,10 @@ function RuleSteps({
       />
 
       <Step n={2} title="Rule" hint="the structured reading" tone={tone}>
-        <div className="row">
+        <div className="row" title={`clauseId ${rule.clauseId}`}>
           <code className="mono">{rule.id}</code>
           <span className="chip chip-action">{rule.action}</span>
           <EffectChip effect={rule.effect} />
-          <span className="chip">clauseId {rule.clauseId}</span>
         </div>
         <p className="small muted">{EFFECT_MEANING[rule.effect]}</p>
         <div className="tree">
@@ -191,7 +209,13 @@ function RuleSteps({
         <p className="small">{rule.rationale}</p>
       </Step>
 
-      <Step n={3} title="Logic" hint="NNF → DNF, one bitmask pair per term" tone={tone}>
+      <Step
+        n={3}
+        title="Logic"
+        hint="NNF → DNF, one bitmask pair per term"
+        tone={tone}
+        folded={`${rule.dnf.length} term${rule.dnf.length === 1 ? "" : "s"} over ${factsOfCondition(rule.condition).size} facts · proved equal to the interpreter`}
+      >
         <p className="small muted">
           Holds when any term holds. A term holds when every <em>pos</em> fact is known TRUE and every{" "}
           <em>neg</em> fact is known FALSE; if nothing refutes it but a fact is unknown, the term is unknown.
@@ -231,10 +255,25 @@ function RuleSteps({
         </p>
       </Step>
 
-      <Step n={4} title="Bytes" hint={`CompiledPolicy.program(${actionConst})`} tone={tone}>
+      <Step
+        n={4}
+        title="Bytes"
+        hint={`CompiledPolicy.program(${actionConst})`}
+        tone={tone}
+        folded={
+          segment
+            ? `rule ${program.rules.indexOf(segment) + 1} of ${program.rules.length} · ${program.byteLength}-byte program · offset ${segment.byteStart}`
+            : "no program segment"
+        }
+      >
         {segment ? (
           <>
-            <HexWithRange hex={program.hex} start={segment.byteStart} end={segment.byteEnd} />
+            <details className="disc">
+              <summary>
+                <span className="disc-title">all bytes</span>
+              </summary>
+              <HexWithRange hex={program.hex} start={segment.byteStart} end={segment.byteEnd} />
+            </details>
             <div className="row small" style={{ marginTop: 6 }}>
               <span className="muted">
                 {program.byteLength} bytes · this rule is bytes [{segment.byteStart}, {segment.byteEnd}) ·
@@ -260,16 +299,6 @@ function RuleSteps({
         ) : (
           <p className="error">No program segment found for clause {rule.clauseId}.</p>
         )}
-        <div className="hashes">
-          <div className="hash">
-            <span className="hash-k">POLICY_HASH</span>
-            <span className="hash-v">{short(policy.policyHash, 12, 8)}</span>
-          </div>
-          <div className="hash">
-            <span className="hash-k">CLAUSE_TABLE_HASH</span>
-            <span className="hash-v">{short(policy.clauseTableHash, 12, 8)}</span>
-          </div>
-        </div>
       </Step>
 
       <Step n={5} title="Enforcement" hint="where these bytes run" tone={tone}>
@@ -329,7 +358,13 @@ function RuleSteps({
         </div>
       </Step>
 
-      <Step n={6} title="What would happen" hint="toggle a hypothetical wallet's facts" tone={tone}>
+      <Step
+        n={6}
+        title="What would happen"
+        hint="toggle a hypothetical wallet's facts"
+        tone={tone}
+        folded="try a wallet's facts"
+      >
         <Evaluator {...evaluator} action={rule.action} focus={rule.id} />
       </Step>
     </ol>

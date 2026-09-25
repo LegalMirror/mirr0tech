@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { live, source } from "@/lib/adapter";
+import { source } from "@/lib/adapter";
 import { explain } from "@/lib/evaluate";
 import { fmtTime, short } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
@@ -21,17 +21,23 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
   const allowed = replay ? replay.onchain.allowed : event.outcome === "ok";
   const clauseId = replay ? replay.onchain.clauseId : (event.clauseId ?? 0);
   const verdict = replay ? replay.verdict : allowed ? "approve" : "deny";
+  // Attestations and designations change facts; they are not decisions under an action.
+  const decided = policy.actionOrder.includes(event.action);
   return (
-    <li style={{ "--tone": TONE[verdict] } as CSSProperties}>
+    <li style={{ "--tone": decided ? TONE[verdict] : "var(--border)" } as CSSProperties}>
       <details>
         <summary>
           <span className="when">{fmtTime(event.at)}</span>
           <span className="chip chip-action">{event.kind}</span>
           <strong>{event.subject}</strong>
           <span className="muted small">{event.summary}</span>
-          <span className={`chip chip-${verdict}`}>
-            {event.action}: {verdict}
-          </span>
+          {decided ? (
+            <span className={`chip chip-${verdict}`}>
+              {event.action}: {verdict}
+            </span>
+          ) : (
+            <span className="meta">facts</span>
+          )}
         </summary>
         <div className="detail">
           <dl className="kv small">
@@ -92,11 +98,8 @@ export default function AuditPage() {
   const sorted = [...(events.data ?? [])].sort((a, b) => b.at.localeCompare(a.at));
   return (
     <>
-      <PageHead eyebrow="Audit" title="Every decision, traceable to a sentence">
-        Newest first. Each row replays its decision through the compiled policy and names the clause.{" "}
-        {!live && events.data?.[0]?.outcome === undefined && (
-          <span className="mock-note">mock events · the gateway build streams the live audit</span>
-        )}
+      <PageHead title="Every decision, traceable to a sentence">
+        Newest first. Each row names the clause behind its decision.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

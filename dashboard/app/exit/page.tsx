@@ -1,13 +1,19 @@
 "use client";
 
-import { live } from "@/lib/adapter";
-
 import { useState } from "react";
 import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
 import { effectiveFacts } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
-import { ClauseTableBadge, Failed, Hash, Loading, PageHead, Refusal } from "../_components/common";
+import {
+  ClauseTableBadge,
+  Disclosure,
+  Failed,
+  Hash,
+  Loading,
+  PageHead,
+  Refusal,
+} from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
 import { useProfile } from "../providers";
 
@@ -114,20 +120,21 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
               </li>
             ))}
           </ol>
-          <h3>Hash chain</h3>
-          <div className="chain">
-            <Hash label="document" value={policy.source.sha256} />
-            <span className="hash-arrow">⊂</span>
-            <Hash label="policyHash" value={policy.policyHash} />
-            <span className="hash-arrow">⊂</span>
-            <Hash label={`program · ${(buyback.program.length - 2) / 2} bytes`} value={buyback.program} />
-            <span className="hash-arrow">⊂</span>
-            <Hash label="strategyHash" value={buyback.strategyHash} />
-          </div>
-          <p className="small muted">
-            Token and maker addresses are placeholders until deployment, so this strategy hash is
-            illustrative; the policy hash inside the program is the real one.
-          </p>
+          <Disclosure title="Provenance" summary="document ⊂ policy ⊂ program ⊂ strategy">
+            <div className="chain">
+              <Hash label="document" value={policy.source.sha256} />
+              <span className="hash-arrow">⊂</span>
+              <Hash label="policyHash" value={policy.policyHash} />
+              <span className="hash-arrow">⊂</span>
+              <Hash label={`program · ${(buyback.program.length - 2) / 2} bytes`} value={buyback.program} />
+              <span className="hash-arrow">⊂</span>
+              <Hash label="strategyHash" value={buyback.strategyHash} />
+            </div>
+            <p className="small muted">
+              Token and maker addresses are placeholders until deployment, so this strategy hash is
+              illustrative; the policy hash inside the program is the real one.
+            </p>
+          </Disclosure>
         </section>
 
         <section className="card">
@@ -288,14 +295,10 @@ export default function ExitPage() {
   const credit = profile === "wildcat-credit";
   return (
     <>
-      <PageHead
-        eyebrow={credit ? "Exit" : "Trade"}
-        title={credit ? "A compliant exit on 1inch Aqua" : "The token's only door into Uniswap"}
-      >
+      <PageHead title={credit ? "A compliant exit on 1inch Aqua" : "The token's only door into Uniswap"}>
         {credit
           ? "The borrower ships a buyback whose program carries the compiled agreement as an instruction."
-          : "The same agreement, enforced at the pool by a hook whose address is part of every PoolKey."}{" "}
-        {!live && <span className="mock-note">static build · quotes are simulated</span>}
+          : "The same agreement, enforced at the pool by a hook whose address is part of every PoolKey."}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="venue" />}

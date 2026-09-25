@@ -1,6 +1,6 @@
 // Assemble a party's facts the way PolicyOracle.facts does on chain: attested facts only while the
 // attestation is live, `screeningCurrent` derived from it, observable facts read, never attested.
-import type { Facts } from "./evaluate";
+import { factsForAction, type Facts } from "./evaluate";
 import type { Party, PolicyData } from "./types";
 
 const OBSERVABLE = new Set(["sanctionsClear", "openTermState", "screeningCurrent"]);
@@ -25,4 +25,10 @@ export const statusAction = (policy: PolicyData) =>
 export function credentialExpiry(policy: PolicyData, party: Party): number | null {
   const window = Number(policy.config.attestationValiditySeconds ?? 0);
   return party.screenedAt !== null && window > 0 ? party.screenedAt + window : null;
+}
+
+/** The facts some rule of this policy reads, in bit order; the rest of the fact set is noise here. */
+export function relevantFacts(policy: PolicyData): string[] {
+  const used = new Set(policy.actionOrder.flatMap((action) => factsForAction(policy, action)));
+  return policy.factOrder.filter((name) => used.has(name));
 }

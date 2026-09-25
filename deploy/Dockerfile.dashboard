@@ -1,0 +1,31 @@
+# Coolify: Build Pack = Dockerfile, Dockerfile location `deploy/Dockerfile.dashboard`, Base directory `/`.
+# `next build` inlines NEXT_PUBLIC_* at build time: set NEXT_PUBLIC_GATEWAY_URL (the API's public
+# URL) and NEXT_PUBLIC_GATEWAY_KEY as build args in the Coolify project, and rebuild when they change.
+ARG NODE_VERSION=22-bookworm-slim
+
+FROM node:${NODE_VERSION} AS build
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates python3 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY dashboard/package.json dashboard/package-lock.json dashboard/
+RUN npm --prefix dashboard ci --no-audit --no-fund
+COPY . .
+# The export reads the vendored SwapVM opcode table to decode the buyback program.
+RUN sh scripts/vendor.sh
+ARG SOURCE_COMMIT
+ARG NEXT_PUBLIC_GATEWAY_URL
+ARG NEXT_PUBLIC_GATEWAY_KEY
+ENV SOURCE_COMMIT=$SOURCE_COMMIT NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL NEXT_PUBLIC_GATEWAY_KEY=$NEXT_PUBLIC_GATEWAY_KEY
+RUN npm --prefix dashboard run build
+
+FROM node:${NODE_VERSION} AS runner
+WORKDIR /site
+ENV PORT=3100
+RUN npm install -g serve@14 --no-audit --no-fund
+COPY --from=build --chown=node:node /app/dashboard/out /site/out
+USER node
+EXPOSE 3100
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3100)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["sh", "-c", "serve out -l ${PORT:-3100} -s"]

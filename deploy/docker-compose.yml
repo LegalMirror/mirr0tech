@@ -1,0 +1,56 @@
+# Production compose for Coolify (Docker Compose deployment, dedicated project).
+#
+# No host ports: Coolify's proxy reaches the services on the project network via `expose`.
+# Configuration is environment — set it in the Coolify project (see .env.coolify.example).
+# The chain is a throwaway anvil: a restart redeploys both acts and reseeds the story. Point
+# RPC_URL at Sepolia (with DEPLOYER_PRIVATE_KEY and the canonical AQUA) to keep state instead.
+name: mirr0tech
+
+networks:
+  mirr0tech:
+    name: mirr0tech
+    driver: bridge
+
+services:
+  anvil:
+    image: ghcr.io/foundry-rs/foundry:latest
+    command: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337", "--block-time", "1", "--silent"]
+    networks: [mirr0tech]
+    expose: ["8545"]
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    networks: [mirr0tech]
+    expose: ["3200"]
+    restart: unless-stopped
+    depends_on: [anvil]
+    environment:
+      PORT: "3200"
+      HOST: 0.0.0.0
+      RPC_URL: ${RPC_URL:-http://anvil:8545}
+      API_KEY: ${API_KEY:-local-dev-stack-operator-key-only}
+      SEED: ${SEED:-true}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
+      BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}
+      AQUA: ${AQUA:-}
+      POOL_MANAGER: ${POOL_MANAGER:-}
+      WETH: ${WETH:-}
+      MULTIBAAS_URL: ${MULTIBAAS_URL:-}
+      MULTIBAAS_API_KEY: ${MULTIBAAS_API_KEY:-}
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.dashboard
+      args:
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
+        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
+        NEXT_PUBLIC_GATEWAY_KEY: ${NEXT_PUBLIC_GATEWAY_KEY:-local-dev-stack-operator-key-only}
+    networks: [mirr0tech]
+    expose: ["3100"]
+    restart: unless-stopped
+    environment:
+      PORT: "3100"

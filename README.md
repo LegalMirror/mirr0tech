@@ -125,6 +125,10 @@ Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { na
 
 The original MVP's REST gateway (`npm start`, bearer token, `Idempotency-Key`, restart recovery) still drives Act 1's issuance: `GET /v1/policy`, `POST /v1/investors`, `POST /v1/deposits`, `POST /v1/mints`, `POST /v1/redemptions`, `GET /v1/audit`, plus mock compliance/settlement endpoints. `npm run demo` exercises it on a mock chain; `CHAIN_MODE=evm` uses the deployed token (`.env.example`).
 
+## Deploy
+
+`deploy/` holds a Coolify-shaped Docker Compose stack — `anvil` + `api` (deploys and seeds on boot) + `dashboard` — with a local override for trying it here; see [docs/deploy.md](docs/deploy.md).
+
 ## Honest limits
 
 The venue enforces what it can observe. Screening results, countersignature, AML/KYC information and solvency are **attested**, not proved — a policy hash is not evidence that anyone was screened correctly. The sanctions oracle and the Wildcat market are mocks with the real interfaces; the real Wildcat market is mainnet-only. Fact bitmaps are readable per wallet (no identities or reasons are stored on chain, but presence of a designation is visible). The fund token is non-rebasing by design because Uniswap v4 does not support rebasing balances. A pool's singleton custody is answered by the hook checking the beneficial owner at the boundary. This is a prototype on a local chain with mock USD; it is not legal advice and describes no real counterparty.

@@ -1,0 +1,33 @@
+# Coolify: Build Pack = Dockerfile, Dockerfile location `deploy/Dockerfile.api`, Base directory `/`.
+# Serves the stack API (/v1/stack, /v1/policy, /v1/lenders, /v1/audit). On boot it deploys both acts
+# to RPC_URL (the `anvil` service by default) and seeds the golden-path state; a restart redeploys.
+ARG NODE_VERSION=22-bookworm-slim
+
+# ── foundry (anvil is only needed when no RPC_URL is given) ────────────────
+FROM ghcr.io/foundry-rs/foundry:latest AS foundry
+
+# ── build: compile all three policy profiles into artifacts/ ──────────────
+FROM node:${NODE_VERSION} AS build
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates python3 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY . .
+RUN sh scripts/vendor.sh \
+ && node scripts/compile.js --demo && node scripts/build-contracts.js \
+ && node scripts/compile.js --secondary --demo && node scripts/build-contracts.js \
+ && node scripts/compile.js --mla --demo && node scripts/build-contracts.js
+
+# ── run ─────────────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION} AS runner
+WORKDIR /app
+ENV NODE_ENV=production PORT=3200 HOST=0.0.0.0
+COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
+COPY --from=build --chown=node:node /app /app
+RUN chmod +x deploy/api-entrypoint.sh
+USER node
+EXPOSE 3200
+# Readiness, not liveness: Coolify swaps traffic when /health answers, i.e. after the deployment.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3200)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["sh", "deploy/api-entrypoint.sh"]

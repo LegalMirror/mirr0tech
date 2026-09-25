@@ -1,0 +1,9 @@
+# Local override: publishes host ports so the stack can be tried without Coolify.
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up --build
+services:
+  anvil:
+    ports: ["8545:8545"]
+  api:
+    ports: ["3200:3200"]
+  dashboard:
+    ports: ["3100:3100"]

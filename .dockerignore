@@ -1,0 +1,10 @@
+node_modules
+dashboard/node_modules
+dashboard/out
+dashboard/.next
+vendor
+artifacts
+generated
+.data
+.git
+*.log

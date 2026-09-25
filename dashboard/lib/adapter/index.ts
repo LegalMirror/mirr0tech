@@ -10,3 +10,6 @@ export function selectSource(env: { gatewayUrl?: string } = {}): DataSource {
 }
 
 export const source: DataSource = selectSource({ gatewayUrl: process.env.NEXT_PUBLIC_GATEWAY_URL });
+
+/** True when screens read the operator gateway rather than exported data and mock parties. */
+export const live = source.kind === "gateway";

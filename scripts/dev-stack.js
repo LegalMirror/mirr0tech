@@ -32,7 +32,7 @@ const record = saved?.chainId === Number(chainId) ? saved : (await deployStack(s
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaasClient() : null;
-const venues = await new VenueService({ provider, signer, record, multibaas }).init();
+const venues = await new VenueService({ provider, signer, record, multibaas, auditPath: `generated/audit-${record.chainId}.json` }).init();
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();

@@ -1,15 +1,13 @@
 "use client";
 
 import type { CSSProperties } from "react";
-import { source } from "@/lib/adapter";
+import { live, source } from "@/lib/adapter";
 import { explain } from "@/lib/evaluate";
 import { fmtTime, short } from "@/lib/format";
 import { useResource } from "@/lib/hooks";
 import type { AuditEvent, PolicyData } from "@/lib/types";
 import { EffectChip, Failed, Loading, PageHead, Refusal, TriChip } from "../_components/common";
 import { useProfile, usePolicy } from "../providers";
-
-const LIVE = Boolean(process.env.NEXT_PUBLIC_GATEWAY_URL);
 
 const TONE: Record<string, string> = {
   approve: "var(--permit)",
@@ -88,7 +86,7 @@ export default function AuditPage() {
     <>
       <PageHead eyebrow="Audit" title="Every decision, traceable to a sentence">
         Newest first. Each row replays its decision through the compiled policy and names the clause.{" "}
-        {!LIVE && <span className="mock-note">mock events · the gateway build streams the live audit</span>}
+        {!live && <span className="mock-note">mock events · the gateway build streams the live audit</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

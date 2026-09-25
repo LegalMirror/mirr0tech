@@ -2,6 +2,8 @@
 // in a terminal, exposed for the dashboard: attest facts, mint and release shares, drive the pool,
 // admit lenders, ship and fill the buyback. Demo wallets are the local chain's unlocked accounts;
 // on a public chain they are derived from the operator key and topped up with gas when funded.
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { Contract, MaxUint256, Wallet, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
@@ -15,8 +17,9 @@ const M = 1_000_000n;
 export const DEMO_WALLETS = ['Investor', 'Stranger', 'Lender A', 'Lender B', 'Lender C'];
 
 export class VenueService {
-  constructor({ provider, signer, record, multibaas = null, log = () => {} }) {
-    Object.assign(this, { provider, signer, record, multibaas, log, audit: [], orders: [] });
+  /// `auditPath` keeps the audit across restarts; without it the audit lives in memory only.
+  constructor({ provider, signer, record, multibaas = null, auditPath = null, log = () => {} }) {
+    Object.assign(this, { provider, signer, record, multibaas, auditPath, log, audit: [], orders: [] });
   }
 
   /// Indexed events from MultiBaas when a deployment is registered there; the local audit otherwise.
@@ -46,7 +49,13 @@ export class VenueService {
       for (const [index, name] of DEMO_WALLETS.entries()) this.wallets[name] = this.demo[index].address;
     }
     this.opcodes = loadOpcodes();
+    if (this.auditPath) this.audit = await readFile(this.auditPath, 'utf8').then(JSON.parse, () => []);
     return this;
+  }
+  async persist() {
+    if (!this.auditPath) return;
+    await mkdir(dirname(this.auditPath), { recursive: true });
+    await writeFile(this.auditPath, `${JSON.stringify(this.audit, null, 2)}\n`);
   }
 
   // ---- helpers -------------------------------------------------------------------------------
@@ -88,11 +97,13 @@ export class VenueService {
       const receipt = result?.wait ? await result.wait() : null;
       Object.assign(entry, { status: 'ok', txHash: receipt?.hash ?? null, ...(receipt ? {} : { result }) });
       this.audit.push(entry);
+      await this.persist();
       return entry;
     } catch (error) {
       const refusal = decodeRefusal(error, this.policy(details.policy ?? 'credit').clauseTable);
       Object.assign(entry, { status: 'refused', refusal: refusal ? { ...refusal, subject: refusal.subject ? this.name(refusal.subject) : null } : null, message: error.shortMessage ?? error.message });
       this.audit.push(entry);
+      await this.persist();
       throw new AppError(refusal ? 403 : 500, refusal ? 'POLICY_REFUSED' : 'CHAIN_ERROR', refusal?.clause ? `${refusal.name}: ${refusal.clause.clause} — ${refusal.clause.quote}` : (refusal?.name ?? error.shortMessage ?? error.message), entry);
     }
   }

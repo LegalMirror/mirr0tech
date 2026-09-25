@@ -1,5 +1,7 @@
 "use client";
 
+import { live } from "@/lib/adapter";
+
 import { useState } from "react";
 import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
@@ -293,7 +295,7 @@ export default function ExitPage() {
         {credit
           ? "The borrower ships a buyback whose program carries the compiled agreement as an instruction."
           : "The same agreement, enforced at the pool by a hook whose address is part of every PoolKey."}{" "}
-        <span className="mock-note">mock wallets · static adapter</span>
+        {!live && <span className="mock-note">mock wallets · static adapter</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="venue" />}

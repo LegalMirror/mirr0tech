@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { source } from "@/lib/adapter";
+import { live, source } from "@/lib/adapter";
 import { explain, factsForAction, factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
@@ -144,7 +144,8 @@ export default function QueuePage() {
     <>
       <PageHead eyebrow="Queue" title="Review items">
         A refusal an unknown fact could still change waits here. A prohibition that holds never does: no one
-        can approve a sanctioned wallet. <span className="mock-note">mock parties · static adapter</span>
+        can approve a sanctioned wallet.{" "}
+        {!live && <span className="mock-note">mock parties · static adapter</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="queue" />}

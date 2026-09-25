@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { source } from "@/lib/adapter";
+import { live, source } from "@/lib/adapter";
 import { explain } from "@/lib/evaluate";
 import { factKind, OBSERVABLE_SOURCE } from "@/lib/facts";
 import { fmtTime, short } from "@/lib/format";
@@ -110,7 +110,7 @@ export default function LendersPage() {
       <PageHead eyebrow={credit ? "Lenders" : "Investors"} title={credit ? "Who may lend" : "Who may hold"}>
         Status is the compiled policy run on each wallet's facts — the same decision the{" "}
         {credit ? "role provider" : "gateway"} makes.{" "}
-        <span className="mock-note">mock parties · static adapter</span>
+        {!live && <span className="mock-note">mock parties · static adapter</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="parties" />}

@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
 import { deployStack } from '../../src/deploy.js';
@@ -22,7 +25,8 @@ test('on a public chain the demo wallets are derived from the operator key and f
   const { provider } = await startAnvil(t);
   const signer = new Wallet(DEV_KEY, provider);
   const { record } = await deployStack(signer);
-  const venues = await new VenueService({ provider, signer, record: { ...record, chainId: 11155111 } }).init();
+  const auditPath = `${await mkdtemp(join(tmpdir(), 'mirr0tech-'))}/audit.json`;
+  const venues = await new VenueService({ provider, signer, record: { ...record, chainId: 11155111 }, auditPath }).init();
   const lender = venues.wallets['Lender A'];
   assert.match(lender, /^0x[0-9a-fA-F]{40}$/);
   assert.equal(await provider.getBalance(lender), 0n);
@@ -32,4 +36,6 @@ test('on a public chain the demo wallets are derived from the operator key and f
   assert.equal((await venues.deposit('Lender A', '1000')).status, 'ok');
   assert.equal((await venues.wallet('Lender A')).balances.mDEMO, '1000.0');
   await assert.rejects(venues.signerFor('0x000000000000000000000000000000000000dEaD'), /NOT_LOCAL|derived demo wallet/);
+  const reloaded = await new VenueService({ provider, signer, record: { ...record, chainId: 11155111 }, auditPath }).init();
+  assert.deepEqual(reloaded.audit.map((entry) => entry.type), ['attest', 'credit.deposit'], 'the audit survives a restart');
 });

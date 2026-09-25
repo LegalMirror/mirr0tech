@@ -755,7 +755,7 @@ dl.kv dd {
 }
 @media (max-width: 1180px) {
   .pol-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 .doc-card {
@@ -1924,4 +1924,18 @@ blockquote.why {
 }
 .standings li {
   padding: 1px 0;
+}
+
+/* Narrow screens: nothing in the document card may set a minimum width */
+.doc-card,
+.pol-grid > .card {
+  min-width: 0;
+}
+.cov-row,
+.cov-filters {
+  flex-wrap: wrap;
+}
+.overview-grid > .card,
+.parties > .card {
+  min-width: 0;
 }

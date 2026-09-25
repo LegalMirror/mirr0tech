@@ -10,8 +10,8 @@ no host ports in the production compose, everything as environment.
 | `dashboard` (`deploy/Dockerfile.dashboard`) | 3100 | static Next.js, `NEXT_PUBLIC_*` inlined at build |
 
 **Sepolia.** Set `RPC_URL`, `DEPLOYER_PRIVATE_KEY`, `DEPLOYMENT_PATH=deployments/sepolia.json`
-(the committed record; matching chain id → no redeploy), `SEED=false` after the first boot, and
-`MULTIBAAS_*` to register the contracts. The canonical `AQUA`, `POOL_MANAGER`, `WETH` are in
+(the committed record; matching chain id → no redeploy), `AUDIT_PATH=deployments/sepolia-audit.json`
+(the seeded timeline) with `SEED=false`, and `MULTIBAAS_*` to register the contracts. The canonical `AQUA`, `POOL_MANAGER`, `WETH` are in
 `.env.coolify.example`.
 
 ## Coolify

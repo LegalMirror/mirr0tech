@@ -36,6 +36,7 @@ services:
       SEED: ${SEED:-true}
       DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
       DEPLOYMENT_PATH: ${DEPLOYMENT_PATH:-}
+      AUDIT_PATH: ${AUDIT_PATH:-}
       DATA_DIR: /app/.data
       BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}
       AQUA: ${AQUA:-}

@@ -1,6 +1,7 @@
 # Demo script — 3 minutes, two acts, one asset
 
-Run: `npm run dev:stack` (API on :3200) and the dashboard in gateway mode (or the hosted stack). The seed
+Run: `npm run dev:stack` (API on :3200) and the dashboard in gateway mode (or the hosted stack; for Sepolia:
+`RPC_URL=… DEPLOYER_PRIVATE_KEY=… DEPLOYMENT_PATH=deployments/sepolia.json AUDIT_PATH=deployments/sepolia-audit.json npm run dev:stack`, no seed needed). The seed
 (`npm run seed:stack`) leaves the state below in place; the presenter only has to click. Every line in
 *italics* is narration. Numbers match PRD §4.
 

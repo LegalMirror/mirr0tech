@@ -6,7 +6,11 @@ A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed
 
 ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
 
-**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — the clause highlighter on the exported policies and the Sepolia deployment (static build; the live gateway is a local or Coolify run).
+**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — the story, the agreements with every enforced sentence, who may lend and why, the Aqua exit, the Sepolia timeline (static build; the live gateway is a local or Coolify run).
+
+[![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
+
+[![Agreement](docs/img/agreement.png)](https://legalmirror.github.io/mirr0tech/agreement)
 
 ## Run it
 

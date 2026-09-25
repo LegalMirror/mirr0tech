@@ -13,6 +13,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Act 1 — tokenize and trade (60 s)
 
+0. **Overview**: one asset, both acts, who stands where, the Sepolia links. *One agreement in, the code that admits, refuses and pays out.*
 1. **Agreement** screen, profile *Tokenize*. Show the Securitize/BlackRock agreement with every quoted span lit
    and the coverage bar. Click a lit paragraph. *Eight rules, each one a verbatim quote from the hashed
    document. Terms it leaves open are flagged, not guessed.* Point at the pipeline: quote → rule → logic →

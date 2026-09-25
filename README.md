@@ -68,7 +68,7 @@ Terms the documents leave open (default remedies, governing law, sanctions dispu
 | `scripts/demo-golden.js`, `scripts/demo-credit.js`, `scripts/demo.js` | both acts · Act 2 lender lifecycle · the original custodial issuance demo (REST) |
 | `test/`, `test/chain/` | unit tests incl. the equivalence proof · anvil tests: `evm` (token + operator signer), `rwa-pool` (Act 1), `credit` (role provider), `swapvm` (Aqua strategy), `hook` (v4), `stack` |
 | `docs/` | `PRD.md`, `ARCHITECTURE.md`, `SWAPVM_INTEGRATION.md`, `MLA_CLAUSE_MAP.md` |
-| `dashboard/` | clause highlighter and operator screens (see its README) |
+| `dashboard/` | Next.js dashboard: clause highlighter with the six pipeline steps, lenders/queue/exit/audit screens; static export by default, live against the stack API with `NEXT_PUBLIC_GATEWAY_URL` + `NEXT_PUBLIC_GATEWAY_KEY` (see `dashboard/README.md`) |
 | `generated/`, `artifacts/<profile>/` | build output, git-ignored; each artifact directory carries its policy and clause table |
 
 Compilers: repository contracts on solc 0.8.37; Uniswap's `PoolManager` pins 0.8.26 (`solc-v4`); SwapVM and Aqua pin 0.8.30 via IR (`solc-swapvm`). `scripts/build-contracts.js` bundles them and reports bytecode sizes.
@@ -91,6 +91,16 @@ MULTIBAAS_URL=… MULTIBAAS_API_KEY=… RPC_URL=<sepolia> DEPLOYER_PRIVATE_KEY=�
 ```
 
 MultiBaas only sees chains it supports, so development and every test stay on anvil; the sync is a post-deploy step on Sepolia. `test/multibaas.test.js` covers the registration against a fake client. Feedback: the SDK's `createContract` / `setAddress` / `linkAddressContract` triple is exactly the right granularity for a compiler that emits versioned contracts — version = policy hash is a natural fit; we would have liked a supported-chain check in the SDK and an idempotent "upsert" so re-syncs need no conflict handling.
+
+## Dashboard
+
+```sh
+npm --prefix dashboard install
+npm --prefix dashboard run dev                 # exports both policies, serves http://localhost:3100 on static data
+NEXT_PUBLIC_GATEWAY_URL=http://127.0.0.1:3200 NEXT_PUBLIC_GATEWAY_KEY=local-dev-stack-operator-key-only npm --prefix dashboard run dev   # live, against `npm run dev:stack`
+```
+
+The clause highlighter shows the document with every quoted span lit, and for a selected rule: quote → rule → DNF terms → program bytes → enforcing contract and revert → a what-would-happen evaluator that runs the interpreter and the bitmask decision side by side. With the gateway set, lenders, facts, decisions and the audit come from the chain; the dashboard's PolicyData is recomputed by the same export code, so its `policyHash` equals the deployed one.
 
 ## Stack API — drive both acts without a terminal
 

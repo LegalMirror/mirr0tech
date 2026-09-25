@@ -8,6 +8,7 @@ import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
 import { createApp } from '../src/app.js';
+import { loadPolicyData } from '../src/dashboard-api.js';
 
 let anvil = null;
 let rpcUrl = process.env.RPC_URL;
@@ -32,6 +33,7 @@ const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaa
 const venues = await new VenueService({ provider, signer, record, multibaas }).init();
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
-const server = createApp(null, apiKey, venues).listen(Number(process.env.PORT ?? 3000), host, () =>
+const policyData = loadPolicyData();
+const server = createApp(null, apiKey, venues, policyData).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

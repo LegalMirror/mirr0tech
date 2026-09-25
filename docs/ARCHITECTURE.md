@@ -202,6 +202,8 @@ Compilers: repository contracts on solc 0.8.37 (`solc`); v4 bundle on 0.8.26 (`s
 | `scripts/demo-golden.js` | both acts end to end on anvil — the demo script as a terminal run |
 | `src/venues.js`, `src/venues-api.js`, `scripts/dev-stack.js` | operator service and REST routes over the deployed stack; local runner |
 | `src/multibaas.js`, `scripts/multibaas-sync.js`, `test/multibaas.test.js` | MultiBaas registration of a deployment (post-deploy on a supported chain) |
+| `src/dashboard-api.js`, `test/chain/dashboard-api.test.js` | the dashboard adapter's routes (`/v1/policy*`, `/v1/lenders*`, `/v1/audit`) served live from the stack |
+| `dashboard/`, `scripts/export-ui.js` | Next.js dashboard and the export that recomputes PolicyData for it |
 | `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
 | `contracts/PolicyEval.sol` | three-valued evaluator |
 | `contracts/PolicyAttestor.sol` | facts, expiry, revocation, EIP-712 relay |

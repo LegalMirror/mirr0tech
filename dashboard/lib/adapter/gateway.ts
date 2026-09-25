@@ -3,13 +3,14 @@
 import type { AuditEvent, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
 import type { DataSource } from "./types";
 
-export function gatewaySource(baseUrl: string): DataSource {
+export function gatewaySource(baseUrl: string, apiKey = process.env.NEXT_PUBLIC_GATEWAY_KEY): DataSource {
   const listeners = new Set<() => void>();
   const call = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
     const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
       ...init,
       headers: {
         "content-type": "application/json",
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
         ...(init.method && init.method !== "GET" ? { "idempotency-key": crypto.randomUUID() } : {}),
         ...init.headers,
       },

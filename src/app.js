@@ -2,16 +2,23 @@ import express from 'express';
 import { timingSafeEqual } from 'node:crypto';
 import { ensure, AppError } from './errors.js';
 import { venueRoutes } from './venues-api.js';
+import { dashboardRoutes } from './dashboard-api.js';
 
 function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
 }
 // `service` is the custodial issuance ledger (optional); `venues` is the deployed two-act stack (optional).
-export function createApp(service, apiKey, venues = null) {
+export function createApp(service, apiKey, venues = null, policyData = null) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
   const app = express();
   app.disable('x-powered-by');
   app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
+  // The dashboard is served from another origin (or another machine on the LAN); the bearer token is the gate.
+  app.use((req, res, next) => {
+    res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS' });
+    if (req.method === 'OPTIONS') return res.sendStatus(204);
+    next();
+  });
   app.get('/health', (_req, res) => res.json({
     status: service?.pending() ? 'reconciliation_required' : 'ok', mode: service?.chain.mode ?? 'stack',
     policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,
@@ -24,6 +31,8 @@ export function createApp(service, apiKey, venues = null) {
   });
   app.use(express.json({ limit: '32kb' }));
   if (venues) app.use('/v1/stack', venueRoutes(venues));
+  // The dashboard's routes take the place of the custodial ledger's when only the stack is served.
+  if (venues && policyData && !service) app.use('/v1', dashboardRoutes(venues, policyData));
   if (service) {
   app.get('/v1/policy', (_req, res) => res.json(service.policy));
   app.get('/v1/investors', (_req, res) => res.json(Object.values(service.snapshot().investors)));

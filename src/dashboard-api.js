@@ -94,11 +94,14 @@ export function dashboardRoutes(venues, policyData) {
         subject: entry.wallet ?? entry.refusal?.subject ?? 'Operator', action: entry.type,
         summary: refused ? `${entry.refusal?.name ?? 'refused'}${entry.refusal?.clause ? ` — ${entry.refusal.clause.clause}: “${entry.refusal.clause.quote}”` : ''}` : summaryOf(entry),
         facts: entry.facts ?? {}, txHash: entry.txHash ?? null, venue: VENUE[entry.policy ?? kind] ?? 'attestor',
+        explorer: entry.txHash && EXPLORER[venues.record.chainId] ? `${EXPLORER[venues.record.chainId]}/tx/${entry.txHash}` : null,
       };
     }).reverse();
   }));
   return router;
 }
+
+const EXPLORER = { 11155111: 'https://sepolia.etherscan.io' };
 
 function summaryOf(entry) {
   switch (entry.type) {

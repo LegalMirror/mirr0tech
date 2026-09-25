@@ -9,6 +9,8 @@ import type { AuditEvent, PolicyData } from "@/lib/types";
 import { EffectChip, Failed, Loading, PageHead, Refusal, TriChip } from "../_components/common";
 import { useProfile, usePolicy } from "../providers";
 
+const LIVE = Boolean(process.env.NEXT_PUBLIC_GATEWAY_URL);
+
 const TONE: Record<string, string> = {
   approve: "var(--permit)",
   review: "var(--unresolved)",
@@ -49,8 +51,12 @@ function Row({ policy, event }: { policy: PolicyData; event: AuditEvent }) {
             )}
             <dt>Transaction</dt>
             <dd>
-              {event.txHash ? (
-                <code title={event.txHash}>{short(event.txHash, 10, 6)} (mock)</code>
+              {event.txHash && event.explorer ? (
+                <a href={event.explorer} target="_blank" rel="noreferrer">
+                  <code title={event.txHash}>{short(event.txHash, 10, 6)} ↗</code>
+                </a>
+              ) : event.txHash ? (
+                <code title={event.txHash}>{short(event.txHash, 10, 6)}</code>
               ) : (
                 "none — refused before signing"
               )}
@@ -82,7 +88,7 @@ export default function AuditPage() {
     <>
       <PageHead eyebrow="Audit" title="Every decision, traceable to a sentence">
         Newest first. Each row replays its decision through the compiled policy and names the clause.{" "}
-        <span className="mock-note">mock events · MultiBaas event queries replace this</span>
+        {!LIVE && <span className="mock-note">mock events · the gateway build streams the live audit</span>}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

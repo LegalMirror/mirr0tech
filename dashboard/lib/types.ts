@@ -227,5 +227,7 @@ export type AuditEvent = {
   /** The fact set the decision ran on, so the row can replay the trace */
   facts: Record<string, Tri>;
   txHash: string | null;
+  /** Block-explorer link for the transaction on a public chain */
+  explorer?: string | null;
   venue: string;
 };

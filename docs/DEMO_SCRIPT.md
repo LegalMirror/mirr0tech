@@ -1,59 +1,49 @@
-# Demo script — 3 minutes, two acts, one asset
+# Demo script — one flow, about 4 minutes
 
-Fallback with no stack at all: https://legalmirror.github.io/mirr0tech/ (static build, mock parties, Sepolia links).
-Run: `npm run dev:stack` (API on :3200) and the dashboard in gateway mode (or the hosted stack; for Sepolia:
-`RPC_URL=… DEPLOYER_PRIVATE_KEY=… DEPLOYMENT_PATH=deployments/sepolia.json AUDIT_PATH=deployments/sepolia-audit.json npm run dev:stack`, no seed needed). The seed
-(`npm run seed:stack`) leaves the state below in place; the presenter only has to click. Every line in
-*italics* is narration. Numbers match PRD §4.
+Sequence and numbers match PRD §5; `test/chain/flow.test.js` runs the same commands on anvil. Fallback with no gateway: https://legalmirror.github.io/mirr0tech/ (static dashboard, Sepolia links) and the README "Sepolia" section, where every step below is a recorded tx (`agr_1b8a5c438bb1`).
+
+**Setup.** `npm run dev:stack` (anvil + gateway on `PORT`, default 3000), or the Sepolia gateway: `RPC_URL=… DEPLOYER_PRIVATE_KEY=… DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack`. `PAYMENT_WEBHOOK_SECRET` set. Terminal left: `npx mirr0 login <url> <key>` done. Browser right: `<url>/docs` (Swagger UI). Lines in *italics* are narration; what follows `→` is what the audience reads on screen.
 
 ## Open (15 s)
 
-*The paper behind a tokenized asset says who may hold it, where it may trade, how it may be lent. None of
-that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech compiles the paper itself.*
+*A fund's transfer-agent agreement says who may hold the token and what onboarding they clear. On chain that becomes a hand-kept allowlist: it cannot tell "not permitted" from "not yet checked", and nothing says which sentence refused a wallet. mirr0tech compiles the agreement itself.*
 
-## Act 1 — tokenize and trade (60 s)
+## 1 Upload → Verified (45 s)
 
-0. **Overview**: one asset, both acts, who stands where, the Sepolia links. *One agreement in, the code that admits, refuses and pays out.*
-1. **Agreement** screen, act *Fund*. Show the Securitize/BlackRock agreement with every quoted span lit
-   and the coverage bar. Click a lit paragraph. *Eight rules, each one a verbatim quote from the hashed
-   document. Terms it leaves open are flagged, not guessed.* Point at the pipeline: quote → rule → logic →
-   bytes → contract → what-would-happen. *The interpreter and the on-chain bitmask agree on every input —
-   the compiler proves that before it emits a byte.*
-2. **Lenders/Investors**: the Investor is onboarded, the Stranger is not. *Shares were minted to custody and
-   released only to the onboarded wallet — the stranger's release was refused by Exhibit A.*
-3. **Trade** screen: two pools exist, both created by the Stranger. *Anyone may create a pool. The one
-   without the hook initialised fine — and the first deposit into it reverted at the token: no policy, no
-   door.* Then the hooked pool: Investor allowed, Stranger refused, quote rendered. *The issuer published
-   one hook address. Every pool under it enforces the prospectus; every pool without it is inert.*
+- `mirr0 upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL` → `agr_…  extracting  BUIDL`.
+- `mirr0 show agr_… --wait compiled` → `compiled`, `confidence <n>  rules <n>  history uploaded → extracting → verified → compiled`, the hash. *A deliberation read the document: an extractor proposes, a critic checks every quote against the text. Each rule carries the sentence it came from and a verdict; contested items are shown, not hidden.*
+- `mirr0 ast agr_…` → the tree; `✓` verified, `?` contested, `!` unresolved. Point at `fact: identityVerified`.
 
-## Act 2 — lend it out (75 s)
+## 2 Constrain (30 s)
 
-4. **Agreement**, act *Loan*. *Same compiler, different paper: Wildcat's template Master Loan
-   Agreement, the borrower's own Lender Check Policy, one addendum clause.* Click the §1 "Role Provider"
-   paragraph. *The agreement delegates admission to a role provider — so that is what we compiled it into.*
-5. **Lenders**: A admitted, B in review, C flagged. Click B. *No countersignature — the policy quotes Lender
-   Check Policy 2.1. Unknown is a real value here; it never admits.* Click C. *Designated by the oracle the
-   agreement names as definitive. No override for the officer; only the borrower's §13(c)(y) path.*
-6. **Exit**: the shipped buyback. *The borrower stands a bid for its own debt at the addendum's 0.96 — on 1inch
-   Aqua, so no capital moved. Look at the program: Deadline, then the agreement itself as an opcode, then
-   the price, the curve, the cap.* Show Lender A's fill (96,000 for 100,000). Then the Stranger's quote:
-   refused at quote time, clause 4.2 quoted. *Refused before a transaction exists.*
-   If time allows, the auction variant: *same addendum, clause A1.5 — the bid opens at 0.96 and improves to 1.00
-   over six hours, so the lender chooses when to accept. A tender offer, compiled from one sentence.*
-7. **Lenders** → flag Lender A (sanction toggle). Back to **Exit** → quote as A: refused, MLA 13(a).
-   **Lenders** → A's payment eligibility: blocked, 13(c). *Nothing was redeployed. The same strategy stopped
-   filling for that wallet, and the payment desk stopped paying it — from one oracle read.*
+- `mirr0 constrain agr_… --credential document --actions mint,transfer` → `identity: document on mint, transfer — "Know-your-customer (KYC)…"` and `deploy again: the policy hash changed`. *Exhibit A asks for KYC. A proof of human says a person exists; a passport says who. The issuer chooses per agreement, and the choice is inside the hash the token will carry.*
 
-## Close (30 s)
+## 3 Deploy (45 s; ~15 s on anvil, a few minutes on Sepolia, so deploy ahead there)
 
-8. **History**: the timeline — every decision with its clause and tx hash. *This is what takes a compliance
-   team days to reconstruct.*
-9. Change one word in the agreement (prepared tab): the hash changes. *The deployed provider, hook and
-   strategy keep enforcing the agreement exactly as signed. Law stays law; the code is its build artifact.*
+- `mirr0 deploy agr_… --wait` → `deployed`, `oracle 0x…`, `hook 0x…` (mined address), `pool 0x…`. *Solidity compiled now, from this AST. Its own oracle, token, hook and pool on the canonical Uniswap v4 PoolManager. The hook is the token's only door: a pool without it initializes, then reverts at the first deposit.*
 
-*mirr0tech links a tokenized asset's off-chain legal clauses to the on-chain code that executes them.*
+## 4 Prove the hook (75 s)
+
+- `mirr0 facts agr_… Investor kycApproved=true amlApproved=true sanctionsClear=true` → `attested … tx 0x…`.
+- `mirr0 explain agr_… Investor` → `Investor transfer: refused — transfer-identity-verified — Exhibit A — Investor Onboarding: "…"`. *Facts alone do not admit. The refusal names the sentence.*
+- `mirr0 verify agr_… Investor` → `identity verified for Investor (nullifier 0x…)  tx 0x…`. *A World ID document proof, verified server-side, bound to this wallet: one human, one wallet.* `mirr0 explain agr_… Investor` → `allowed`.
+- `mirr0 fund agr_… Investor 10000 && mirr0 mint agr_… 10000 && mirr0 release agr_… Investor 5000` → three txs.
+- `mirr0 pool agr_… liquidity Investor && mirr0 pool agr_… swap Investor` → `… through the policy-hooked pool: ok  tx 0x…` twice. *Liquidity and a swap, through the hook.*
+- `mirr0 pool agr_… swap Stranger` → `POLICY_REFUSED: …` and `↳ transfer-identity-verified — Exhibit A — Investor Onboarding: "…"`. *Same pool, no proof: refused, sentence rendered, no transaction.*
+- Optional (mock proofs): `mirr0 verify agr_… Stranger --proof investor.json` (the Investor's saved proof) → `HUMAN_ALREADY_BOUND`; a proof-of-human payload → `WRONG_CREDENTIAL`.
+
+## 5 Payment in (30 s)
+
+- Post a signed `payment_intent.succeeded` event to `POST /webhooks/payments` (`metadata.wallet`, `metadata.agreement: agr_…`; `sign()` in `src/payments.js` makes the `Stripe-Signature` header). Investor, 125.50 USD → `settlement.status: ok`, mint and release txs. Stranger, 50.00 → `held`, `subscription-documents`.
+- `mirr0 audit agr_…` → `payment.settle ok Investor` and `payment.settle held Stranger — subscription-documents`. *Money in is a fact like any other. A hold is a decision with a sentence, not an error, and the rail never retries it.*
+
+## Close (20 s)
+
+- `mirr0 audit agr_…` → every decision: `worldid.verify ok`, `rwa.pool.swap refused — transfer-identity-verified`, the payments. Swagger UI on the right: the whole contract, the webhook under **Webhooks**. *Change one word in the agreement: new hash, new deployment. The deployed hook keeps enforcing the document as signed. Law stays law; the code is its build artifact.*
 
 ## Fallbacks
 
-- Terminal instead of UI: `npm run demo:golden` prints the same story, refusals with quotes included.
-- If the chain restarted: `npm run seed:stack` rebuilds the state in ~40 s.
+- Gateway down: the static site and the README "Sepolia" links tell the same story as recorded txs; the audit is `deployments/sepolia-agreement-audit.json`.
+- anvil restarted: rerun from `upload`, about 2 minutes; or `npm run test:chain:stack` for the recorded run.
+- Live model slow: unset `NOOLOG_API_KEY`, the mock serves the same routes from the draft reading; `mirr0 status` shows `model mock`.
+- No World `rp_id` / app not migrated: mock proofs run every path; `APP_NOT_MIGRATED` is its own code.

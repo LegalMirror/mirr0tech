@@ -1,93 +1,20 @@
 # mirr0tech
 
-**mirr0tech links a tokenized asset's off-chain legal clauses to the on-chain code that executes them.**
+**mirr0tech compiles a tokenized asset's legal agreement into the token's issuance rules and the Uniswap v4 hook it trades through.**
 
-A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed to the document, and compiled into each venue the asset passes through: the token's issuance rules, the Uniswap v4 hook it trades through, the Wildcat role provider that admits lenders, the 1inch Aqua strategy that gives a lender an exit. Every on-chain refusal names its clause.
+An agreement goes in. A deliberation generates its policy: rules, terms and open items, each quoting the sentence it came from, each with a verdict and a confidence. The issuer adds the World ID constraint the agreement asks for, deploys, and the token's pool is live. Every refusal, off chain (`403 POLICY_REFUSED`) and on chain (`LegalClauseViolation(clauseId, policyHash)`), names its sentence.
 
-ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
+ETHGlobal Tokyo 2026. Prototype, testnet, mock USD, not legal advice, no affiliation with Uniswap, World, Curvegrid, Stripe, Wildcat, 1inch, Securitize or BlackRock.
 
-**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — the story, the agreements with every enforced sentence, who may lend and why, the Aqua exit, the Sepolia timeline (static build; the live gateway is a local or Coolify run).
+**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — static dashboard build: the agreement with every enforced sentence, the Sepolia timeline. The gateway is a local or Coolify run.
 
 [![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
 
 [![Agreement](docs/img/agreement.png)](https://legalmirror.github.io/mirr0tech/agreement)
 
-## Run it
+## The flow from a terminal
 
-Node 18+ and [Foundry](https://getfoundry.sh) (`anvil`). Everything runs locally.
-
-```sh
-npm ci && npm run vendor                                           # vendor/ ← 1inch SwapVM + Aqua sources
-npm run build && npm run build:secondary && npm run build:credit   # artifacts/<profile>/
-npm run demo:golden                                                # both acts end to end on a fresh anvil
-npm run check                                                      # unit + chain tests, all three profiles
-```
-
-## The demo
-
-**Act 1 — tokenize and trade.** The Securitize/BlackRock transfer-agent agreement compiles into a permissioned fund token and a Uniswap v4 hook. Shares mint to custody and release only to an onboarded investor. Anyone may create a pool; one without the hook cannot take the token (`NoPolicyDoor`), and a stranger in the hooked pool is refused with *"Exhibit A — Investor Onboarding"* quoted.
-
-**Act 2 — lend it out.** The Wildcat template Master Loan Agreement, the borrower's Lender Check Policy and a one-clause buyback addendum compile into a Wildcat `IRoleProvider` and a 1inch Aqua strategy. Lender A deposits; Lender B, uncountersigned, goes to review; Lender C, designated by the sanctions oracle, is denied with no override. The borrower ships a standing buyback to Aqua (virtual balance, no capital moves) whose program contains the agreement as an opcode. Lender A fills at the addendum's 0.96; a stranger is refused at quote time; a later designation makes the same strategy unfillable for that wallet and blocks its payment, nothing redeployed.
-
-## How it works
-
-```
-document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, each with a verbatim quote
-            ─► DNF bitmasks per rule ─► equivalence proof vs the JS interpreter (all 3^k assignments)
-            ─► policyHash + clause-table hash ─► CompiledPolicy.sol + program templates
-```
-
-- **Three-valued facts.** True, false, or not established. Unknown never satisfies a requirement, and an expired attestation makes every fact unknown, so screening is continuous. `contracts/PolicyEval.sol` and `src/policy/evaluate.js` decide identically or the compiler refuses to emit.
-- **Observable vs attested.** Sanctions come from the oracle the agreement names, the market's term state from the market; the compliance function attests the rest into `PolicyAttestor` with an expiry. `PolicyOracle` assembles both for every venue.
-- **Provenance on every revert.** `LegalClauseViolation(clauseId, policyHash)` / `CounterpartyRefused(subject, clauseId, policyHash)`; the clause table's hash is committed on chain, so the sentence a front end shows cannot be substituted.
-- **No generated code.** Extraction emits schema-validated JSON; the compiler emits bitmasks into fixed templates; one audited evaluator serves every policy.
-
-## Venues
-
-| Venue | Contract | The agreement there |
-| --- | --- | --- |
-| Wildcat V2 | `MirrortechRoleProvider.sol`, Wildcat's real `IRoleProvider` | `getCredential` admits lenders, `mayWithdraw` re-checks at payment, `explain` says why. One `addRoleProvider` call registers it. |
-| 1inch Aqua + SwapVM | `swapvm/MirrortechRouter.sol` (`SwapVM` + `LimitOpcodes` + two instructions), `PolicyGuard.sol`, `FixedRateBalances.sol` | The agreement runs inside the maker's program: `PolicyGuard` evaluates maker and taker at every fill and every `quote()`; strategies ship to the unmodified Aqua registry. |
-| Uniswap v4 | `MirrorPolicyHook.sol` | Admission on liquidity and swaps, address mined for its permission bits, and a transient handshake that makes the hook the token's only door into Uniswap. |
-
-## Source documents
-
-`test/human_contracts/`: the [Wildcat template MLA](https://docs.wildcat.finance/legal/master-loan-agreement) verbatim with illustrative fields (fictional "Demo MM Ltd"); an illustrative Lender Check Policy and buyback addendum (the MLA delegates admission to the borrower's process, §1); a public Securitize/BlackRock services agreement, interpreted as a subset. Open terms (default remedies, governing law, sanctions disputes) are listed as `unresolved` and block compilation unless `--demo` is passed.
-
-## How we used 1inch Aqua and SwapVM
-
-- **Official contracts.** Aqua unmodified (the canonical registry on Sepolia); `MirrortechRouter` is `SwapVM` + `LimitOpcodes` with two instructions appended, no opcode renumbered (`contracts/swapvm/MirrortechRouter.sol:31-49`).
-- **Instructions.** `PolicyGuard._policyGuard` (`PolicyGuard.sol:38-50`) reads `ctx.query.maker/taker` and calls `PolicyOracle.decide`; view-only, so `quote()` refuses before a transaction exists. `FixedRateBalances` (`FixedRateBalances.sol:27-45`) pins the addendum's rate over preloaded Aqua balances.
-- **Programs.** `src/policy/programs.js` derives opcodes from the vendored `LimitOpcodes.sol`, encodes `[opcode][len][args]`, builds hookless Aqua orders and taker traits. Two positions from one addendum: `BuybackFixedPrice` (A1.1) and `BuybackDutchAuction`, the official `DutchAuctionBalanceOut` between rate and curve, floor to the A1.5 ceiling over the window: a tender offer with the agreement as an opcode.
-- **Executed.** `test/chain/swapvm.test.js`, `scripts/demo-golden.js`: `ship` → `quote` → `swap` (`pull`/`push`) → refusals → cap, deadline → `dock`; the auction quotes at open, midway and near close, fills, expires.
-
-Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
-
-## How we used World ID
-
-Exhibit A of the fund agreement says onboarding starts with "Know-your-customer (KYC)… checks during onboarding of investors". KYC is an identity check, so the proportionate credential is a **Passport/NFC document**, not a proof of human; it compiles to the fact `identityVerified`, required to be issued shares and to enter the Uniswap pool. `src/worldid.js` verifies the proof with World (`POST /api/v4/verify/{rp_id}`, `rp_context` signed server-side), refuses a proof bound to another wallet, binds the nullifier so one person cannot onboard twice, and attests the fact with an expiry; every venue reads it like any other fact. The Investors screen opens the IDKit widget when an app is registered, a mock proof otherwise; "Use the Investor's proof" on the Stranger shows the refusal. Trust moment, credential choice, alternative paths and the integration debrief: [docs/WORLD_ID.md](docs/WORLD_ID.md).
-
-## How we used Noolog
-
-New to Noolog? [docs/NOOLOG.md](docs/NOOLOG.md): what it is, the docs MCP server (`.mcp.json` wires it into this checkout), the API and SDK links.
-
-The extraction is generated by a Noolog deliberation, not by one model call. `src/noolog/extract.js` sends the document (and the hand-authored reading as a draft) to the OpenAI-compatible endpoint (`POST /v1/chat/completions`, model `nsed:deep`); the answer is the winning proposal, the `x-nsed-session-id` header names the job, and `GET /deliberation/{job}/details` + `/references` give every claim its verdicts (`verified | contested | unverified | wrong`), the evaluators' counter-positions on contested items, the winner, the convergence and a confidence per rule, term and open item. That report ships as `verification` in every policy export; the dashboard shows it on the Agreement screen (counts, contested items, every claim, the schema on real data) and under every sentence. With no `NOOLOG_API_KEY` the in-process mock (`src/noolog/mock.js`) serves the same routes, status codes and schemas (checked against `noolog-wire` and `quorum-rs`) with a mechanical critic: a quote that is not in the text is wrong, one that repeats or is too short is contested, an open item is unverified. `test/noolog.test.js` runs the loop over HTTP: a forged quote is refuted and dropped from the generated extraction; the MLA's repeated sentences come back contested.
-
-## How we used Curvegrid MultiBaas
-
-`src/multibaas.js` uploads every contract's ABI and bytecode under a label and a policy-hash version (`policy-<hash8>`), aliases and links each address (`attestor`, `fund_hook`, `role_provider`, `swapvm_router`, …), so MultiBaas indexes `Attested`/`Revoked`/`Overridden`, `CredentialDecision`, `PolicyChecked`, Aqua's `Pushed`/`Pulled` and the router's `Swapped`. The stack API serves them at `GET /v1/stack/events` and the audit screen reads that. `node scripts/multibaas-sync.js deployments/sepolia.json` registered the Sepolia deployment (13 contracts; the dev plan links 10 and indexes from the link, `MULTIBAAS_STARTING_BLOCK`). `src/multibaas-signer.js` is the operator key in a vault: with `SIGNER=multibaas` the gateway signs attestations, mints and deploys through a MultiBaas Cloud Wallet (`/chains/ethereum/hsm/submit`); only the signature leaves the HSM. The issuer configures it in the platform: `PUT /v1/settings/signing` takes the Azure Key Vault account and key (or an existing Cloud Wallet), hands the operator roles and gas to it, and the gateway signs from the vault from then on (`docs/API.md`, Key custody). The dev deployment has no HSM wallet yet, so this is proven on anvil with an unlocked account standing in for the vault. `test/multibaas.test.js` and `test/multibaas-signer.test.js` cover both against a fake client.
-
-Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right granularity for a compiler that emits versioned contracts; we missed a supported-chain check and an idempotent upsert for re-syncs.
-
-## Dashboard and API
-
-`npm --prefix dashboard run dev` serves http://localhost:3100 on exported data; with `NEXT_PUBLIC_GATEWAY_URL` and `NEXT_PUBLIC_GATEWAY_KEY` it runs live against `npm run dev:stack` (anvil + operator API). The clause highlighter maps every paragraph to what it compiled to and walks a rule from quote to DNF to bytes to contract; the Lenders, Decisions, Exit and History screens drive the chain. Routes and repository map: [docs/API.md](docs/API.md).
-
-## Deploy
-
-`deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`): [docs/deploy.md](docs/deploy.md). `.github/workflows/pages.yml` publishes the static dashboard to GitHub Pages on every push.
-
-### The flow from a terminal
+`npx mirr0` (`scripts/mirr0.js`) is the front end; every command is one call of the [agreements API](docs/AGREEMENTS_API.md). `test/chain/flow.test.js` runs exactly this on anvil; the same sequence ran on Sepolia ([below](#sepolia)).
 
 ```sh
 npm run dev:stack &                      # anvil + the stack + the gateway on :3000
@@ -99,11 +26,25 @@ npx mirr0 verify <id> Investor && npx mirr0 fund <id> Investor 10000 && npx mirr
 npx mirr0 pool <id> swap Stranger                                        # refused, with the sentence
 ```
 
-Every command is one call of the [agreements API](docs/AGREEMENTS_API.md); `GET /docs` is the Swagger UI over all of it.
+What each step prints: `show` — `verified → compiled`, the confidence, the hash; `ast` — agreement → actions → rules → facts, a verdict glyph per node; `constrain` — `identityVerified` under mint and transfer, a new hash; `deploy` — oracle, hook at its mined address, pool id; `explain` before `verify` — refused, `transfer-identity-verified` and the sentence, after — allowed; `pool … swap Stranger` — `POLICY_REFUSED` with the sentence, no transaction; `audit` — every decision with clause and tx. `GET /docs` is the Swagger UI over all of it.
 
-### Sepolia
+## What it is made of
 
-Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json` is the record (`DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack` serves it without redeploying). Policy hashes are the same bytes as the local build.
+- **Generation and verification** (`src/noolog/`). A Noolog deliberation (extractor + critic, model `nsed:deep`) proposes rules, terms and open items, each quoting the document verbatim; every claim gets a verdict (`verified | contested | unverified | wrong`), the report a confidence. The AST is validated against the text (schema, every quote a verbatim substring) before it compiles. Without `NOOLOG_API_KEY` an in-process mock serves the same routes.
+- **World ID constraint** (`PUT /v1/agreements/:id/constraints`). The issuer picks the credential (`document` for KYC, `proof_of_human`, `selfie`) and the actions (`mint`, `transfer`, `burn`); the rule quotes the sentence that asks for it, the credential goes into the config, both into the hash. `400 QUOTE_NOT_FOUND` when the quote is not in the document.
+- **Compiler and hash** (`src/policy/`). Three-valued facts: true, false, unknown; unknown never satisfies, an expired attestation makes every fact unknown. DNF bitmasks per rule, proved equivalent to the JS interpreter over every assignment; `policyHash` over source + AST + config; the clause table's hash committed on chain. Generated Solidity holds constants only; one evaluator (`contracts/PolicyEval.sol`) serves every policy.
+- **Per-agreement deploy** (`POST /deploy`, `src/deploy.js`). Solidity compiled at runtime; `PolicyOracle`, `CompiledMirrorToken`, `MirrorPolicyHook` (CREATE2 address mined for its permission bits) and a pool on the canonical v4 `PoolManager`. The hook decides on `beforeAddLiquidity`, `beforeRemoveLiquidity`, `beforeSwap`; a transient handshake makes it the token's only door: a hookless pool initializes, its first deposit reverts at the token (`NoPolicyDoor`).
+- **Payments in** (`POST /webhooks/payments`). Stripe-signed (`Stripe-Signature`, HMAC over `t.body`, 5-min tolerance), no bearer. A settled USD event with `metadata.wallet` attests `depositConfirmed`; the policy decides the mint: shares released, or **held** with the sentence. Idempotent by event id; always 2xx once verified, so the rail never retries a decision.
+- **Key custody** (`PUT /v1/settings/signing`). The gateway starts on a file key; `{ provider: "multibaas", azure, key }` registers the Azure Key Vault key with MultiBaas, hands the operator roles and gas to the Cloud Wallet and signs from it thereafter; the choice persists across restarts. Proven on anvil with a stand-in vault.
+- **Indexing** (`src/multibaas.js`). Every contract registered with MultiBaas under a policy-hash version; `GET /v1/stack/events` serves the indexed events behind the audit.
+- **API contract.** `GET /openapi.json` (OpenAPI 3.1) and `GET /docs` (Swagger UI), both open, no bearer.
+- **Dashboard** (`dashboard/`). Next.js; the clause highlighter maps every paragraph to what it compiled to and walks a rule from quote to DNF to bytes to contract.
+
+Routes: [docs/AGREEMENTS_API.md](docs/AGREEMENTS_API.md) (the flow), [docs/API.md](docs/API.md) (stack, webhook, custody, repository map), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), [docs/PRD.md](docs/PRD.md).
+
+## Sepolia
+
+The base stack and one agreement's own deployment run on Sepolia against the canonical `PoolManager`; `deployments/sepolia.json` is the record (`DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack` serves it without redeploying). Policy hashes are the same bytes as the local build. MultiBaas: 13 contracts registered, 10 linked and indexed under the dev plan. Not yet on Sepolia: an HSM-signed transaction (no Cloud Wallet on the dev MultiBaas deployment; proven on anvil).
 
 | Contract | Address |
 | --- | --- |
@@ -136,9 +77,44 @@ Golden path on Sepolia, as the audit records it:
 [buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0xf732931467f914badca599ffc884bef8379ccd5e8903ed68b1b24a8ada615c6f) ·
 [Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0x5564bf23bfa078e91e1b9178bf78e3e3507db7361abb963e99e7c5444c2f0467).
 
+## How we used World ID
+
+Exhibit A of the fund agreement says onboarding starts with "Know-your-customer (KYC)… checks during onboarding of investors". KYC is an identity check, so the proportionate credential is a **Passport/NFC document** (`issuer_schema_id` 9303), not a proof of human. The issuer locks that choice into the agreement's hash with `mirr0 constrain`; it compiles to the fact `identityVerified`, required to be issued shares and to enter the pool. `src/worldid.js` verifies the proof with World (`POST /api/v4/verify/{rp_id}`, `rp_context` signed server-side), accepts only the agreement's credential (`WRONG_CREDENTIAL`), refuses a proof whose signal is another wallet (`INVALID_PROOF`), binds the nullifier so one person onboards one wallet (`HUMAN_ALREADY_BOUND`), and attests the fact with an expiry; the hook reads it like any other fact. `mirr0 verify --proof file.json` posts an IDKit result; without `WORLD_RP_ID` a mock proof runs every path. Trust moment, credential choice, alternative paths and the integration debrief: [docs/WORLD_ID.md](docs/WORLD_ID.md).
+
+## How we used Noolog
+
+New to Noolog? [docs/NOOLOG.md](docs/NOOLOG.md): what it is, the docs MCP server (`.mcp.json` wires it into this checkout), the API and SDK links.
+
+The policy is generated by a deliberation, not by one model call. `src/noolog/extract.js` posts the document (and the hand-authored reading as a draft) to Noolog's chat-completions endpoint (model `nsed:deep`); the answer is the winning proposal, the `x-nsed-session-id` header names the job, and `GET /deliberation/{job}/details` + `/references` give every claim its verdict, the evaluators' counter-positions on contested items, the convergence and a confidence per rule, term and open item. That report is `verification` on every record and export: `mirr0 show` prints the confidence, `mirr0 ast` a glyph per node, the dashboard the counts, contested items and every claim under its sentence. Without `NOOLOG_API_KEY` the in-process mock (`src/noolog/mock.js`) serves the same routes, status codes and schemas (checked against `noolog-wire` and `quorum-rs`) with a mechanical critic: a quote not in the text is wrong, one that repeats or is too short is contested, an open item is unverified. `test/noolog.test.js` runs the loop over HTTP: a forged quote is refuted and dropped from the generated policy.
+
+## How we used Curvegrid MultiBaas
+
+`src/multibaas.js` uploads every contract's ABI and bytecode under a label and a policy-hash version (`policy-<hash8>`), aliases and links each address (`attestor`, `fund_hook`, …), so MultiBaas indexes the attestor's `Attested`/`Revoked`/`Overridden`, the hook's `PolicyChecked` and the credit venue's events; `GET /v1/stack/events` serves them and the audit reads that. `node scripts/multibaas-sync.js deployments/sepolia.json` registered the Sepolia deployment (13 contracts; the dev plan links 10 and indexes from the link, `MULTIBAAS_STARTING_BLOCK`). `src/multibaas-signer.js` is the operator key in a vault: the gateway signs attestations, mints and deploys through a MultiBaas Cloud Wallet (`/chains/ethereum/hsm/submit`); only the signature leaves the HSM. The issuer configures it in the platform: `PUT /v1/settings/signing` takes the Azure Key Vault account and key (or an existing Cloud Wallet), hands the operator roles and gas to it, and the gateway signs from the vault from then on ([docs/API.md](docs/API.md), Key custody). The dev deployment has no HSM wallet yet, so this is proven on anvil with an unlocked account standing in for the vault (`test/chain/signing.test.js`); `test/multibaas.test.js` and `test/multibaas-signer.test.js` cover the client against a fake.
+
+Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right granularity for a compiler that emits versioned contracts; we missed a supported-chain check and an idempotent upsert for re-syncs.
+
+## Also in the repo
+
+**The credit venue.** The [Wildcat template MLA](https://docs.wildcat.finance/legal/master-loan-agreement), an illustrative Lender Check Policy and a one-clause buyback addendum (`test/human_contracts/`) compile through the same compiler into a Wildcat `IRoleProvider` (`contracts/MirrortechRoleProvider.sol`: `getCredential` admits lenders, `mayWithdraw` re-checks at payment) and a 1inch Aqua strategy whose SwapVM program carries the agreement as an opcode (`contracts/swapvm/`: `PolicyGuard` evaluates maker and taker at every fill and at `quote()`). Built, tested (`npm run test:chain`) and deployed on Sepolia against the canonical Aqua (addresses and the last three golden-path links above); out of the demo flow. [docs/SWAPVM_INTEGRATION.md](docs/SWAPVM_INTEGRATION.md) · [docs/MLA_CLAUSE_MAP.md](docs/MLA_CLAUSE_MAP.md) · `npm run demo:golden` runs it with the fund flow on a fresh anvil.
+
+## Run it
+
+Node 18+ and [Foundry](https://getfoundry.sh) (`anvil`). Everything runs locally.
+
+```sh
+npm ci && npm run vendor                                           # vendor/ ← 1inch SwapVM + Aqua sources (credit venue)
+npm run build && npm run build:secondary && npm run build:credit   # artifacts/<profile>/
+npm run dev:stack                                                  # anvil + base stack + gateway on PORT (default 3000; Compose 3200)
+npm run check                                                      # unit + chain tests; test/chain/flow.test.js is the flow
+```
+
+`.env.example` lists every setting; all optional locally: `NOOLOG_API_KEY` (mock deliberation without), `WORLD_RP_ID` + `WORLD_RP_SIGNING_KEY` (mock proofs without), `MULTIBAAS_URL` + `MULTIBAAS_API_KEY` (indexing, Cloud Wallet), `PAYMENT_WEBHOOK_SECRET` (the webhook answers `503 NO_WEBHOOK_SECRET` without it), `RPC_URL` + `DEPLOYER_PRIVATE_KEY` + `DEPLOYMENT_PATH=deployments/sepolia.json` to serve Sepolia.
+
+Dashboard: `npm --prefix dashboard run dev` serves http://localhost:3100 on exported data; with `NEXT_PUBLIC_GATEWAY_URL` and `NEXT_PUBLIC_GATEWAY_KEY` it runs live against the gateway ([dashboard/README.md](dashboard/README.md)). Deploy: `deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`), [docs/deploy.md](docs/deploy.md); `.github/workflows/pages.yml` publishes the static dashboard to GitHub Pages on every push.
+
 ## Limits
 
-Screening, countersignature, AML/KYC and solvency are attested, not proved; a policy hash is no evidence that anyone was screened correctly. The sanctions oracle and the Wildcat market are mocks with the real interfaces (the real market is mainnet-only). Fact bitmaps are readable per wallet. The fund token is non-rebasing because Uniswap v4 does not support rebasing balances. Not legal advice; no real counterparty.
+Screening, countersignature, AML/KYC and solvency are attested, not proved; a policy hash is no evidence that anyone was screened correctly. The sanctions oracle is a mock with the real interface (so is the credit venue's Wildcat market; the real one is mainnet-only). Fact bitmaps are readable per wallet. The token is non-rebasing because Uniswap v4 has no rebasing balances. Not legal advice; no real counterparty.
 
 ## Team
 

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { evaluatePolicy } from '../src/policy/evaluate.js';
 import { validateAst } from '../src/policy/schema.js';
 import { compilePolicy, verifyPolicy } from '../src/policy/compile.js';
-import { legalAst } from './legal-ast-fixture.js';
+import { modelLegalAst } from './legal-ast-fixture.js';
 import { legalDocument } from './legal-ast-fixture.js';
 import { extractAst } from '../src/policy/extract.js';
 import { document, envelope, compiled, config, compliant } from './helpers.js';
@@ -51,7 +51,7 @@ test('live extractor requests strict structured data and validates returned sour
   let body;
   const result = await extractAst(legalDocument, { apiKey: 'test-only', model: 'test-model', fetchImpl: async (_url, request) => {
     body = JSON.parse(request.body);
-    return { ok: true, json: async () => ({ id: 'test', status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(legalAst) }] }] }) };
+    return Response.json({ id: 'test', status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(modelLegalAst) }] }] });
   } });
   assert.equal(body.store, false);
   assert.equal(body.text.format.strict, true);
@@ -64,5 +64,5 @@ test('extractor fails on missing credentials, refusals, truncation and malformed
     { status: 'incomplete' },
     { status: 'completed', output: [{ content: [{ type: 'refusal', refusal: 'No' }] }] },
     { status: 'completed', output: [{ content: [{ type: 'output_text', text: '{}' }] }] },
-  ]) await assert.rejects(extractAst(document, { apiKey: 'test', model: 'test', fetchImpl: async () => ({ ok: true, json: async () => response }) }));
+  ]) await assert.rejects(extractAst(document, { apiKey: 'test', model: 'test', fetchImpl: async () => Response.json(response) }));
 });

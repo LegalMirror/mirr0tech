@@ -1,5 +1,5 @@
 // The product's core loop, one record per uploaded agreement:
-//   uploaded → extracting → verified → analyzed (legal AST), or compiled → deploying → deployed (compiler fixtures).
+//   uploaded → extracting → verified → analyzed (legal AST), or compiled → deploying → deployed (explicit compiler mappings).
 // `verified` means the extraction returned an AST whose quotes are in the document; `compiled`
 // means the policy hash, clause table and Solidity exist; `deployed` means the token, its oracle,
 // its hook and a policy-managed pool are on chain. Records persist as one JSON file; the heavy
@@ -107,7 +107,7 @@ export class Agreements {
 
   get(id) {
     const record = this.record(id);
-    return { ...summary(record), ast: record.envelope?.ast ?? null, export: this.exports.has(id) || record.policyHash ? this.export(id) : null };
+    return { ...summary(record), ast: record.envelope?.ast ?? null, documentAst: record.envelope?.documentAst ?? null, export: this.exports.has(id) || record.policyHash ? this.export(id) : null };
   }
 
   ast(id) {
@@ -170,7 +170,7 @@ export class Agreements {
         await this.persist();
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
-        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft, generation: record.generation });
+        const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation });
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
         if (isLegalAst(envelope.ast)) {
           this.transition(record, 'analyzed');
@@ -268,13 +268,13 @@ export class Agreements {
     ensure(record.status === 'compiled', 409, 'INVALID_STATE', `Agreement is ${record.status}; deploy needs compiled`);
     const document = this.document(record);
     const compiled = compilePolicy(record.envelope, record.config, document, { demo: true });
-    ensure(compiled.solidity, 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no token of its own to deploy; it is served by the stack's credit venue`);
+    ensure(compiled.solidity || record.profile === 'wildcat-credit', 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no deployment adapter`);
     this.venues.delete(id);
     this.transition(record, 'deploying');
     // All agreements share the signer, including operator and anonymous demo requests.
     const job = this.deployQueue.then(async () => {
       try {
-        const deployment = await this.deployer({ policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
+        const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
         this.transition(record, 'deployed', { deployment });
       } catch (error) {
         this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });

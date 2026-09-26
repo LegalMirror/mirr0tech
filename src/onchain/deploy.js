@@ -152,3 +152,53 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
     ...(cashier ? { cashier: { ...sources.cashier, enabled: true, asset, initialSqrtPriceX96: initialSqrtPriceX96.toString(),
       hookAbi: v4[hookName].abi, routerAbi: v4.MirrorCashierRouter.abi } } : {}), hook: mined.address, hookSalt: mined.salt, poolManager: record.rwa.poolManager, poolKey, poolId, txs, deployedAt: new Date().toISOString() };
 }
+
+/// A separate MVP credit market per uploaded, explicitly mapped bundle. Reuses only shared
+/// testnet infrastructure; its policy oracle, role provider and SwapVM guard bind the new hash.
+export async function deployCredit(signer, { record, sources, log = () => {} }) {
+  const { compileBundle } = await import('./solc.js');
+  const { verifyPolicy } = await import('../policy/compile.js');
+  const { buildOnchainPolicy, emitCompiledPolicy } = await import('./policy.js');
+  const { buybackTermsFrom, buildBuybackProgram, buildAquaOrder, loadOpcodes } = await import('./programs.js');
+  const policy = verifyPolicy(sources.policy);
+  if (policy.profile !== 'wildcat-credit' || !policy.demo) throw new Error('Credit deployment requires an explicit MVP credit policy');
+  if (sources.compiledPolicy !== emitCompiledPolicy(buildOnchainPolicy(policy.ast), policy.hash)) {
+    throw new Error('Generated Solidity does not match the credit policy');
+  }
+  const terms = buybackTermsFrom(policy);
+  if (terms.deadlineTimestamp <= Math.floor(Date.now() / 1000)) throw new Error('The source buyback offer has expired');
+  const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy };
+  const core = await compileBundle('core', [
+    ['contracts/PolicyOracle.sol', 'PolicyOracle'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider'],
+    ['contracts/MockWildcatMarket.sol', 'MockWildcatMarket'], ['contracts/test/MockUSD.sol', 'MockUSD'],
+  ], { overrides });
+  const swap = await compileBundle('swapvm', [['contracts/swapvm/MirrortechRouter.sol', 'MirrortechRouter']], { overrides });
+  const borrower = await signer.getAddress();
+  const txs = {};
+  const deploy = async (artifact, label, ...args) => {
+    const contract = await new ContractFactory(artifact.abi, artifact.bytecode, signer).deploy(...args);
+    await contract.waitForDeployment();
+    txs[label] = contract.deploymentTransaction().hash;
+    log(`${label} ${await contract.getAddress()}`);
+    return contract;
+  };
+  const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
+  if (await oracle.policyHash() !== policy.hash) throw new Error('Generated Solidity does not match the credit policy');
+  const roleProvider = await deploy(core.MirrortechRoleProvider, 'roleProvider', await oracle.getAddress());
+  const asset = await deploy(core.MockUSD, 'mockUSD');
+  const assetAddress = await asset.getAddress();
+  const market = await deploy(core.MockWildcatMarket, 'market', assetAddress, await roleProvider.getAddress(), borrower);
+  txs.bindMarket = (await (await oracle.bindMarket(await market.getAddress())).wait()).hash;
+  const router = await deploy(swap.MirrortechRouter, 'router', record.credit.aqua, record.credit.weth, borrower, await oracle.getAddress());
+  txs.configureVenue = (await (await market.setVenue(await router.getAddress(), true)).wait()).hash;
+  const program = buildBuybackProgram({ opcodes: loadOpcodes(),
+    policyGuardOpcode: Number(await router.policyGuardOpcode()), fixedRateBalancesOpcode: Number(await router.fixedRateBalancesOpcode()),
+    policyHash: policy.hash, action: policy.actionOrder.indexOf('transfer'), deadline: terms.deadlineTimestamp,
+    positionToken: await market.getAddress(), asset: assetAddress, capPosition: terms.capPosition, capAsset: terms.capAsset });
+  return { chainId: record.chainId, policyHash: policy.hash, clauseTableHash: policy.clauseTableHash,
+    oracle: await oracle.getAddress(), roleProvider: await roleProvider.getAddress(), token: await market.getAddress(),
+    market: await market.getAddress(), asset: assetAddress, router: await router.getAddress(), aqua: record.credit.aqua,
+    mockMarket: true, buyback: { status: 'prepared', order: buildAquaOrder(borrower, program),
+      terms: JSON.parse(JSON.stringify(terms, (_key, value) => typeof value === 'bigint' ? value.toString() : value)) },
+    txs, deployedAt: new Date().toISOString() };
+}

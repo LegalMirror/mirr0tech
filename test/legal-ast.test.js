@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { once } from 'node:events';
-import { legalAst, legalDocument } from './legal-ast-fixture.js';
+import { legalAst, legalDocument, modelLegalAst } from './legal-ast-fixture.js';
 import { validateLegalAst, legalAstGraph } from '../src/legal/ast.js';
 import { bundleDocuments, documentFrom } from '../src/policy/document.js';
 import { extractWithOpenAI } from '../src/openai-extract.js';
@@ -51,7 +51,7 @@ test('legal AST is persisted, served and regenerable without compilation or chai
   const directory = await mkdtemp(join(tmpdir(), 'legal-ast-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, 'agreements.json');
-  const extract = (input) => extractWithOpenAI({ ...input, apiKey: 'test', fetchImpl: async () => Response.json({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(legalAst) }] }] }) });
+  const extract = (input) => extractWithOpenAI({ ...input, apiKey: 'test', fetchImpl: async () => Response.json({ status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(modelLegalAst) }] }] }) });
   const agreements = new Agreements({ path, extract });
   const created = await agreements.create({ name: 'Services', documents: [{ name: legalDocument.name, text: legalDocument.text }] });
   await agreements.settled();

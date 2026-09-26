@@ -467,6 +467,11 @@ export function exportCompiled({ profile, act = null, label = null, venue = null
     title: ast.title, parties: ast.parties,
     source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, parts: document.parts ?? null },
     policyHash: compiled.policy.hash,
+    contractSources: Object.fromEntries([
+      ['generated/CompiledPolicy.sol', compiled.compiledPolicy],
+      ['generated/CompiledMirrorToken.sol', compiled.solidity],
+      ['generated/CompiledCashierTerms.sol', compiled.compiledCashierTerms],
+    ].filter(([, source]) => typeof source === 'string' && source.length)),
     clauseTableHash: onchain.clauseTableHash,
     equivalenceChecks: compiled.equivalenceChecks,
     demo: compiled.policy.demo,

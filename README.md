@@ -22,7 +22,7 @@ pnpm install --frozen-lockfile
 pnpm run vendor
 ```
 
-Add `OPENAI_API_KEY` to the server's `.env` for file generation. `OPENAI_MODEL` is optional (default `gpt-6-astra`, with low reasoning effort / Astra light). Keys are never sent to the dashboard. The **Demo** flow works without a key and uses a deterministic fixture.
+Add `OPENAI_API_KEY` to the server's `.env` for file generation. `OPENAI_MODEL` is optional (default `gpt-5.4-mini`, with reasoning disabled and a compact first-pass analysis). Keys are never sent to the dashboard. The **Demo** flow works without a key and uses a deterministic fixture.
 
 ```sh
 # Terminal 1: persistent workspace API at http://localhost:3000
@@ -127,7 +127,7 @@ Sandbox World ID session proofs gate application login. The separate document-ve
 
 ## Legal document extraction
 
-Uploaded documents now use Astra light through the OpenAI Responses API. `src/legal/ast.js` defines the document AST: sections and clauses, semantic child nodes, typed cross-references, and explicit open questions. The server validates all quote occurrences against the named source file, computes character offsets, and rejects duplicate IDs, missing link targets and cyclic hierarchy. Noolog extraction has been removed. Offline compiler demos still use explicitly labelled deterministic fixtures; existing saved compiler policies can still be read. A legal-document AST does not by itself authorize deployment.
+Uploaded documents use GPT-5.4 mini with reasoning disabled through the OpenAI Responses API. The light analysis selects up to 24 key nodes and 12 relationships; it does not cover every clause. `src/legal/ast.js` defines the document AST: sections and clauses, semantic child nodes, typed cross-references, and explicit open questions. The server validates all quote occurrences against the named source file, computes character offsets, and rejects duplicate IDs, missing link targets and cyclic hierarchy. Noolog extraction has been removed. Offline compiler demos still use explicitly labelled deterministic fixtures; existing saved compiler policies can still be read. A legal-document AST does not by itself authorize deployment. The exact bundled fund and complete credit sources now have explicit MVP compiler mappings; see [live document and Sepolia integration tests](docs/LEGAL_AST.md#executable-mvp-test-mappings).
 
 In **Contract-AST**, select a source clause or graph node to trace its relationships. **Focus selection** shows adjacent clauses and the structural ancestors; clear it for the full graph. **Human Language** highlights the selected quote in the normalized source. **Download AST JSON** exports the full AST (including all source documents, hashes, nodes, relationships and open questions), regardless of the current graph filter. Use **Regenerate** on an existing uploaded contract to replace its old extraction. See [the AST format](docs/LEGAL_AST.md).
 

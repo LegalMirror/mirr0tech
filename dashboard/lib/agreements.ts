@@ -9,9 +9,13 @@ export type AgreementDeployment = {
   policyHash: string;
   oracle: string;
   token: string;
-  hook: string;
-  poolManager: string;
-  poolId: string;
+  hook?: string;
+  poolManager?: string;
+  poolId?: string;
+  roleProvider?: string;
+  market?: string;
+  router?: string;
+  mockMarket?: boolean;
   deployedAt: string;
   txs: Record<string, string>;
 };
@@ -28,6 +32,8 @@ export type Agreement = {
     model: string | null;
     responseId?: string;
     reasoningEffort?: string;
+    analysisMode?: "light";
+    compilerMapping?: { provider: string; id: string; scope: string };
     agents?: string[];
   } | null;
   verification: { confidence: Omit<Verification["confidence"], "byRef">; contested: number } | null;
@@ -40,6 +46,7 @@ export type Agreement = {
 };
 export type AgreementDetail = Agreement & {
   export: PolicyData | null;
+  documentAst?: LegalAst | null;
   ast?:
     | LegalAst
     | {
@@ -155,8 +162,6 @@ export function deployBlocked(
 ): string | null {
   if (!writable) return "Start an active demo workspace to deploy your own contract.";
   if (!record || record.status !== "compiled") return "Deployment requires a compiled contract.";
-  if (record.profile === "wildcat-credit")
-    return "This credit profile uses the existing stack venue; per-contract deployment is not supported.";
   if (!status?.chain) return "No chain signer is reported by this gateway.";
   return null;
 }

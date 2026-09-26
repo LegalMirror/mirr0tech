@@ -208,13 +208,18 @@ test('updating an old agreement to the registered action changes its hash and re
   assert.equal(agreements.get(record.id).export.config.worldId.action, 'humanity');
 });
 
-test('a credit-profile agreement compiles but has no token to deploy per agreement', async () => {
-  const agreements = new Agreements({ extract: extractDemo, deployer: async () => { throw new Error('must not be called'); } });
+test('a credit-profile agreement passes its bound policy to the deployment adapter', async () => {
+  let input;
+  const agreements = new Agreements({ extract: extractDemo, deployer: async (value) => { input = value; return { policyHash: value.policyHash }; } });
   const names = ['wildcat-mla.md', 'lender-check-policy.md', 'buyback-addendum.md'];
   const documents = await Promise.all(names.map(async (name) => ({ name, text: await readFile(`test/human_contracts/${name}`, 'utf8') })));
   const record = await upload(agreements, { name: 'MLA', documents, profile: 'wildcat-credit' });
   assert.equal(record.status, 'compiled', record.error ?? '');
   assert.equal(record.source.parts.length, 3);
-  assert.throws(() => agreements.deploy(record.id), (error) => error.code === 'UNSUPPORTED_PROFILE');
-  assert.equal(agreements.get(record.id).status, 'compiled');
+  agreements.deploy(record.id);
+  await agreements.settled();
+  assert.equal(agreements.get(record.id).status, 'deployed');
+  assert.equal(input.profile, 'wildcat-credit');
+  assert.equal(input.sources.policy.hash, record.policyHash);
+  assert.equal(input.sources.policy.ast.terms.find((term) => term.name === 'buybackPrice').value, '0.96');
 });

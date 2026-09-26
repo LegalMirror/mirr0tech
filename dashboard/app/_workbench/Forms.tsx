@@ -262,10 +262,15 @@ export function UploadDialog({
             <option value="rwa-secondary">RWA · token + secondary trading</option>
             <option value="custodial-rwa">RWA · custodial mint / burn</option>
             <option value="wildcat-credit" disabled={demoWorkspace}>
-              Credit · existing stack venue (no per-contract deploy)
+              Credit · role provider + mock market + buyback
             </option>
           </select>
         </label>
+        {mode !== "demo" && profile === "wildcat-credit" && (
+          <p className="wb-muted">
+            For the executable credit demo, upload the Wildcat MLA, lender-check policy and buyback addendum together.
+          </p>
+        )}
         <div className="wb-segmented" aria-label="Document input">
           <button type="button" aria-pressed={mode === "demo"} onClick={() => setMode("demo")}>
             Demo

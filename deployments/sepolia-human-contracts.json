@@ -1,0 +1,97 @@
+{
+  "chainId": 11155111,
+  "deployer": "0x8583AD4a0F59Ba45C7E201318C6F774F31f7bbC8",
+  "deployments": {
+    "fund": {
+      "chainId": 11155111,
+      "policyHash": "0xe989ab52d1a152333ef8fd18ecf52f6a8b7e760cbe7c6e2359205cf5665bd052",
+      "oracle": "0x2D1a91211944edA20a8c65b6A436a43800d7844a",
+      "token": "0x6092D8717DeeBC7428590c64275800ABe10B50B5",
+      "router": "0xdCF15E8b14BA3D38D1b024783F656a79d40015eD",
+      "hook": "0x2F9C1C61359f5C30fc92B4AD4D27815158bd4A80",
+      "hookSalt": "0x00000000000000000000000000000000000000000000000000000000000057d1",
+      "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+      "poolKey": {
+        "currency0": "0x6092D8717DeeBC7428590c64275800ABe10B50B5",
+        "currency1": "0x68EBB62f76ee7880d7CC71892ec8e3d25565dC67",
+        "fee": 3000,
+        "tickSpacing": 60,
+        "hooks": "0x2F9C1C61359f5C30fc92B4AD4D27815158bd4A80"
+      },
+      "poolId": "0x7d85e76257305bc47f467fac186197628c11b6ef19a0c18fa39ef710c2ddb32a",
+      "txs": {
+        "oracle": "0xdd7261dd5429bf44cca296afb890c1b6724f29687a47ba09c8adc454069d8ce9",
+        "token": "0x61df5c60d13447989104b705a0a873f6c33e4c504f610613177587cc57e70cc8",
+        "hook": "0x8c81b4c4621eaa1198590d3295cab7e9588f5230683157d14f69f82bb7cc2562",
+        "configure": "0xcc9a010492a60f5cdf81362ce8f73f56a284583bbbcd6a3d881ba4c6c204fa17",
+        "pool": "0xec0f9899db23bd145fab4207312e8575ce436d54f0c8a1b9959231e781a6716f"
+      },
+      "deployedAt": "2026-09-26T16:40:05.033Z",
+      "files": [
+        "ea026411904ex10-9.htm"
+      ],
+      "verifiedAt": "2026-09-26T16:40:07.758Z",
+      "checks": [
+        "successful receipts",
+        "contract bytecode present",
+        "policy hash matches",
+        "unscreened wallet denied"
+      ]
+    },
+    "credit": {
+      "chainId": 11155111,
+      "policyHash": "0x580dd10756ba0162388e5b72e489e51035152e4e80e49fb1963f5159ae5908e3",
+      "clauseTableHash": "0x6b441e907b9441e64670c6e4d88d624ff83ec21b0c5d21d18881ed3658f3986f",
+      "oracle": "0xd6c870764e7D1A04EcE0D78e02Ea76a94c66B1e1",
+      "roleProvider": "0x120Dd1ae1a5d07d4B6c962122E615f617181156C",
+      "token": "0x3d11dd6AAD48AEbdb5D200441D57a46CF2A518B1",
+      "market": "0x3d11dd6AAD48AEbdb5D200441D57a46CF2A518B1",
+      "asset": "0x05C2b1A7EDa6B4B2b8B3Aee6B19da5c9EcB55644",
+      "router": "0x474CAfd413323aeb51Af77dF948D93EF17Af67e1",
+      "aqua": "0x1111113ccf1426a8e30e2bff5e005d929bf6a90a",
+      "mockMarket": true,
+      "buyback": {
+        "status": "prepared",
+        "order": {
+          "maker": "0x8583AD4a0F59Ba45C7E201318C6F774F31f7bbC8",
+          "traits": "28948022309329048855892746252171976963317496166410141009864396001978282409984",
+          "data": "0x0d05006b36ec7f2921580dd10756ba0162388e5b72e489e51035152e4e80e49fb1963f5159ae5908e3022a683d11dd6aad48aebdb5d200441d57a46cf2a518b1000000000000000000000000000000000000000000000000000000e8d4a5100005c2b1a7eda6b4b2b8b3aee6b19da5c9ecb55644000000000000000000000000000000000000000000000000000000df847580001501001300"
+        },
+        "terms": {
+          "price": "0.96",
+          "cap": "1000000",
+          "deadline": "2026-12-31",
+          "ceiling": "1.00",
+          "windowHours": "6",
+          "capPosition": "1000000000000",
+          "capAsset": "960000000000",
+          "capAssetCeiling": "1000000000000",
+          "windowSeconds": 21600,
+          "deadlineTimestamp": 1798761599
+        }
+      },
+      "txs": {
+        "oracle": "0x6cf8540729cd867e3f1a23d8d7199e56c972a958e548f432ce779ed0784867d7",
+        "roleProvider": "0x592906f7b2fdf40bcbf9db350c143bb0c4fbc79eb3c37053721600e04b8aa628",
+        "mockUSD": "0x061d8421e26a1c20974c0a1fc3123f38b72ee7041355bdc6111823ad6f179ed8",
+        "market": "0x2b642805c07ad25bd73e8f59d3081af6723c8fb102dc3a9ef76021262324b4d4",
+        "bindMarket": "0xbced1234c11185ea8a9576582449be7b32361199197130ec0f876df1c6f701a4",
+        "router": "0x696deaad909f0ec8436cdf36cfbda2c2a455d77924bcd91777484983b46d8261",
+        "configureVenue": "0x5b4c29739b588d3f0bd16d679a831553c710be4950af5afc7463473320dd20bb"
+      },
+      "deployedAt": "2026-09-26T16:42:14.855Z",
+      "files": [
+        "wildcat-mla.md",
+        "lender-check-policy.md",
+        "buyback-addendum.md"
+      ],
+      "verifiedAt": "2026-09-26T16:42:22.531Z",
+      "checks": [
+        "successful receipts",
+        "contract bytecode present",
+        "policy hash matches",
+        "unscreened wallet denied"
+      ]
+    }
+  }
+}

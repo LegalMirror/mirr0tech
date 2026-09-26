@@ -218,6 +218,8 @@ export type PolicyData = {
   verification?: Verification;
   extraction: { provider: string; model: string | null };
   factOrder: string[];
+  /** Agreement-specific Solidity emitted by the deployment compiler. */
+  contractSources?: Record<string, string>;
   actionOrder: string[];
   text: string;
   documents: DocumentPart[];

@@ -526,7 +526,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             {confirmation.kind === "deploy" ? (
               <>
                 <p>
-                  This asks the gateway’s signer to deploy a token, oracle and hook and initialize a pool on
+                  {record.profile === "wildcat-credit"
+                    ? "This deploys a policy oracle, role provider, mock asset, mock credit market and buyback router on"
+                    : "This deploys a token, oracle and hook and initializes a pool on"}{" "}
                   chain <strong>{status?.chain?.chainId}</strong>. It spends the signer’s gas and may create
                   irreversible on-chain state.
                 </p>

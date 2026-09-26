@@ -1,6 +1,6 @@
 # Agreements API
 
-The core loop as REST: **upload → Astra extraction → source validation → analyzed AST**. Offline compiler demos additionally support compile and deploy. Agreement routes in `src/routes.js` are mounted under `/v1` over `src/agreements.js` (store + lifecycle). Same bearer as every route: `API_KEY` for writes, `VIEWER_KEY` for GET. Error envelope `{ error: { code, message } }`. Tests: `test/agreements.test.js`, `test/agreements-api.test.js`, `test/chain/agreements-deploy.test.js`.
+The core loop as REST: **upload → OpenAI light extraction → source validation → analyzed AST**, or **compiled → deploying → deployed** for explicitly mapped MVP documents. Offline compiler demos additionally support compile and deploy. Agreement routes in `src/routes.js` are mounted under `/v1` over `src/agreements.js` (store + lifecycle). Same bearer as every route: `API_KEY` for writes, `VIEWER_KEY` for GET. Error envelope `{ error: { code, message } }`. Tests: `test/agreements.test.js`, `test/agreements-api.test.js`, `test/chain/agreements-deploy.test.js`.
 
 ## Endpoints
 
@@ -21,7 +21,7 @@ Upload: the document's `name` extension picks the reader (`.txt`, `.md`, `.htm`,
 
 AST graph: new uploads use [legal AST v2](LEGAL_AST.md). `GET /:id` includes the complete `ast`; `GET /:id/ast` projects it into `{ nodes, edges }` with a document/section/clause hierarchy and typed cross-clause relations. The terminal `analyzed` state needs no compiler or chain. Historical and explicit demo compiler records retain their version 1 graph. The UI downloads the complete `ast` from the detail response.
 
-Errors: `400 INVALID_BODY`, `400 UNKNOWN_PROFILE`, `400 INVALID_DOCUMENT` (unsupported extension, empty, over 2 MB), `401 UNAUTHORIZED`, `404 NOT_FOUND`, `409 INVALID_STATE` (wrong state, or a job already in flight), `409 UNSUPPORTED_PROFILE` (the credit profile has no token to deploy per agreement), `413 BODY_TOO_LARGE`, `503 NO_CHAIN`. A background failure is on the record: `status: "failed"`, `error: <message>` for generation; a failed deploy returns to `compiled` with `error: "Deploy failed: …"`. A restart mid-job marks the record `failed` (`Interrupted while extracting`).
+Errors: `400 INVALID_BODY`, `400 UNKNOWN_PROFILE`, `400 INVALID_DOCUMENT` (unsupported extension, empty, over 2 MB), `401 UNAUTHORIZED`, `404 NOT_FOUND`, `409 INVALID_STATE` (wrong state, or a job already in flight), `409 UNSUPPORTED_PROFILE` (no deployment adapter for the selected profile), `413 BODY_TOO_LARGE`, `503 NO_CHAIN`. A background failure is on the record: `status: "failed"`, `error: <message>` for generation; a failed deploy returns to `compiled` with `error: "Deploy failed: …"`. A restart mid-job marks the record `failed` (`Interrupted while extracting`).
 
 ## The flow
 
@@ -48,7 +48,7 @@ mirr0 pool agr_… swap Stranger                                        # POLICY
 ```mermaid
 stateDiagram-v2
     [*] --> uploaded: POST /v1/agreements
-    uploaded --> extracting: Astra extraction started
+    uploaded --> extracting: OpenAI light extraction started
     extracting --> verified: AST and source references validated
     verified --> analyzed: legal AST ready to explore and download
     analyzed --> extracting: POST /regenerate
@@ -70,9 +70,9 @@ Uploaded documents finish at `analyzed`. Only explicit compiler fixtures continu
 - `verified` — schema, source quotations and structural references validated locally.
 - `analyzed` — the document AST is ready for graph exploration and JSON download; no executable policy is implied.
 - `compiled` — `compilePolicy` succeeded: `policyHash` over source + AST + config, clause table hash, DNF programs, generated Solidity, equivalence checks passed, coverage resolved.
-- `deployed` — `PolicyOracle`, `CompiledMirrorToken` and `MirrorPolicyHook` (CREATE2 salt mined for the hook flags) deployed, the token configured for the venue, the pool initialized on the stack's `PoolManager` (`deployFund`, `src/onchain/deploy.js`).
+- `deployed` — `PolicyOracle`, `CompiledMirrorToken` and `MirrorPolicyHook` (CREATE2 salt mined for the hook flags) deployed, the token configured for the venue, the pool initialized on the stack's `PoolManager` (`deployFund`, `src/onchain/deploy.js`). Credit deployments instead create their own policy oracle, role provider, mock asset/market and buyback router (`deployCredit`).
 
-Solidity is compiled at deploy time by `src/onchain/solc.js` (bundles `core` and `uniswap-v4`) with the generated `CompiledPolicy.sol` and `CompiledMirrorToken.sol` supplied in memory. Uploaded documents use `OPENAI_API_KEY`, default model `gpt-6-astra`, and low reasoning effort. Explicit `generation: "demo"` uses the bundled compiler fixture without an API call.
+Solidity is compiled at deploy time by `src/onchain/solc.js` (bundles `core` and `uniswap-v4`) with the generated `CompiledPolicy.sol` and `CompiledMirrorToken.sol` supplied in memory. Uploaded documents use `OPENAI_API_KEY`, default model `gpt-5.4-mini`, and reasoning disabled. Explicit `generation: "demo"` uses the bundled compiler fixture without an API call.
 
 ## Storage
 
@@ -89,7 +89,7 @@ In-memory map, mirrored to `${DATA_DIR:-generated}/agreements-<chainId>.json` af
   "createdAt": "2026-09-26T04:12:09.000Z",
   "updatedAt": "2026-09-26T04:13:40.000Z",
   "source": { "name": "ea026411904ex10-9.htm", "sha256": "9c1e…", "textSha256": "b7a0…" },
-  "extraction": { "provider": "openai", "model": "gpt-6-astra", "reasoningEffort": "low", "responseId": "resp_…" },
+  "extraction": { "provider": "openai", "model": "gpt-5.4-mini", "reasoningEffort": "none", "analysisMode": "light", "responseId": "resp_…" },
   "verification": { "confidence": { "overall": 0.93, "verified": 22, "total": 25, "counts": { "verified": 22, "contested": 2, "unverified": 1, "wrong": 0, "unknown": 0 } }, "contested": 2 },
   "policyHash": "0x8d2f…",
   "clauseTableHash": "0x41aa…",
@@ -126,3 +126,9 @@ curl -s $API/v1/agreements/$ID -H "$AUTH" | jq '{token: .deployment.token, hook:
 curl -s -X POST $API/v1/agreements/$ID/deploy -H "$AUTH"                              # 409 INVALID_STATE: not compiled
 curl -s -X POST $API/v1/agreements/$ID/regenerate -H "$AUTH" | jq '{status, history: (.history | length)}'
 ```
+
+OpenAI extraction writes structured `[OpenAI]` JSON events to server stdout: request start, a waiting heartbeat every 15 seconds, response headers, response receipt, local validation start, and completion or failure. Filter by `agreementId` to follow a job; each attempt also has a unique `clientRequestId` sent to OpenAI as `X-Client-Request-Id`. Response logs include the upstream request/response IDs, HTTP status, upstream processing time when provided, token usage, and incomplete-output reason. Logs contain sizes and timings, not uploaded text, generated AST content, API keys, or raw upstream error messages.
+
+`OPENAI_TIMEOUT_MS` controls the request and response-body deadline (default `300000`, maximum `3600000`). The entire document bundle is currently generated in one non-streaming request with up to 6,000 output tokens. Local schema/source-quote validation starts only after that response arrives; `validationMs` separates that work from the overall `elapsedMs`. A waiting heartbeat reports that the request is still pending, not model progress. Increasing the deadline permits longer generations but does not make them faster. Restart the server after changing environment settings; saved failed agreements can then be regenerated.
+
+Exact source-bound MVP compiler mappings preserve the model overview as `documentAst` and expose the executable subset as `ast`. Fund uploads use `rwa-secondary`; credit uploads require the complete MLA, lender-check policy and buyback addendum with `wildcat-credit`. Per-agreement credit deployment now creates a policy-bound role provider, mock market and buyback router on Sepolia. See [LEGAL_AST.md](LEGAL_AST.md#executable-mvp-test-mappings) for live integration-test commands and limitations.

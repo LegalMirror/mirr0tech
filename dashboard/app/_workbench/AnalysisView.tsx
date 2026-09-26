@@ -54,7 +54,9 @@ export function AnalysisView({
           {sample
             ? "Exported sample"
             : record.extraction?.provider === "openai"
-              ? "OpenAI AST · source quotes checked"
+              ? record.extraction.analysisMode === "light"
+                ? "OpenAI light analysis · source quotes checked"
+                : "OpenAI AST · source quotes checked"
               : record.extraction?.provider === "demo"
                 ? "Demo AST · deterministic fixture"
                 : report?.mock
@@ -88,6 +90,18 @@ export function AnalysisView({
         </Notice>
       )}
       {record.error && <Notice error>{record.error}</Notice>}
+      {record.extraction?.analysisMode === "light" && (
+        <Notice>
+          Light analysis highlights selected key terms and obligations. It does not cover every clause;
+          review the full source for omitted details.
+        </Notice>
+      )}
+      {record.extraction?.compilerMapping && (
+        <Notice>
+          The executable subset uses an explicit MVP mapping for these exact source documents.
+          Compliance and settlement are simulated; other provisions remain unresolved.
+        </Notice>
+      )}
       {isLegalAst(record.ast) && (
         <section className="wb-surface">
           <h3>{record.ast.title}</h3>

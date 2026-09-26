@@ -137,6 +137,46 @@ describe("source-linked workbench", () => {
     expect(html).toContain("exhaustive equivalence checks (not Z3)");
     expect(html).toContain("Issuer-added identity constraints are separate decisions");
   });
+  it("shows generated code, deployment hashes and chain-appropriate explorer links", async () => {
+    const policy = await compiled("rwa-secondary");
+    expect(policy.contractSources?.["generated/CompiledMirrorToken.sol"]).toContain(
+      "contract CompiledMirrorToken"
+    );
+    const address = `0x${"a".repeat(40)}`;
+    const hash = `0x${"b".repeat(64)}`;
+    const record = {
+      id: "agr_e6b419d1d506",
+      profile: policy.profile,
+      status: "deployed",
+      policyHash: policy.policyHash,
+      history: [],
+      deployment: { chainId: 11155111, policyHash: policy.policyHash, token: address, txs: { token: hash } },
+    } as unknown as AgreementDetail;
+    const render = () =>
+      renderToStaticMarkup(
+        createElement(DeployView, {
+          record,
+          policy,
+          constraints: null,
+          constraintError: "",
+          sample: false,
+          writable: false,
+          busy: false,
+          status: null,
+          client: agreementsClient({ url: "", viewerKey: "", operatorKey: "", revision: 0 }),
+          blocked: null,
+          onDeploy: () => {},
+          onConstrain: () => {},
+        })
+      );
+    const html = render();
+    expect(html).toContain("generated/CompiledMirrorToken.sol");
+    expect(html).toContain(`https://sepolia.etherscan.io/address/${address}`);
+    expect(html).toContain(`https://sepolia.etherscan.io/tx/${hash}`);
+    expect(html).toContain("Deployment transaction hashes");
+    record.deployment!.chainId = 31337;
+    expect(render()).not.toContain("https://sepolia.etherscan.io");
+  });
   it("never treats a sample as deployed and shows a safe NAV caveat", async () => {
     const policy = await compiled("rwa-secondary");
     const record = {

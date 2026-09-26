@@ -29,7 +29,28 @@ Schema: ${JSON.stringify(astSchema)}`;
 export function instructionsFor(config = { profile: 'rwa-secondary' }) {
   const actions = enforceableActions(config, ACTIONS);
   return `${INSTRUCTIONS}
-This deployment enforces these actions only: ${actions.join(', ')}. Emit rules for no other action; put obligations about anything else under "unresolved". Emit a term only for a number the agreement states that a venue must enforce (a price, a cap, a period); every other number belongs under "unresolved". Every rule and every term carries a "rationale".`;
+This deployment enforces these actions only: ${actions.join(', ')}. For each of them, the rule that says when the action is allowed is a "permit" whose condition names the facts; "require" and "forbid" add conditions on top of a permit and never replace it. Emit rules for no other action; put obligations about anything else under "unresolved". Emit a term only for a number the agreement states that a venue must enforce (a price, a cap, a period); every other number belongs under "unresolved". Every rule and every term carries a "rationale".`;
+}
+
+/// An agreement that says when an action may happen, and permits nothing else, means the action is
+/// permitted exactly then. A seat may write that gate as "require" rules alone; nothing would ever be
+/// permitted, so the permit those rules imply is derived: one per action, quoting the first of them.
+export function derivePermits(ast) {
+  const rules = [...(ast.rules ?? [])];
+  const derived = [];
+  for (const action of new Set(rules.map((rule) => rule.action))) {
+    if (rules.some((rule) => rule.action === action && rule.effect === 'permit')) continue;
+    const required = rules.filter((rule) => rule.action === action && rule.effect === 'require');
+    if (!required.length) continue;
+    rules.push({
+      id: `${action}-permitted-when-required`, action, effect: 'permit',
+      condition: required.length === 1 ? required[0].condition : { type: 'all', children: required.map((rule) => rule.condition) },
+      source: { ...required[0].source },
+      rationale: `The agreement states when ${action} may happen and permits it in no other case, so meeting every stated condition permits it.`,
+    });
+    derived.push({ action, from: required.map((rule) => rule.id) });
+  }
+  return { ast: { ...ast, rules }, derived };
 }
 
 /// What the deployment cannot enforce is demoted to "unresolved" rather than failing the compile:
@@ -76,10 +97,14 @@ export function chatRequest({ profile, document, draft = null, rounds = 2, model
 
 /// The native submit: the job id is the room id, so progress and the reference tree can be read back.
 /// Instructions travel in the user turn (the orchestrator folds no system turn); the draft is the assistant turn.
-export function deliberationRequest({ profile, document, draft = null, rounds = 2, model = MODEL, policyId = null, config = { profile }, room: nonce = room() }) {
+// Noolog's halting dial: the share of consensus evidence a deliberation needs before it may stop.
+export const effortFor = (env = process.env) => Number(env.NOOLOG_EFFORT ?? 0.5);
+
+export function deliberationRequest({ profile, document, draft = null, rounds = 2, model = MODEL, policyId = null, config = { profile }, room: nonce = room(), effort = effortFor() }) {
   return {
     room_id: `mirr0tech-${profile}-${document.sha256.slice(2, 10)}-${nonce}`,
     deliberation_rounds: rounds,
+    effort,
     ...(policyId ? { policy_id: policyId } : { agent_names: AGENTS }),
     messages: [
       { role: 'user', content: `${instructionsFor(config)}\n\nAGREEMENT:\n${document.text}` },
@@ -163,13 +188,14 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
     // Demote first: what this deployment cannot enforce need not be well-formed to be set aside.
     const { ast: fitted, demoted } = fitToProfile(parseAstText(state.result), config);
-    const { ast: anchored, unanchored } = anchorQuotes(fitted, document.text);
+    const { ast: permitted, derived } = derivePermits(fitted);
+    const { ast: anchored, unanchored } = anchorQuotes(permitted, document.text);
     const ast = validateAst(anchored, document.text);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);
     const verification = { ...verificationFrom({ jobId, details, references }), mock: Boolean(server), model: MODEL };
     return {
       envelope: {
-        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents, demoted, unanchored },
+        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents, demoted, derived, unanchored },
         // No undefined keys: the source object is inside the policy hash.
         source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       },
@@ -197,11 +223,12 @@ export async function extractWithOpenAI({ profile = 'rwa-secondary', document, d
   const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error('The model returned no content');
   const { ast: fitted, demoted } = fitToProfile(parseAstText(content), config);
-  const { ast: anchored, unanchored } = anchorQuotes(fitted, document.text);
+  const { ast: permitted, derived } = derivePermits(fitted);
+  const { ast: anchored, unanchored } = anchorQuotes(permitted, document.text);
   const ast = validateAst(anchored, document.text);
   return {
     envelope: {
-      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted, unanchored },
+      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted, derived, unanchored },
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
     },
     verification: null,

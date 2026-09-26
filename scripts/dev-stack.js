@@ -56,7 +56,7 @@ const identityFor = (verifier) => {
   return { verifier, registry: registries.get(scope) };
 };
 const worldId = identityFor(verifier);
-const venues = await new VenueService({ provider, signer, record, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json` }).init();
+const venues = await new VenueService({ provider, signer, record, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json`, log: (line) => console.log(`venue stack ${line}`) }).init();
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
 const agreements = await new Agreements({
@@ -70,6 +70,7 @@ const agreements = await new Agreements({
     record: { ...record, rwa: { ...record.rwa, ...deployment, router: deployment.router ?? record.rwa.router, policyHash: policy.hash, clauseTableHash: clauseTable.clauseTableHash }, address: deployment.token, policyHash: policy.hash },
     worldId: identityFor(new WorldIdVerifier({ credential, action })),
     auditPath: `${dataDir}/audit-${record.chainId}-${id}.json`,
+    log: (line) => console.log(`venue ${id} ${line}`),
   }).init(),
 }).init();
 // Public testnet visitors receive isolated, quota-limited workspaces—not operator credentials.

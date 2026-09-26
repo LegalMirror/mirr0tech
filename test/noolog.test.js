@@ -4,7 +4,8 @@ import { once } from 'node:events';
 import { NoologClient, NoologError } from '../src/noolog/client.js';
 import { createMockNoolog, claimsOf } from '../src/noolog/mock.js';
 import { verificationFrom, VERDICT_WEIGHT } from '../src/noolog/verify.js';
-import { extractWithNoolog, chatRequest } from '../src/noolog/extract.js';
+import { extractWithNoolog, chatRequest, fitToProfile } from '../src/noolog/extract.js';
+import { readFile } from 'node:fs/promises';
 import { deliberationRequest } from './noolog-request.js';
 import { document, envelope } from './helpers.js';
 import { readDocuments } from '../src/policy/document.js';
@@ -66,7 +67,8 @@ test('claims are checked against the document: a fabricated quote is wrong and d
   const { envelope: generated, verification: report } = await extractWithNoolog({ profile: 'custodial-rwa', document, draft: forged.ast });
   assert.equal(report.mock, true);
   assert.ok(report.confidence.overall > 0 && report.confidence.overall < 1);
-  assert.equal(generated.ast.rules.length, forged.ast.rules.length - 1, 'the winner dropped the forged rule');
+  assert.ok(!generated.ast.rules.some((rule) => rule.id === forged.ast.rules[0].id), 'the winner dropped the forged rule');
+  assert.deepEqual(generated.extraction.derived.map((entry) => entry.action), ['mint'], 'the forged rule was the mint permit; the requires that remain imply one');
   assert.equal(generated.extraction.provider, 'noolog');
   assert.equal(generated.extraction.responseId, report.jobId);
   assert.ok(!report.claims.some((c) => c.ref === `rule:${forged.ast.rules[0].id}`), 'the winner carries no claim about the dropped rule');
@@ -168,7 +170,7 @@ test('the OpenAI-compatible bypass returns the AST with no verdicts, on any base
   const env = { OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'astra-legal', OPENAI_BASE_URL: 'https://astra.example/v1/' };
   const { envelope: out, verification } = await extractWithOpenAI({ document, draft: envelope.ast, fetchImpl, env });
   assert.equal(verification, null, 'one model call, nobody checked it');
-  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/', demoted: [], unanchored: [] });
+  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/', demoted: [], derived: [], unanchored: [] });
   assert.equal(out.ast.rules.length, envelope.ast.rules.length);
   assert.equal(calls[0].url, 'https://astra.example/v1/chat/completions');
   assert.equal(calls[0].auth, 'Bearer sk-test');
@@ -316,4 +318,57 @@ test('a live answer whose quotes differ from the source only in spacing or punct
   assert.equal(generated.ast.rules.some((rule) => rule.id === 'invented-rule'), false);
   assert.deepEqual(generated.extraction.unanchored, [{ kind: 'rule', id: 'invented-rule', clause: 'X' }]);
   assert.ok(generated.ast.unresolved.some((item) => /invented-rule was not found in the source/.test(item.description)));
+});
+
+test('a reading whose gate is a require rule and nothing permits: the permit the agreement implies is derived, so the policy compiles', async () => {
+  const { derivePermits } = await import('../src/noolog/extract.js');
+  const { compilePolicy } = await import('../src/policy/compile.js');
+  const { anchorQuotes } = await import('../src/policy/anchor.js');
+  const { PROFILES } = await import('../scripts/export-ui.js');
+  const reading = JSON.parse(await readFile('test/fixtures/noolog-short-fund-reading.json', 'utf8'));
+  assert.ok(reading.rules.some((rule) => rule.action === 'transfer' && rule.effect === 'require') && !reading.rules.some((rule) => rule.action === 'transfer' && rule.effect === 'permit'), 'the seats wrote the transfer gate as a require');
+  const { ast, derived } = derivePermits(reading);
+  const permit = ast.rules.find((rule) => rule.id === 'transfer-permitted-when-required');
+  assert.equal(permit.effect, 'permit');
+  assert.deepEqual(permit.condition, reading.rules.find((rule) => rule.id === 'transfer-recipient-eligible').condition, 'one require: its condition is the permit');
+  assert.deepEqual(derived.find((entry) => entry.action === 'transfer'), { action: 'transfer', from: ['transfer-recipient-eligible'] });
+  assert.deepEqual(derived.map((entry) => entry.action).sort(), ['burn', 'mint', 'transfer'], 'the seats wrote every gate as requires');
+  assert.equal(ast.rules.find((rule) => rule.id === 'mint-permitted-when-required').condition.children.length, 3, 'three mint requires: all of them permit');
+  const short = await readDocuments(['test/human_contracts/short-fund-agreement.md']);
+  const spec = PROFILES.find((entry) => entry.profile === 'rwa-secondary');
+  const config = { ...JSON.parse(await readFile(spec.config, 'utf8')), profile: 'rwa-secondary' };
+  const { ast: fitted } = fitToProfile(ast, config);
+  const { ast: anchored } = anchorQuotes(fitted, short.text);
+  const compiled = compilePolicy({ ast: anchored, source: { name: short.name, sha256: short.sha256, textSha256: short.textSha256 } }, config, short, { demo: true });
+  assert.match(compiled.policy.hash, /^0x[0-9a-f]{64}$/);
+});
+
+test('a live reading with a require-only gate comes back with the derived permit recorded in the extraction', async () => {
+  const answer = structuredClone(envelope.ast);
+  answer.rules = answer.rules.filter((rule) => rule.id !== 'issuance-authorized');
+  const client = {
+    policyFor: async () => ({ policy_id: 'p', max_rounds: 2 }),
+    startDeliberation: async () => ({ job_id: 'job-derived' }),
+    waitForResult: async () => ({ status: 'completed', result: JSON.stringify(answer) }),
+    details: async () => ({ history: [], rounds: [] }),
+    references: async () => ({ rounds: [], edges: [], hunk_edges: [], winner: null }),
+  };
+  const { envelope: generated } = await extractWithNoolog({ profile: 'rwa-secondary', document, client, live: true });
+  const permit = generated.ast.rules.find((rule) => rule.action === 'mint' && rule.effect === 'permit');
+  assert.equal(permit.id, 'mint-permitted-when-required');
+  assert.equal(permit.condition.type, 'all', 'several requires: all of them permit');
+  assert.ok(document.text.includes(permit.source.quote), 'the derived permit quotes the agreement');
+  assert.deepEqual(generated.extraction.derived.map((entry) => entry.action), ['mint']);
+});
+
+test('every deliberation asks for effort 0.5 unless NOOLOG_EFFORT says otherwise', async () => {
+  const { deliberationRequest } = await import('../src/noolog/extract.js');
+  assert.equal(deliberationRequest({ profile: 'rwa-secondary', document }).effort, 0.5);
+  const saved = process.env.NOOLOG_EFFORT;
+  try {
+    process.env.NOOLOG_EFFORT = '0.7';
+    assert.equal(deliberationRequest({ profile: 'rwa-secondary', document }).effort, 0.7);
+  } finally {
+    if (saved === undefined) delete process.env.NOOLOG_EFFORT; else process.env.NOOLOG_EFFORT = saved;
+  }
 });

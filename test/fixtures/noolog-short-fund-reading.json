@@ -1,0 +1,216 @@
+{
+  "schemaVersion": "1.0",
+  "title": "Tokenized Fund Share Agreement (short demo)",
+  "parties": [
+    {
+      "name": "Mirror Treasury Fund Ltd.",
+      "role": "Issuer"
+    },
+    {
+      "name": "Mirror Transfer Agent LLC",
+      "role": "Transfer Agent"
+    }
+  ],
+  "rules": [
+    {
+      "id": "mint-eligible-investor",
+      "action": "mint",
+      "effect": "require",
+      "condition": {
+        "type": "all",
+        "children": [
+          {
+            "type": "fact",
+            "name": "kycApproved"
+          },
+          {
+            "type": "fact",
+            "name": "amlApproved"
+          },
+          {
+            "type": "fact",
+            "name": "sanctionsClear"
+          }
+        ]
+      },
+      "source": {
+        "clause": "Section 2",
+        "quote": "Shares may be issued to or held by an investor only after the investor has passed know-your-customer and anti-money-laundering checks and is not listed on any sanctions list."
+      },
+      "rationale": "Issuance is a mint; recipient must have passed KYC and AML and be sanctions-clear."
+    },
+    {
+      "id": "mint-identity-verified",
+      "action": "mint",
+      "effect": "require",
+      "condition": {
+        "type": "fact",
+        "name": "identityVerified"
+      },
+      "source": {
+        "clause": "Section 3",
+        "quote": "An investor must verify their identity with a government-issued identity document before shares are issued to, transferred to or redeemed by that investor."
+      },
+      "rationale": "Issuance is a mint; recipient identity must be verified first."
+    },
+    {
+      "id": "mint-subscription-settled",
+      "action": "mint",
+      "effect": "require",
+      "condition": {
+        "type": "all",
+        "children": [
+          {
+            "type": "fact",
+            "name": "subscriptionAccepted"
+          },
+          {
+            "type": "fact",
+            "name": "depositConfirmed"
+          }
+        ]
+      },
+      "source": {
+        "clause": "Section 4",
+        "quote": "The Transfer Agent shall issue shares to an investor only after the Issuer has accepted the investor's subscription and the investor's payment has been received by the Issuer's custodian."
+      },
+      "rationale": "Issuance is a mint; requires accepted subscription and confirmed payment receipt."
+    },
+    {
+      "id": "burn-identity-verified",
+      "action": "burn",
+      "effect": "require",
+      "condition": {
+        "type": "fact",
+        "name": "identityVerified"
+      },
+      "source": {
+        "clause": "Section 3",
+        "quote": "An investor must verify their identity with a government-issued identity document before shares are issued to, transferred to or redeemed by that investor."
+      },
+      "rationale": "Redemption is a burn; redeeming investor identity must be verified first."
+    },
+    {
+      "id": "burn-redemption-authorized",
+      "action": "burn",
+      "effect": "require",
+      "condition": {
+        "type": "all",
+        "children": [
+          {
+            "type": "fact",
+            "name": "redemptionAuthorized"
+          },
+          {
+            "type": "fact",
+            "name": "sufficientBalance"
+          }
+        ]
+      },
+      "source": {
+        "clause": "Section 5",
+        "quote": "The Transfer Agent shall redeem shares only when the Issuer has authorized the redemption and the investor holds enough shares to cover it."
+      },
+      "rationale": "Redemption is a burn; requires Issuer authorization and sufficient share balance."
+    },
+    {
+      "id": "transfer-recipient-eligible",
+      "action": "transfer",
+      "effect": "require",
+      "condition": {
+        "type": "all",
+        "children": [
+          {
+            "type": "fact",
+            "name": "kycApproved"
+          },
+          {
+            "type": "fact",
+            "name": "amlApproved"
+          },
+          {
+            "type": "fact",
+            "name": "sanctionsClear"
+          },
+          {
+            "type": "fact",
+            "name": "identityVerified"
+          }
+        ]
+      },
+      "source": {
+        "clause": "Section 6",
+        "quote": "Shares may be transferred only to an investor who meets the conditions of Sections 2 and 3."
+      },
+      "rationale": "Section 6 imports Section 2 (KYC, AML, sanctions) and Section 3 (identity) as recipient conditions for every transfer."
+    }
+  ],
+  "terms": [
+    {
+      "name": "netAssetValue",
+      "value": "1.00",
+      "unit": "USD per share",
+      "source": {
+        "clause": "Section 7",
+        "quote": "The net asset value is USD 1.00 per share."
+      },
+      "rationale": "Per-share price the venue applies to subscriptions (mint) and redemptions (burn)."
+    },
+    {
+      "name": "subscriptionFee",
+      "value": "25",
+      "unit": "basis points",
+      "source": {
+        "clause": "Section 7",
+        "quote": "The subscription fee is 25 basis points and the redemption fee is 25 basis points."
+      },
+      "rationale": "Fee rate charged on subscription (mint); a stated price, enforceable like the NAV."
+    },
+    {
+      "name": "redemptionFee",
+      "value": "25",
+      "unit": "basis points",
+      "source": {
+        "clause": "Section 7",
+        "quote": "The subscription fee is 25 basis points and the redemption fee is 25 basis points."
+      },
+      "rationale": "Fee rate charged on redemption (burn); a stated price, enforceable like the NAV."
+    },
+    {
+      "name": "supplyCap",
+      "value": "1000000",
+      "unit": "shares",
+      "source": {
+        "clause": "Section 8",
+        "quote": "The total number of outstanding shares shall not exceed 1000000 shares."
+      },
+      "rationale": "Hard ceiling on outstanding shares the venue must enforce against minting."
+    }
+  ],
+  "unresolved": [
+    {
+      "clause": "Preamble",
+      "description": "Effective Date \"September 1, 2026\" is a contract date, not a venue-enforced price, cap or period."
+    },
+    {
+      "clause": "Section 1",
+      "description": "\"Each share is recorded by the Transfer Agent.\" is a record-keeping obligation, not a mint, burn or transfer gate."
+    },
+    {
+      "clause": "Section 4",
+      "description": "Receipt of \"the investor's payment\" by \"the Issuer's custodian\" is a deposit obligation; deposit is not enforced here, only its outcome (depositConfirmed) gates mint."
+    },
+    {
+      "clause": "Section 6",
+      "description": "\"Any other transfer is void.\" is a legal consequence, not an on-chain effect; the venue can only reject transfers failing the transfer rule."
+    },
+    {
+      "clause": "Section 7",
+      "description": "Fee collection mechanics (payer, timing, asset, deducted from shares or cash) are unspecified; rates are terms, collection cannot be compiled."
+    },
+    {
+      "clause": "Section 8",
+      "description": "Enforcing the cap as a mint precondition needs a supply-level comparison; the fact vocabulary has none, so the gate cannot be a rule condition."
+    }
+  ]
+}

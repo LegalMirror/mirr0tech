@@ -223,3 +223,23 @@ test('a credit-profile agreement passes its bound policy to the deployment adapt
   assert.equal(input.sources.policy.hash, record.policyHash);
   assert.equal(input.sources.policy.ast.terms.find((term) => term.name === 'buybackPrice').value, '0.96');
 });
+
+test('the happy path is logged: the reading, the tree, the policy, the constraint and the deployment', async () => {
+  const lines = [];
+  const agreements = new Agreements({
+    extract: extractDemo,
+    log: (line) => lines.push(line),
+    deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xtoken', hook: '0xhook', oracle: '0xoracle', poolId: '0xpool', policyHash }),
+  });
+  const record = await upload(agreements);
+  await agreements.constrain(record.id, { identity: { credential: 'document', actions: ['transfer'] } });
+  agreements.deploy(record.id);
+  await agreements.settled();
+  const text = lines.join('\n');
+  assert.match(text, new RegExp(`^${record.id} reading with the default reader · 1 document · \\d+ chars$`, 'm'));
+  assert.match(text, new RegExp(`^${record.id} ast: \\d+ rules, \\d+ terms, \\d+ unresolved · provider demo$`, 'm'));
+  assert.match(text, new RegExp(`^${record.id} policy ${record.policyHash.slice(0, 10)}… · \\d+ rules compiled$`, 'm'));
+  assert.match(text, new RegExp(`^${record.id} constraint document on transfer · “.+”$`, 'm'));
+  assert.match(text, new RegExp(`^${record.id} deploying policy 0x[0-9a-f]{8}… · profile rwa-secondary$`, 'm'));
+  assert.match(text, new RegExp(`^${record.id} deployed token 0xtoken hook 0xhook oracle 0xoracle pool 0xpool$`, 'm'));
+});

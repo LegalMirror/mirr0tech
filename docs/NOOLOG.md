@@ -30,6 +30,7 @@ The bypass posts `/chat/completions` with `response_format: { type: "json_object
 | `NOOLOG_URL` | gateway base, default `https://api.peeramid.xyz` |
 | `NOOLOG_API_KEY` | bearer token (`op-…`) for the live orchestrator; never in source control |
 | `NOOLOG_MODEL` | `nsed:legal_rwa_pro` (default: the legal RWA policy; its seats come from the policy) or `nsed:deep` (generic; the request names `extractor` + `critic`) |
+| `NOOLOG_EFFORT` | the halting dial sent with every deliberation (0–1, default `0.5`): the share of consensus evidence the seats need before they may stop |
 | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL` | the bypass; the base URL may be any OpenAI-compatible endpoint |
 
 ## How the live path works
@@ -43,6 +44,12 @@ The bypass posts `/chat/completions` with `response_format: { type: "json_object
 When the seats score the answer without decomposing it into claims, the confidence is the mean of their scores mapped to [0, 1] and `confidence.basis` says `evaluations` (else `claims`, or `winner` for the aggregate alone). Live claim keys are the orchestrator's ids, so per-rule confidence exists only where claims anchor to rules.
 
 Budget: an account without credits answers `429 insufficient_quota` / `{"error":"Insufficient budget"}`; the agreement fails with `The model account is out of credits (429)`. A full agreement (≈80 KB request) takes about ten minutes per round, up to three rounds; the client waits up to the policy's job timeout (an hour). A one-line question takes ten seconds to a minute.
+
+### After the seats answer
+
+- **Fitted**: rules for actions no venue enforces and terms no component consumes move to `unresolved` (`extraction.demoted`).
+- **Permits derived**: a gate written only as `require` rules would permit nothing; the permit it implies is added per action, quoting the first require (`extraction.derived`).
+- **Quotes anchored**: a quote that differs from the source only in quotes, dashes or spacing is replaced by the verbatim span; one with no span moves to `unresolved` (`extraction.unanchored`).
 
 ## Client library (`src/noolog/client.js`)
 

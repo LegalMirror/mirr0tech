@@ -124,6 +124,7 @@ export class VenueService {
       }
       Object.assign(entry, { status: 'ok', txHash: receipt?.hash ?? null, ...(receipt ? {} : { result }) });
       this.audit.push(entry);
+      this.log(`${type}${details.wallet ? ` ${details.wallet}` : ''} ok${entry.txHash ? ` tx=${entry.txHash}` : ''}`);
       await this.persist();
       return entry;
     } catch (error) {
@@ -131,6 +132,7 @@ export class VenueService {
       const refusal = decodeCashierRefusal(error, table) ?? decodeRefusal(error, table);
       Object.assign(entry, { status: 'refused', refusal: refusal ? { ...refusal, subject: refusal.subject ? this.name(refusal.subject) : null } : null, message: error.shortMessage ?? error.message });
       this.audit.push(entry);
+      this.log(`${type}${details.wallet ? ` ${details.wallet}` : ''} refused ${refusal?.clause?.ruleId ?? refusal?.name ?? entry.message}`);
       await this.persist();
       throw new AppError(refusal ? 403 : 500, refusal ? 'POLICY_REFUSED' : 'CHAIN_ERROR', refusal?.clause ? `${refusal.name}: ${refusal.clause.clause} — ${refusal.clause.quote}` : (refusal?.name ?? error.shortMessage ?? error.message), entry);
     }
@@ -219,6 +221,7 @@ export class VenueService {
       if (!(error instanceof WorldIdError)) throw error;
       this.audit.push({ id: id(`worldid:${Date.now()}:${Math.random()}`).slice(0, 18), at: new Date().toISOString(), type: 'worldid.verify', policy: 'rwa', wallet: this.name(address), status: 'refused', refusal: { name: error.code, clauseId: null, clause: null }, message: error.message });
       await this.persist();
+      this.log(`worldid.verify ${this.name(address)} refused ${error.code}`);
       throw new AppError(error.status, error.code, error.message);
     }
     const { policy } = this.policy('rwa');
@@ -261,6 +264,7 @@ export class VenueService {
     }
     await (await this.c.token.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
     await (await this.c.market.connect(signer).approve(this.record.credit.router, MaxUint256)).wait();
+    this.log(`fund ${this.name(address)} ${amount} mUSDC`);
     return { wallet: this.name(address), funded: amount };
   }
   /// A settled payment from the rail: the funds fact is attested, then the policy decides the mint.

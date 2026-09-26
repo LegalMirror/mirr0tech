@@ -130,6 +130,7 @@ export class Agreements {
     Object.assign(record, patch, { status, updatedAt: now() });
     record.history.push({ status, at: record.updatedAt, ...(record.policyHash ? { policyHash: record.policyHash } : {}) });
     this.log(`${record.id} ${status}${record.error ? `: ${record.error}` : ''}`);
+    if (status === 'compiled' && patch.policyHash) this.log(`${record.id} policy ${patch.policyHash.slice(0, 10)}… · ${patch.coverage.rules} rules compiled`);
   }
 
   /// `documents` are the uploaded files ([{ name, text }]); their bytes are kept so the reader sees them as written.
@@ -179,12 +180,21 @@ export class Agreements {
         await this.persist();
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
+        this.log(`${record.id} reading with ${record.generation ?? 'the default reader'} · ${record.documents.length} document${record.documents.length === 1 ? '' : 's'} · ${document.text.length} chars`);
         // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
         // Percent done and the confidence so far; the orchestrator's round text stays internal.
-        const onProgress = (state) => { record.progress = { job: state.job_id, percent: state.percent ?? null, confidence: state.confidence ?? null, at: now() }; };
+        let lastStatus = null;
+        const onProgress = (state) => {
+          record.progress = { job: state.job_id, percent: state.percent ?? null, confidence: state.confidence ?? null, at: now() };
+          if (state.status === lastStatus) return;
+          lastStatus = state.status;
+          this.log(`${record.id} ${state.status} · ${state.percent ?? 0}%${state.confidence == null ? '' : ` · confidence ${state.confidence}`}`);
+        };
         const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation, onProgress, config: record.config });
         record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
+        const { ast } = envelope;
+        this.log(`${record.id} ast: ${ast.rules?.length ?? 0} rules, ${ast.terms?.length ?? 0} terms, ${ast.unresolved?.length ?? 0} unresolved · provider ${envelope.extraction?.provider ?? 'unknown'}${verification ? ` · confidence ${verification.confidence.overall}` : ''}${envelope.extraction?.unanchored?.length ? ` · unanchored ${envelope.extraction.unanchored.length}` : ''}`);
         if (isLegalAst(envelope.ast)) {
           this.transition(record, 'analyzed');
           return;
@@ -251,7 +261,8 @@ export class Agreements {
         ast.rules.push({ id: `${action}-identity-verified`, action, effect: 'require', condition: { type: 'fact', name: 'identityVerified' }, source: { clause, quote }, rationale: IDENTITY_RATIONALE[credential] });
       }
       config.worldId = { credential, action: this.worldIdAction };
-    }
+      this.log(`${record.id} constraint ${credential} on ${[...new Set(actions)].join(', ')} · “${quote.trim().slice(0, 80)}”`);
+    } else this.log(`${record.id} constraint lifted`);
     validateAst(ast, document.text);
     Object.assign(record, { envelope: { ...record.envelope, ast }, config });
     this.exports.delete(id);
@@ -342,7 +353,11 @@ export class Agreements {
       record.mintOperations.push(operation);
     }
     Object.assign(operation, { status: 'pending', error: null });
-    const progress = async (fields) => { Object.assign(operation, fields, { updatedAt: now() }); await this.persist(); };
+    const progress = async (fields) => {
+      Object.assign(operation, fields, { updatedAt: now() });
+      this.log(`${record.id} mint ${input.units} → ${input.recipient} · ${Object.entries(fields).filter(([, value]) => value !== null && typeof value !== 'object').map(([key, value]) => `${key}=${value}`).join(' ')}`);
+      await this.persist();
+    };
     // Reserve the job synchronously before persistence so concurrent requests cannot submit twice.
     const job = this.deployQueue.then(async () => {
       try {
@@ -370,8 +385,10 @@ export class Agreements {
     // All agreements share the signer, including operator and anonymous demo requests.
     const job = this.deployQueue.then(async () => {
       try {
+        this.log(`${record.id} deploying policy ${compiled.policy.hash.slice(0, 10)}… · profile ${record.profile}`);
         const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
         this.transition(record, 'deployed', { deployment });
+        this.log(`${record.id} deployed token ${deployment.token} hook ${deployment.hook ?? '-'} oracle ${deployment.oracle ?? '-'} pool ${deployment.poolId ?? '-'}`);
       } catch (error) {
         this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });
       } finally {

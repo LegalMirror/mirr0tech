@@ -116,8 +116,10 @@ export class DemoWorkspaces {
       await rename(temporary, this.path);
       const directory = await open(dirname(this.path), 'r');
       try { await directory.sync(); } finally { await directory.close(); }
-    } catch {
+    } catch (error) {
       this.broken = true;
+      // The operator needs the cause in the logs: which path, which error.
+      console.error(`demo workspaces: cannot persist ${this.path}: ${error.code ?? error.message}`);
       throw new AppError(503, 'UNAVAILABLE', 'Demo state persistence failed; no further public work is allowed');
     }
   }

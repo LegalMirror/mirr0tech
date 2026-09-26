@@ -53,3 +53,18 @@ test('remote deployment keeps credentials out of frontend build arguments and ex
   assert.doesNotMatch(dashboard, /NEXT_PUBLIC_GATEWAY_KEY|ARG WORLD_RP_SIGNING_KEY|ARG DEPLOYER_PRIVATE_KEY/);
   for (const pattern of ['.env', '.env.*', '**/.env', '**/.env.*']) assert.ok(ignore.split('\n').includes(pattern));
 });
+
+test('the data directory is checked for writes at boot, with the reason and the remedy in the message', async () => {
+  const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { assertWritableDataDir } = await import('../src/runtime-config.js');
+  const directory = await mkdtemp(join(tmpdir(), 'data-dir-'));
+  try {
+    await assertWritableDataDir(join(directory, 'nested', 'data'));
+    await writeFile(join(directory, 'file'), 'x');
+    await assert.rejects(assertWritableDataDir(join(directory, 'file', 'data')), (error) => /DATA_DIR .* is not writable .*(ENOTDIR|EEXIST|ENOENT)/.test(error.message) && /entrypoint chowns/.test(error.message));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

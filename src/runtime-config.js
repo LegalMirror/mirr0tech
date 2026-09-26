@@ -1,3 +1,5 @@
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
+
 // Validate operator configuration before opening an RPC connection or sending a transaction.
 export function stackRuntime(env = process.env) {
   const production = env.NODE_ENV === 'production';
@@ -32,5 +34,19 @@ export function reuseDeployment(chainId, record) {
 export function assertExpectedChain(chainId, expectedChainId) {
   if (expectedChainId !== null && chainId !== expectedChainId) {
     throw new Error(`RPC chain ${chainId} does not match EXPECTED_CHAIN_ID ${expectedChainId}; no deployment was attempted`);
+  }
+}
+
+/// The data directory must take writes now, not at the first request: a root-owned volume or a
+/// read-only mount would otherwise surface as a 503 on the first upload.
+export async function assertWritableDataDir(dataDir) {
+  const probe = `${dataDir}/.write-probe-${process.pid}`;
+  try {
+    await mkdir(dataDir, { recursive: true });
+    await writeFile(probe, 'ok');
+    await unlink(probe);
+  } catch (error) {
+    const who = typeof process.getuid === 'function' ? ` (uid ${process.getuid()}, gid ${process.getgid()})` : '';
+    throw new Error(`DATA_DIR ${dataDir} is not writable${who}: ${error.code ?? error.message}. On Docker the mounted volume must be owned by the runtime user; the API image's entrypoint chowns it when it starts as root.`);
   }
 }

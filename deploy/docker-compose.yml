@@ -43,6 +43,8 @@ services:
       WORLD_ENVIRONMENT: sandbox
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
+      # Staging/sandbox verification window token from the Developer Portal (set_world_id_staging_verification).
+      WORLD_STAGING_VERIFICATION_TOKEN: ${WORLD_STAGING_VERIFICATION_TOKEN:-}
       BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}
       AQUA: ${AQUA:-}
       POOL_MANAGER: ${POOL_MANAGER:-}

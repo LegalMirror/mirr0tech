@@ -34,6 +34,8 @@ services:
       WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
+      # Staging/sandbox verification window token from the Developer Portal (set_world_id_staging_verification).
+      WORLD_STAGING_VERIFICATION_TOKEN: ${WORLD_STAGING_VERIFICATION_TOKEN:-}
       # Operator uploads use Astra; public demos remain explicit offline fixtures.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-astra}

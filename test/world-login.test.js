@@ -363,3 +363,19 @@ test('the simulator\'s device-level identity signs in on v3; production still re
   device.responses[0].identifier = 'device';
   await assert.rejects(login.login({ challengeToken: p.challengeToken, proof: device }), (error) => /: identifier\./.test(error.message));
 });
+
+test('staging and sandbox proofs carry the Portal window token to World; production proofs never do', async (t) => {
+  const { stagingHeaders } = await import('../src/world-login.js');
+  assert.deepEqual(stagingHeaders('staging', 'sk_x'), { 'x-staging-verification-token': 'sk_x' });
+  assert.deepEqual(stagingHeaders('sandbox', 'sk_x'), { 'x-staging-verification-token': 'sk_x' });
+  assert.deepEqual(stagingHeaders('production', 'sk_x'), {});
+  assert.deepEqual(stagingHeaders('sandbox', undefined), {});
+  const saved = process.env.WORLD_STAGING_VERIFICATION_TOKEN;
+  process.env.WORLD_STAGING_VERIFICATION_TOKEN = 'sk_window';
+  t.after(() => { if (saved === undefined) delete process.env.WORLD_STAGING_VERIFICATION_TOKEN; else process.env.WORLD_STAGING_VERIFICATION_TOKEN = saved; });
+  const seen = [];
+  const login = await opened(t, { ...legacyOptions, mode: undefined, fetchImpl: async (url, init) => { seen.push(init.headers); return legacyUpstream(url, init); } });
+  const c = login.challenge({ mode: 'v3' });
+  await login.login({ challengeToken: c.challengeToken, proof: legacyProofFor(c) });
+  assert.equal(seen[0]['x-staging-verification-token'], 'sk_window');
+});

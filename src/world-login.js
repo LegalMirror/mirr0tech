@@ -15,6 +15,10 @@ export const LOGIN_MODES = ['mock', 'sandbox', 'v3', 'production'];
 // v3 is the staging simulator; production is a real World App with an Orb credential. Both are uniqueness requests under an action.
 const environmentOf = (mode) => (mode === 'v3' ? 'staging' : mode);
 const UNIQUENESS = new Set(['v3', 'production']);
+/// World verifies staging and sandbox proofs only inside a window opened in the Developer Portal
+/// (set_world_id_staging_verification); the window's token travels in this header. Production needs none.
+export const stagingHeaders = (environment, token = process.env.WORLD_STAGING_VERIFICATION_TOKEN) =>
+  (environment !== 'production' && token ? { 'x-staging-verification-token': token } : {});
 
 /** Application login is independent of wallet-bound document verification. */
 export class WorldLogin {
@@ -135,7 +139,7 @@ export class WorldLogin {
     console.info('[World ID] verification started', { requestId, environment: environmentOf(mode), provider: 'developer.world.org' });
     try {
       response = await this.fetchImpl(`https://developer.world.org/api/v4/verify/${this.rpId}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proof),
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...stagingHeaders(environmentOf(mode)) }, body: JSON.stringify(proof),
         signal: AbortSignal.timeout(10000), redirect: 'error',
       });
       result = await response.json();

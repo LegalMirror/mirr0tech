@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { hashSignal } from '@worldcoin/idkit-core/hashing';
+import { stagingHeaders } from './world-login.js';
 
 export const WORLD_VERIFY_URL = 'https://developer.world.org/api/v4/verify';
 export const DEFAULT_ACTION = 'onboard-investor';
@@ -128,7 +129,7 @@ export class WorldIdVerifier {
     try {
       ({ http, body } = await Promise.race([
         (async () => {
-          const http = await this.fetchImpl(`${this.url.replace(/\/+$/, '')}/${this.rpId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody, signal: controller.signal, redirect: 'error' });
+          const http = await this.fetchImpl(`${this.url.replace(/\/+$/, '')}/${this.rpId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...stagingHeaders(this.environment) }, body: requestBody, signal: controller.signal, redirect: 'error' });
           if (!http || typeof http.ok !== 'boolean' || typeof http.json !== 'function') throw badUpstream();
           const body = await http.json().catch(() => { throw badUpstream(); });
           return { http, body };

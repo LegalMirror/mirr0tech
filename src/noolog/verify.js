@@ -40,7 +40,14 @@ export function verificationFrom({ jobId, details, references }) {
   })));
   // Seats that score the answer without decomposing it still say how sure they are: their scores, in [0, 1].
   const raw = (record?.evaluations ?? []).map((evaluation) => evaluation.evaluation?.score).filter(Number.isFinite);
-  const scored = raw.some((score) => score < 0) ? raw.map((score) => (score + 1) / 2) : raw;
+  const live = raw.some((score) => score < 0) || (winning?.aggregated_score ?? 0) < 0;
+  const scored = live ? raw.map((score) => (score + 1) / 2) : raw;
+  // What each evaluating model said about the final answer: the evidence when no claims are split out.
+  const evaluations = (record?.evaluations ?? []).filter((evaluation) => Number.isFinite(evaluation.evaluation?.score)).map((evaluation) => ({
+    agent: evaluation.evaluator_agent_id,
+    score: Number((live ? (evaluation.evaluation.score + 1) / 2 : evaluation.evaluation.score).toFixed(2)),
+    justification: typeof evaluation.evaluation.justification === 'string' && evaluation.evaluation.justification.trim() ? evaluation.evaluation.justification.slice(0, 600) : null,
+  }));
   const counts = { verified: 0, contested: 0, unverified: 0, wrong: 0, unknown: 0 };
   for (const claim of claims) for (const v of claim.verdicts) counts[v.verdict in counts ? v.verdict : 'unknown']++;
   const rounds = details.rounds ?? [];
@@ -52,6 +59,7 @@ export function verificationFrom({ jobId, details, references }) {
     convergence: rounds.at(-1)?.convergence_score ?? null,
     claims,
     contested,
+    evaluations,
     confidence: {
       overall: claims.length ? Number(mean(claims.map((claim) => claim.score)).toFixed(4)) : Number(mean(scored.length ? scored : [unit(winning?.aggregated_score) ?? 0]).toFixed(4)),
       // What the number rests on: assessed claims, the seats' scores of the answer, or the winner's aggregate alone.

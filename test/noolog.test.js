@@ -282,3 +282,18 @@ test('progress is a percentage of rounds and time, never 100 before completion; 
   assert.equal(interimConfidence({ history: [] }), null);
   assert.equal(interimConfidence(null), null);
 });
+
+test('the report carries each model\'s score of the final answer, mapped to [0, 1] on live scores', async () => {
+  const { verificationFrom } = await import('../src/noolog/verify.js');
+  const details = { history: [{ round: 2, author_agent_id: 'RwaScrivener', proposal: {}, aggregated_score: 0,
+    evaluations: [{ evaluator_agent_id: 'RwaCounsel', evaluation: { score: 1, justification: '' } }, { evaluator_agent_id: 'RwaCompliance', evaluation: { score: -0.5, justification: 'Missing the sanctions clause.' } }] }],
+    rounds: [], final_result: { round: 2, author_agent_id: 'RwaScrivener', aggregated_score: 0 } };
+  const references = { rounds: [{ round: 2, proposals: [{ author_agent_id: 'RwaScrivener', aggregated_score: 0, on_winner_path: true, claims: [] }] }] };
+  const v = verificationFrom({ jobId: 'j', details, references });
+  assert.deepEqual(v.evaluations, [
+    { agent: 'RwaCounsel', score: 1, justification: null },
+    { agent: 'RwaCompliance', score: 0.25, justification: 'Missing the sanctions clause.' },
+  ]);
+  assert.equal(v.confidence.basis, 'evaluations');
+  assert.equal(v.confidence.overall, 0.625);
+});

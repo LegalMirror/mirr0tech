@@ -6,6 +6,8 @@ import type { AgreementDetail } from "@/lib/agreements";
 import { inFlight } from "@/lib/agreements";
 import { Evidence } from "./PolicyPanes";
 import { Icon, Notice } from "./ui";
+import { ConfidenceSummary } from "./ConfidenceSummary";
+import { verdictsOf } from "@/lib/confidence";
 
 export function AnalysisView({
   record,
@@ -178,6 +180,7 @@ export function AnalysisView({
                     : "Model verdicts are review evidence, not legal certainty."}
                 </p>
               </div>
+              <ConfidenceSummary report={report} />
               <label>
                 Filter verdicts
                 <select value={filter} onChange={(event) => setFilter(event.target.value)}>
@@ -212,6 +215,7 @@ export function AnalysisView({
                         — {verdict.reason ?? "No reason recorded"}
                       </p>
                     ))}
+                    {verdictsOf(claim) && <p className="wb-muted">{verdictsOf(claim)}</p>}
                     {source && (
                       <button onClick={() => onAst(claim.ref)}>
                         Trace this claim <Icon name="arrow" size={14} />
@@ -222,7 +226,9 @@ export function AnalysisView({
               })}
               {!claims.length && (
                 <p className="wb-muted">
-                  No claims match this filter. This does not establish that the contract is complete.
+                  {report.claims.length
+                    ? "No claims match this filter. This does not establish that the contract is complete."
+                    : "The models scored the answer as a whole and did not split it into separate claims; their scores are above."}
                 </p>
               )}
               {!!report.contested.length && (

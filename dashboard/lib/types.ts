@@ -159,6 +159,8 @@ export type Buyback =
 /** What the deliberation established about the extraction: one entry per claim, a confidence per rule. */
 export type Verification = {
   provider: "noolog";
+  /** Each evaluating model's score of the final answer, 0–1; the evidence when no claims are split out. */
+  evaluations?: { agent: string; score: number; justification: string | null }[];
   jobId: string;
   mock: boolean;
   agents: string[];
@@ -193,6 +195,8 @@ export type Verification = {
     verified: number;
     total: number;
     counts: { verified: number; contested: number; unverified: number; wrong: number; unknown: number };
+    /** What the overall score rests on: checked claims, the models' scores of the answer, or the winner's aggregate. */
+    basis?: "claims" | "evaluations" | "winner";
   };
 };
 

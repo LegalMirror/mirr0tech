@@ -1,0 +1,45 @@
+{
+ "provider": "noolog",
+ "jobId": "mirr0tech-rwa-secondary-29a2b715-muiltmvv17zk",
+ "agents": [
+  "RwaCompliance",
+  "RwaScrivener"
+ ],
+ "rounds": 3,
+ "winner": {
+  "round": 3,
+  "agent": "RwaScrivener",
+  "score": 0
+ },
+ "convergence": 0,
+ "claims": [],
+ "contested": [],
+ "evaluations": [
+  {
+   "agent": "RwaCounsel",
+   "score": 1,
+   "justification": null
+  },
+  {
+   "agent": "RwaCompliance",
+   "score": 1,
+   "justification": null
+  }
+ ],
+ "confidence": {
+  "overall": 1,
+  "basis": "evaluations",
+  "byRef": {},
+  "verified": 0,
+  "total": 0,
+  "counts": {
+   "verified": 0,
+   "contested": 0,
+   "unverified": 0,
+   "wrong": 0,
+   "unknown": 0
+  }
+ },
+ "mock": false,
+ "model": "nsed:legal_rwa_pro"
+}

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { downloadAst } from "@/lib/legal-ast";
 import type { AstGraph } from "@/lib/agreements";
 import type { PolicyData } from "@/lib/types";
+import { ConfidenceSummary } from "./ConfidenceSummary";
+import { confidenceBasis, verdictsOf } from "@/lib/confidence";
 import {
   dnfText,
   graphForAction,
@@ -349,6 +351,10 @@ export function Evidence({ policy, sample }: { policy: PolicyData; sample: boole
             <dd>
               {report.agents.join(", ")} · {report.rounds} rounds
             </dd>
+            <dt>Confidence</dt>
+            <dd>
+              {report.confidence.overall.toFixed(2)} · {confidenceBasis(report)}
+            </dd>
             <dt>Claims</dt>
             <dd>
               {report.confidence.verified} / {report.confidence.total} verified ·{" "}
@@ -365,6 +371,10 @@ export function Evidence({ policy, sample }: { policy: PolicyData; sample: boole
       {report && (
         <details>
           <summary>Per-claim extraction evidence ({report.claims.length})</summary>
+          <ConfidenceSummary report={report} />
+          {!report.claims.length && (
+            <p className="wb-muted">The models scored the answer as a whole and did not split it into separate claims.</p>
+          )}
           {report.claims.map((claim) => (
             <article className="wb-claim" key={claim.key}>
               <code>{claim.ref}</code>
@@ -377,6 +387,7 @@ export function Evidence({ policy, sample }: { policy: PolicyData; sample: boole
                   — {verdict.reason ?? "No reason recorded"}
                 </p>
               ))}
+              {verdictsOf(claim) && <p className="wb-muted">{verdictsOf(claim)}</p>}
             </article>
           ))}
         </details>

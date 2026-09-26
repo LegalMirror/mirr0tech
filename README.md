@@ -103,7 +103,8 @@ Golden path on Sepolia, as the audit records it:
 [swap](https://sepolia.etherscan.io/tx/0x9a2cbc65c98d65e2a12a2f19e3e09ed3e3e09a41f158401167bfa6b1fc524210) ·
 [Lender A admitted and deposits](https://sepolia.etherscan.io/tx/0x3a3074b0f8634c65d5be398965fdfb5cb6c44b55540488687e24d0de47dbf2b7) ·
 [buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0x604a19d5dacbb37ded2937eece8d0fbc7d39a8806b22c3fc27ac1dab0c746cb8) ·
-[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0xd42e703d2f20eaccbd0387c1257786340720172054c70dfc759f6d4fd37de82d).
+[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0xd42e703d2f20eaccbd0387c1257786340720172054c70dfc759f6d4fd37de82d) ·
+[tender offer posted with DutchAuctionBalanceOut](https://sepolia.etherscan.io/tx/0x2a2dba2abd9a1b30afe95c48a6805b09487d6ec00e98b16daadef1d2a4c75602) and quoted at 0.9602 minutes into its window.
 The refusals (stranger release, hookless pool, stranger liquidity, Lender C deposit, stranger quote) never became transactions.
 
 ## Limits

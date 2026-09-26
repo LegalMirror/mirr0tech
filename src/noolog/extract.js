@@ -50,7 +50,8 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     return {
       envelope: {
         ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents },
-        source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, parts: document.parts },
+        // No undefined keys: the source object is inside the policy hash.
+        source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       },
       verification,
     };

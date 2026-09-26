@@ -301,7 +301,7 @@ export class DemoWorkspaces {
     });
   }
 
-  mutate(token, id, method, body) {
+  mutate(token, id, method, body, signer = null) {
     return this.run(async () => {
       const session = this.owned(token, id);
       ensure(['constrain', 'regenerate', 'deploy', 'mint', 'seed'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
@@ -330,7 +330,8 @@ export class DemoWorkspaces {
         this.supported(record);
         this.mockOnly();
       }
-      return safeRecord(await this.agreements[method](id, body));
+      // A deploy names the World ID human who approved it; the record binds them to the policy hash.
+      return safeRecord(await (method === 'deploy' ? this.agreements.deploy(id, { signer }) : this.agreements[method](id, body)));
     });
   }
 }

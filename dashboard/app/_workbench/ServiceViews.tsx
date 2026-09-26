@@ -189,6 +189,9 @@ export function DeployView({
                   "Pool manager": deployment.poolManager,
                   "Pool ID": deployment.poolId,
                   "Deployed policy": deployment.policyHash,
+                  "Signed off by (World ID)": deployment.signOff
+                    ? `${deployment.signOff.worldId} · ${deployment.signOff.credential ?? deployment.signOff.provider} · ${deployment.signOff.at}`
+                    : undefined,
                 })
                   .filter(([, value]) => value !== undefined)
                   .map(([label, value]) => (

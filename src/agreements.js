@@ -373,7 +373,7 @@ export class Agreements {
     return { ...operation };
   }
 
-  deploy(id) {
+  deploy(id, { signer = null } = {}) {
     const record = this.record(id);
     ensure(this.deployer, 503, 'NO_CHAIN', 'This gateway has no signer to deploy with');
     ensure(record.status === 'compiled', 409, 'INVALID_STATE', `Agreement is ${record.status}; deploy needs compiled`);
@@ -387,7 +387,9 @@ export class Agreements {
       try {
         this.log(`${record.id} deploying policy ${compiled.policy.hash.slice(0, 10)}… · profile ${record.profile}`);
         const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
-        this.transition(record, 'deployed', { deployment });
+        const signOff = signer ? { worldId: signer.id, provider: signer.provider, environment: signer.environment, credential: signer.credential ?? null, mock: Boolean(signer.mock), policyHash: compiled.policy.hash, at: now() } : null;
+        this.transition(record, 'deployed', { deployment: { ...deployment, ...(signOff ? { signOff } : {}) } });
+        if (signOff) this.log(`${record.id} signed off by World ID ${signOff.worldId} (${signOff.credential ?? signOff.provider}) for policy ${signOff.policyHash.slice(0, 10)}…`);
         this.log(`${record.id} deployed token ${deployment.token} hook ${deployment.hook ?? '-'} oracle ${deployment.oracle ?? '-'} pool ${deployment.poolId ?? '-'}`);
       } catch (error) {
         this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });

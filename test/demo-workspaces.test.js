@@ -515,3 +515,17 @@ test('a demo workspace seeds its own pool: bounded budgets, counted as a job, st
   await assert.rejects(workspaces.liquidity(stranger, id), (error) => [403, 404].includes(error.status));
   await assert.rejects(workspaces.seedOperation(stranger, id, 'demo-seed-request-0001'), (error) => [403, 404].includes(error.status));
 });
+
+test('a deploy records the World ID human who signed it off, bound to the policy hash it deployed', async () => {
+  const agreements = new Agreements({ extract: extractDemo, deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xtest', policyHash }) });
+  const { workspaces } = await service({ agreements });
+  const { accessToken: token } = await workspaces.session('1.1.1.1');
+  const id = await created(workspaces, agreements, token);
+  const human = { id: 'world_f3737b9bd47a011d62929ac7', provider: 'world-id', environment: 'staging', mock: false, credential: 'orb' };
+  await workspaces.mutate(token, id, 'deploy', undefined, human);
+  await agreements.settled();
+  const record = agreements.get(id);
+  assert.equal(record.status, 'deployed');
+  assert.deepEqual(record.deployment.signOff, { worldId: human.id, provider: 'world-id', environment: 'staging', credential: 'orb', mock: false, policyHash: record.policyHash, at: record.deployment.signOff.at });
+  assert.match(record.deployment.signOff.at, /^\d{4}-\d\d-\d\dT/);
+});

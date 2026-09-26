@@ -26,6 +26,8 @@ export type AgreementDeployment = {
   mockMarket?: boolean;
   deployedAt: string;
   txs: Record<string, string>;
+  /** The World ID human who approved this deploy, bound to the policy hash it deployed. */
+  signOff?: { worldId: string; provider: string; environment: string; credential: string | null; mock: boolean; policyHash: string; at: string };
 };
 export type Agreement = {
   id: string;

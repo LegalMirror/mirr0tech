@@ -23,7 +23,7 @@ export const schemas = {
   Error: obj({ error: obj({ code: str('Machine-readable code, e.g. POLICY_REFUSED'), message: str('Plain-words reason'), details: { description: 'The audit entry, for a refusal', type: 'object' } }, ['code', 'message']) }),
   Health: obj({ status: str('ok | reconciliation_required'), mode: str('stack | mock | live'), policyHash: { type: ['string', 'null'] }, stack: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, rwa: str('Fund policy hash'), credit: str('Credit policy hash') } } }),
   Status: obj({
-    model: obj({ provider: str('noolog'), mode: str('mock | live'), url: str('Deliberation API'), model: str('Model id') }),
+    model: obj({ provider: str('noolog | openai'), mode: str('mock | live | openai (EXTRACTOR)'), url: str('Deliberation API, or the OpenAI-compatible base URL'), model: str('Model id, e.g. nsed:legal_rwa_pro'), listed: { type: ['boolean', 'null'], description: 'The live gateway lists this model on /v1/models (null: could not ask)' }, models: { type: 'array', items: { type: 'string' }, description: 'Every model the token may name (live only)' } }, ['provider', 'mode', 'url', 'model']),
     compiler: obj({ solidity: obj({ core: str('solc version'), swapvm: str('solc version'), 'uniswap-v4': str('solc version') }) }),
     chain: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, deployer: str('Operator address'), attestor: str('PolicyAttestor'), poolManager: str('Uniswap v4 PoolManager') } },
   }),
@@ -35,6 +35,7 @@ export const schemas = {
   Agreement: obj({
     id: str('agr_<12 hex>'), name: str('Display name'), profile: str('Deployment profile'),
     status: str('uploaded | extracting | verified | compiled | deploying | deployed | failed'),
+    progress: { type: ['object', 'null'], description: 'While extracting on the live orchestrator: the job and its status line', properties: { job: str('Deliberation job id'), status: str('e.g. running: round 2 — Starting'), at: str('ISO time') } },
     createdAt: str('ISO time'), updatedAt: str('ISO time'),
     source: obj({ name: str('Document name'), sha256: str('Bytes hash'), textSha256: str('Normalized text hash') }),
     extraction: { type: ['object', 'null'], properties: { provider: str('noolog'), model: str('Model id'), responseId: str('Deliberation job id') } },

@@ -26,6 +26,7 @@ test('the agreements API: upload, watch it compile, read the tree, regenerate, d
   assert.equal((await call('/v1/agreements', { method: 'POST', body: { name: 'x', text: html, extra: 1 }, token: viewer })).status, 401, 'a viewer cannot upload');
   const status = await call('/v1/status');
   assert.equal(status.data.model.mode, 'mock');
+  assert.equal(status.data.model.listed, true, 'the mock serves whatever model is configured');
   assert.match(status.data.compiler.solidity.core, /^0\.8\./);
   assert.equal(status.data.chain, null);
 

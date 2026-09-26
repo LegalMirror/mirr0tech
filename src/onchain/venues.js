@@ -7,6 +7,7 @@ import { dirname } from 'node:path';
 import { Contract, MaxUint256, Wallet, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
+import { PERMIT2, mintPositionCall, swapExactInSingleCall } from './periphery.js';
 import { decodeCashierRefusal } from './cashier-refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './programs.js';
 import { AppError, ensure } from '../errors.js';
@@ -313,9 +314,31 @@ export class VenueService {
     const signer = await this.signerFor(wallet);
     return this.run('rwa.pool.create', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () => this.c.poolManager.connect(signer).initialize(this.poolKey(hooked), this.record.rwa.cashier?.initialSqrtPriceX96 ?? SQRT_PRICE_1_1));
   }
+  /// Canonical-periphery deployments (routing uniswap-api): the hook trusts only PositionManager and
+  /// the Universal Router, which pull tokens through Permit2 and name the wallet as msgSender().
+  get canonical() { return this.record.rwa.routing === 'uniswap-api'; }
+  async approvePermit2(signer, spender) {
+    const owner = await signer.getAddress();
+    const permit2 = new Contract(this.record.rwa.permit2, PERMIT2, signer);
+    for (const currency of [this.record.rwa.token, this.record.rwa.asset ?? this.record.usdc]) {
+      const erc20 = new Contract(currency, ['function allowance(address,address) view returns (uint256)', 'function approve(address,uint256) returns (bool)'], signer);
+      if (await erc20.allowance(owner, this.record.rwa.permit2) < 1n << 200n) await (await erc20.approve(this.record.rwa.permit2, MaxUint256)).wait();
+      const [amount] = await permit2.allowance(owner, currency, spender);
+      if (amount < 1n << 150n) await (await permit2.approve(currency, spender, (1n << 160n) - 1n, (1n << 48n) - 1n)).wait();
+    }
+  }
+  deadline() { return BigInt(Math.floor(Date.now() / 1000) + 600); }
   async addLiquidity(wallet, hooked) {
     const signer = await this.signerFor(wallet);
     const key = this.poolKey(hooked);
+    if (this.canonical) {
+      const spender = this.record.rwa.positionManager;
+      return this.run('rwa.pool.addLiquidity', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, async () => {
+        await this.approvePermit2(signer, spender);
+        const max = (1n << 128n) - 1n;
+        return signer.sendTransaction({ to: spender, data: mintPositionCall({ key, tickLower: -TICK_SPACING, tickUpper: TICK_SPACING, liquidity: 10n ** 12n, amount0Max: max, amount1Max: max, owner: await signer.getAddress(), deadline: this.deadline() }) });
+      });
+    }
     // A full-range demo position covers arbitrary deployed NAVs without assuming tick zero.
     const position = this.record.rwa.cashier
       ? { tickLower: Math.ceil(-887272 / key.tickSpacing) * key.tickSpacing, tickUpper: Math.floor(887272 / key.tickSpacing) * key.tickSpacing, liquidityDelta: 10n ** 9n, salt: id('position') }
@@ -326,6 +349,13 @@ export class VenueService {
   async swap(wallet, hooked) {
     ensure(!this.record.rwa.cashier, 400, 'BOUNDED_ORDER_REQUIRED', 'Use /rwa/cashier/swap with amount, minOut and deadline for this agreement');
     const signer = await this.signerFor(wallet);
+    if (this.canonical) {
+      const spender = this.record.rwa.router;
+      return this.run('rwa.pool.swap', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, async () => {
+        await this.approvePermit2(signer, spender);
+        return signer.sendTransaction({ to: spender, data: swapExactInSingleCall({ key: this.poolKey(hooked), zeroForOne: true, amountIn: 1000n, amountOutMinimum: 0n, deadline: this.deadline() }) });
+      });
+    }
     return this.run('rwa.pool.swap', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () =>
       // The protocol's own bounds (MIN_SQRT_PRICE + 1): a limit near 1:1 made every swap after the first revert.
       this.c.v4Router.connect(signer).swap(this.poolKey(hooked), { zeroForOne: true, amountSpecified: -1000n, sqrtPriceLimitX96: 4295128740n }));

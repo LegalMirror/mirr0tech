@@ -10,7 +10,8 @@ const USAGE = `mirr0 <command> [args] [--json]
 
   login <url> <key>                         remember the gateway and the operator key (${RC})
   status                                    model, compiler, chain
-  upload <file> [--name N] [--profile P]    upload an agreement; it generates and compiles in the background
+  upload <file> [--name N] [--profile P] [--generation demo|noolog|openai]
+                                            upload an agreement; it generates and compiles in the background
   list | show <id> [--wait <state>]         records; --wait polls until the state (or failed)
   ast <id>                                  the tree: agreement → actions → rules → facts
   constrain <id> [--credential C] [--actions a,b] [--quote "…"] [--none]
@@ -74,7 +75,7 @@ const commands = {
   async status() { const status = await call('/v1/status'); out(status, `model ${status.model.mode} (${status.model.model})  solc ${status.compiler.solidity.core}  chain ${status.chain?.chainId ?? 'none'}`); },
   async upload([file]) {
     if (!file) fail('mirr0 upload <file>');
-    const record = await call('/v1/agreements', { method: 'POST', body: { name: flags.name ?? basename(file), documents: [{ name: basename(file), text: await readFile(file, 'utf8') }], ...(flags.profile ? { profile: flags.profile } : {}) } });
+    const record = await call('/v1/agreements', { method: 'POST', body: { name: flags.name ?? basename(file), documents: [{ name: basename(file), text: await readFile(file, 'utf8') }], ...(flags.profile ? { profile: flags.profile } : {}), ...(flags.generation ? { generation: flags.generation } : {}) } });
     out(record, line(record));
   },
   async list() { const records = await call('/v1/agreements'); out(records, records.map(line).join('\n') || 'no agreements yet'); },

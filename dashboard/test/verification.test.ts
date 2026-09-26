@@ -45,8 +45,6 @@ describe("verification", () => {
     expect(confidenceLabel(0.2)).toBe("low");
     expect(claimsFor(verification, "rule:a")).toHaveLength(1);
     expect(claimsFor(undefined, "rule:a")).toEqual([]);
-    expect(verificationSentence(verification)).toBe(
-      "1 of 2 claims verified by extractor and critic over 2 rounds · confidence 0.93 (high)"
-    );
+    expect(verificationSentence(verification)).toBe("1 of 2 claims verified · confidence 0.93 (high)");
   });
 });

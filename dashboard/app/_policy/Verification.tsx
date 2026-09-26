@@ -57,9 +57,11 @@ export function Verification({ policy, onSelect }: { policy: PolicyData; onSelec
           Confidence {v.confidence.overall.toFixed(2)}{" "}
           <span className="meta">({confidenceLabel(v.confidence.overall)})</span>
         </h2>
-        <span className="meta">
-          {v.confidence.verified} of {v.confidence.total} claims verified · winner {v.winner?.agent} after{" "}
-          {v.rounds} rounds · convergence {v.convergence?.toFixed(2)}
+        <span
+          className="meta"
+          title={`winner ${v.winner?.agent} after ${v.rounds} rounds · convergence ${v.convergence?.toFixed(2)}`}
+        >
+          {v.confidence.verified} of {v.confidence.total} claims verified
         </span>
       </div>
       <p className="actions-line">

@@ -8,10 +8,6 @@ ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with
 
 **Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend connects automatically to a quota-limited, anonymous demo workspace, so no API keys are needed.
 
-[![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
-
-[![Agreement](docs/img/agreement.png)](https://legalmirror.github.io/mirr0tech/agreement)
-
 ## The problem
 
 Tokenizing a real-world asset is expensive, and most of the cost is people translating legal documents into code:

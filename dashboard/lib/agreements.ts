@@ -144,7 +144,7 @@ export type IdentityConstraint = {
 };
 export type Constraints = { identity: IdentityConstraint | null };
 export type Upload = {
-  generation?: "demo" | "openai";
+  generation?: "demo" | "openai" | "noolog";
   name: string;
   profile: ProfileId;
   documents: { name: string; text: string }[];

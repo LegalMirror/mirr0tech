@@ -414,3 +414,19 @@ test('a failed persist closes public work until the disk takes writes again; a s
   // The attempt made while the disk refused stays counted: quotas err on the side of less work.
   assert.equal(JSON.parse(await readFile(path, 'utf8')).requests.length, 3);
 });
+
+test('a public upload may ask for a Noolog deliberation, only when the gateway holds a Noolog key', async () => {
+  const { workspaces } = await service();
+  const body = { ...upload, generation: 'noolog' };
+  const saved = process.env.NOOLOG_API_KEY;
+  try {
+    delete process.env.NOOLOG_API_KEY;
+    assert.throws(() => workspaces.prepare(body), rejected(503, 'UNAVAILABLE'));
+    process.env.NOOLOG_API_KEY = 'test-only-never-send';
+    assert.equal(workspaces.prepare(body).generation, 'noolog');
+    assert.equal(workspaces.prepare(upload).generation, 'demo', 'the bundled reading stays the default');
+    assert.throws(() => workspaces.prepare({ ...upload, generation: 'openai' }), rejected(400, 'INVALID_BODY'));
+  } finally {
+    if (saved === undefined) delete process.env.NOOLOG_API_KEY; else process.env.NOOLOG_API_KEY = saved;
+  }
+});

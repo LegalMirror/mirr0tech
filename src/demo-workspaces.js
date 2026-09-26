@@ -217,14 +217,18 @@ export class DemoWorkspaces {
   }
 
   prepare(body) {
-    invalid(fields(body, ['name', 'documents', 'text', 'filename', 'profile', 'config']), 'Unsupported upload field');
+    invalid(fields(body, ['name', 'documents', 'text', 'filename', 'profile', 'config', 'generation']), 'Unsupported upload field');
+    // The bundled reading, or a live Noolog deliberation over the same bundled documents when the gateway holds a key.
+    const generation = body.generation ?? 'demo';
+    invalid(['demo', 'noolog'].includes(generation), 'Public demo generation is demo or noolog');
+    unavailable(generation !== 'noolog' || process.env.NOOLOG_API_KEY, 'Noolog deliberation is not configured on this gateway (NOOLOG_API_KEY).');
     ensure(Buffer.byteLength(JSON.stringify(body)) <= this.limits.maxRequestBytes, 413, 'BODY_TOO_LARGE', 'Demo upload is too large');
     invalid(typeof body.name === 'string' && body.name.trim().length > 0 && body.name.length <= 120, 'name must be 1–120 characters');
     const profile = body.profile ?? 'rwa-secondary';
     invalid(PUBLIC_PROFILES.includes(profile), 'Public profiles are rwa-secondary and custodial-rwa');
     const documents = body.documents ?? (typeof body.text === 'string' ? [{ name: body.filename ?? `${body.name}.txt`, text: body.text }] : null);
     invalid(Array.isArray(documents) && documents.length > 0 && documents.length <= this.limits.maxParts && documents.every((part) => fields(part, ['name', 'text']) && typeof part.name === 'string' && part.name.length > 0 && part.name.length <= 200 && typeof part.text === 'string' && part.text.length > 0), 'Expected bounded documents [{ name, text }] or text and filename');
-    return { name: body.name.trim(), documents, profile, config: this.validateConfig(profile, body.config) };
+    return { name: body.name.trim(), documents, profile, generation, config: this.validateConfig(profile, body.config) };
   }
 
   supported(input) {
@@ -255,7 +259,7 @@ export class DemoWorkspaces {
       await this.reserve(session, ['uploads', 'jobs']);
       this.supported(input);
       this.mockOnly();
-      const created = await this.agreements.create({ ...input, generation: 'demo' });
+      const created = await this.agreements.create(input);
       session.ids.push(created.id);
       await this.persist();
       return safeRecord(created);

@@ -25,11 +25,11 @@ Only a handful of incumbent platforms can do this work today, because each deal 
 
 mirr0tech replaces that manual translation:
 
-1. **AGI reads the agreement.** Using collective intellect of [Noolog](docs/NOOLOG.md) between several models (Astra, Fable and GPT-OSS-Safeguard) proposes the rules that are mapped in to AST and eventually in to SMT/Z3. Each rule must quote the document verbatim, and the models cross-check each other's claims.
-2. **The rules become an abstract syntax tree (AST).** The AST is the backend's source of truth: the API, the dashboard and the compiler all read it.
-3. **The AST compiles to Solidity** and deploys on chain as a permissioned token and a Uniswap v4 hook.
-4. **Formal verification + Noolog stops hallucinations reaching the chain.** The compiler checks that the on-chain logic matches the reference interpreter on every possible input, and refuses to emit contracts otherwise, while Collective mind of Astra, Fable and Safeguard rail-guards ensure more then +80% boost above typical LLM. A quote that isn't in the document is rejected, and a human approves the policy before it's frozen and hashed on chain.
-5. System provisions ability for executives not simply sign-off using **World ID** legal document mirrored as smart contract RWA tokenisation, but have robust, compliant and audit-tracable AI + HITL system integrated on background from noolog
+1. **Several models read the agreement.** A [Noolog](docs/NOOLOG.md) deliberation seats Claude Fable, GPT-6 Astra and GPT-OSS-Safeguard. They propose the rules, then score and cross-check each other's claims over up to three rounds. Every rule must quote the agreement verbatim.
+2. **The rules become an abstract syntax tree (AST).** The AST is the backend's single source of truth. The API, the dashboard and the compiler all read it.
+3. **The AST compiles to Solidity.** It deploys as a permissioned token plus a Uniswap v4 hook that enforces the agreement on every swap and liquidity change.
+4. **Hallucinations can't reach the chain.** A quote that isn't in the document is rejected. The compiler checks the on-chain logic against a reference interpreter on every possible combination of facts, and refuses to emit contracts if they disagree. What the models couldn't ground stays in "unresolved" instead of being enforced.
+5. **A verified human signs off.** The executive who deploys or mints is signed in with **World ID**. Their World ID identifier is recorded with the exact policy hash they approved. The result is an audit trail from the sentence in the agreement, through the models' verdicts and the human's approval, to the contract on chain.
 
 **Why now:** AI can finally read long legal text reliably enough to propose rules, and formal verification makes it cheap to check every proposal mechanically instead of trusting it.
 

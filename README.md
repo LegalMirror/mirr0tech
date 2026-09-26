@@ -72,6 +72,17 @@ A World ID credential proves one onboarding condition. It is not a full KYC, AML
 
 ## How we used Uniswap v4
 
+hook = the fund's own cashier inside the pool:
+
+• You want to buy at $1.05? Cashier says "no need — fund issues new shares at $1.00", mints them to you, your USD goes to the fund. That's legally how a fund works ("issue shares upon receipt of funds").
+• You want to sell at $0.95? Cashier redeems at $1.00, burns your share, pays you.
+• Small moves around $1? Normal pool trade.
+• Cashier still checks ID (KYC, World ID) before minting/redeeming — same door, same sentence on refusal.
+
+Real funds state it: "Shares are issued and redeemed at NAV per share; a subscription fee of X% / redemption fee of Y% applies." Our BUIDL transfer-agent contract doesn't carry it (that lives in BlackRock's private memo), so we write a demo addendum with that sentence — 25 bps — same way Act 2 uses buyback-addendum.md. Compiler turns the sentence into the hook's spread; a refusal quotes it.
+
+Result: price can't wander away from $1 (cashier always offers $1) → bots have nothing to farm → LPs safe. Not "fee when it hurts", but "it can't hurt". And the rules ($1, spread, who may buy) come straight from the legal document we compiled.
+
 - **`contracts/MirrorPolicyHook.sol`** implements `beforeAddLiquidity` (line 113), `beforeRemoveLiquidity` (line 122) and `beforeSwap` (line 131). Each calls `_enforce` (line 140), which evaluates the compiled policy for the beneficiary carried in `hookData`, since `sender` is always the router.
 - **The hook is the token's only door into Uniswap.** The hook sets a transient approval; `MirrorToken._update` (`contracts/MirrorToken.sol:106`) consumes it through `consumeApproval` (hook line 98) on every PoolManager transfer. A pool without the hook reverts with `NoPolicyDoor`.
 - **Address mining.** `src/policy/hookAddress.js` mines the hook address for its permission bits.

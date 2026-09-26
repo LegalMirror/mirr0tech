@@ -120,7 +120,7 @@ Integrating IDKit took an afternoon. **Getting one test proof to verify** took t
 - Provide a test passport credential in sandbox or the simulator, or state plainly that none exists.
 - Map the sandbox app's refusals to specific IDKit error codes instead of `generic_error`.
 
-At the time of writing, no staging or sandbox proof has verified end to end for us; the unit and HTTP tests run against a fake World verifier.
+**Result, 2026-09-26 evening:** with the staging window open and its token sent, simulator login verified end to end with Orb (human) and device identities. The simulator's passport and ID identities still failed, so the document credential remains untested outside production. Sandbox still refuses in-app with `generic_error`.
 
 ## Official sources and integration notes
 

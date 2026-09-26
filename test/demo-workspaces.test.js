@@ -411,7 +411,7 @@ test('a failed persist closes public work until the disk takes writes again; a s
   assert.equal(workspaces.broken, false);
 
   await chmod(join(directory, 'state'), 0o500);
-  t.after(() => chmod(join(directory, 'state'), 0o700));
+  t.after(() => chmod(join(directory, 'state'), 0o700).catch(() => {}));
   await assert.rejects(workspaces.admit('1.1.1.1'), rejected(503, 'UNAVAILABLE'));
   assert.equal(workspaces.broken, true);
   await assert.rejects(workspaces.admit('1.1.1.1'), rejected(503, 'UNAVAILABLE'), 'still closed while the disk refuses');

@@ -71,7 +71,7 @@ A World ID credential proves one onboarding condition. It is not a full KYC, AML
 
 **Status:** the Sepolia attestations below come from mock proofs. A live World Sandbox proof has not been demonstrated yet.
 
-**Integration debrief.** Friction: IDKit needs an explicit preset and legacy (v3) policy; the RP context must be signed on the server; the v4 verify endpoint can return HTTP 200 with failed proof items inside, so status codes alone can't be trusted; the signal is optional in the SDK but mandatory for a wallet-bound gate. The one improvement with the greatest impact would be a complete server-side example that validates the per-credential result, the wallet signal, cancellation and retry, and durable nullifier binding. Time to first live success: not yet measured. Full trust boundaries: [docs/WORLD_ID.md](docs/WORLD_ID.md).
+**Integration debrief.** IDKit itself took an afternoon; testing took the day. The simulator is refused (`environment_not_allowed`) until a "staging window" is opened with `set_world_id_staging_verification`, a tool that exists only in the Developer Portal MCP, behind a team-wide admin API key. The window then returns a token that every staging and sandbox verify call must carry as an undocumented `x-staging-verification-token` header. Sandbox needs a separate gated app and answered our request with an unmapped `generic_error`, and no test passport exists anywhere we could find. The full account and our asks: [docs/WORLD_ID.md § Feedback for World](docs/WORLD_ID.md#feedback-for-world-testing-is-the-hard-part).
 
 ## How we used Uniswap v4
 

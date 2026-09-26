@@ -99,6 +99,29 @@ Verify these with the venues/frontend owners before claiming the whole applicati
 
 Related routes: `GET /v1/stack/worldid/context`, `POST /v1/stack/wallets/:wallet/worldid`; related integration: `src/onchain/venues.js` `verifyHuman`, `dashboard/app/_components/HumanCheck.tsx`. No signing secret belongs in those client components.
 
+## Feedback for World: testing is the hard part
+
+Integrating IDKit took an afternoon. **Getting one test proof to verify** took the rest of the day, and the path to it runs through an undocumented Portal tool behind a team-wide admin key. In order, as it happened on 2026-09-26:
+
+1. **We followed the docs.** The integration guide says: "To test during development, use the simulator and set `environment` to `staging`." We did, with an action registered in the Portal.
+2. **World refused the proof:** `environment_not_allowed · Staging verification is not open for this app. Open a staging window with the set_world_id_staging_verification tool…`. The Developer Portal web UI has no such control, and the tool is missing from the documented Developer Portal MCP tool table, which lists eleven tools and not this one.
+3. **The tool exists only in the Developer Portal MCP**, which authenticates with a **team API key that can change every app in the team**. To test with a *simulator*, a developer has to mint a team-wide admin key and hand it to an AI assistant, or speak MCP JSON-RPC by hand. We pasted it into an LLM chat, and it is now a secret we have to rotate.
+4. **The window returns a second secret.** `set_world_id_staging_verification` answers with a token, "shown once", valid for 24 hours, that must be sent as an `x-staging-verification-token` header on every `/api/v4/verify` call carrying staging **or sandbox** proofs. The Verify API reference documents `environment: staging | sandbox` and says nothing about this header, so every server that follows it fails.
+5. **Actions are per environment.** Our `login` and `onboard-investor` actions existed in production; the simulator needed separate staging copies. The Portal MCP's `create_world_id_action` offers `production` and `staging`, and no `sandbox`.
+6. **Sandbox is a second gated product.** It needs a separate sandbox World ID app, from TestFlight or a private Play track after a tester request. It documents only Selfie Check. Our session request reached the sandbox app, which answered through the bridge, and IDKit reported `generic_error`, with no mapped code for what the app refused.
+7. **The simulator's identity level is a surprise.** A legacy Orb request returns the identity's *highest* credential, so a simulator identity without Orb returned a device or document level. That is documented, but only in the migration guide.
+8. **A passport cannot be tested.** Our trust moment needs the passport credential (9303). Nothing in the docs says whether sandbox or the simulator can issue one. As far as we can tell, the only way to see a passport proof is production World App with a real passport tapped over NFC.
+9. **The signal is hashed as bytes, and nothing says so** (see below).
+
+**Asks, in order of impact:**
+- Open staging verification for development apps by default, or put the window behind a button in the Portal UI next to the actions.
+- Document `x-staging-verification-token` in the Verify API reference and the simulator guide, and show the token in the Portal.
+- Offer scoped keys (one app, one capability) before steering developers to hand keys to agents.
+- Provide a test passport credential in sandbox or the simulator, or state plainly that none exists.
+- Map the sandbox app's refusals to specific IDKit error codes instead of `generic_error`.
+
+At the time of writing, no staging or sandbox proof has verified end to end for us; the unit and HTTP tests run against a fake World verifier.
+
 ## Official sources and integration notes
 
 Audit sources were the installed `@worldcoin/idkit-core@4.3.0` types, presets, hashing and signing exports (`@worldcoin/idkit-server@1.1.1`), plus the official docs MCP at [docs.world.org/mcp](https://docs.world.org/mcp). The [Developer Portal MCP](https://developer.world.org/api/mcp) requires an API key for its tools; its unauthenticated rejection is not live verification evidence. Public documentation and the Developer Portal OpenAPI schema were retrieved through the docs MCP instead.

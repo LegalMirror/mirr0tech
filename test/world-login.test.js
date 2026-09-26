@@ -182,7 +182,7 @@ const legacyProofFor = (c) => ({ protocol_version: '3.0', environment: 'staging'
 const legacyUpstream = async (_url, init) => {
   const p = JSON.parse(init.body);
   return { ok: true, json: async () => ({ success: true, environment: 'staging', action: p.action,
-    results: [{ identifier: 'orb', success: true, nullifier: p.responses[0].nullifier }] }) };
+    results: [{ identifier: p.responses[0].identifier, success: true, nullifier: p.responses[0].nullifier }] }) };
 };
 const legacyOptions = { mode: 'v3', action: 'login', fetchImpl: legacyUpstream };
 async function legacySignIn(login) {
@@ -198,13 +198,14 @@ test('every mode is offered unless one is pinned; the screen picks per challenge
     { mode: 'mock', environment: 'mock', configured: true },
     { mode: 'sandbox', environment: 'sandbox', configured: true },
     { mode: 'v3', environment: 'staging', configured: true },
+    { mode: 'production', environment: 'production', configured: true },
   ]);
   const v3 = login.challenge({ mode: 'v3' });
   assert.equal(v3.environment, 'staging');
   assert.equal(v3.action, 'registered-login');
   assert.equal(login.challenge({ mode: 'sandbox' }).environment, 'sandbox');
   assert.throws(() => login.challenge({ mode: 'mock' }), { code: 'SANDBOX_LOGIN_DISABLED' });
-  assert.throws(() => login.challenge({ mode: 'production' }), { code: 'SANDBOX_LOGIN_DISABLED' });
+  assert.throws(() => login.challenge({ mode: 'mainnet' }), { code: 'SANDBOX_LOGIN_DISABLED' });
   assert.throws(() => login.challenge({ mode: 'v3', existingSessionId: worldSessionId }), { code: 'LOGIN_SESSION' });
   // A sandbox login and a mock login both authenticate on the same backend.
   const sandbox = await signIn(login);
@@ -223,7 +224,7 @@ test('every mode is offered unless one is pinned; the screen picks per challenge
   assert.equal(defaulted.config().modes.find((m) => m.mode === 'v3').configured, true);
   const unconfigured = await opened(t, { mode: undefined, appId: '', rpId: '', signingKey: '' });
   assert.equal(unconfigured.config().mode, 'mock', 'without RP keys the screen starts on mock');
-  assert.deepEqual(unconfigured.config().modes.map((m) => m.configured), [true, false, false]);
+  assert.deepEqual(unconfigured.config().modes.map((m) => m.configured), [true, false, false, false]);
   assert.throws(() => unconfigured.challenge({ mode: 'sandbox' }), { code: 'WORLD_LOGIN_CONFIG' });
   const missing = await opened(t, { mode: undefined, action: '' });
   assert.equal(missing.config().modes.find((m) => m.mode === 'v3').configured, false, 'v3 needs a registered login action');
@@ -298,7 +299,7 @@ test('login and the wallet document check are configured independently: login ne
   for (const environment of ['staging', 'sandbox', 'production']) {
     process.env.WORLD_ENVIRONMENT = environment;
     const login = await opened(t, { mode: undefined, action: 'login' });
-    assert.deepEqual(login.config().modes.map((m) => m.environment), ['mock', 'sandbox', 'staging'], `login under WORLD_ENVIRONMENT=${environment}`);
+    assert.deepEqual(login.config().modes.map((m) => m.environment), ['mock', 'sandbox', 'staging', 'production'], `login under WORLD_ENVIRONMENT=${environment}`);
     assert.equal(login.challenge({ mode: 'sandbox' }).environment, 'sandbox');
     assert.equal(login.challenge({ mode: 'v3' }).environment, 'staging');
     assert.equal(new WorldIdVerifier({ mock: false, rpId: 'rp_test', appId: 'app_test', signingKeyHex: '12'.repeat(32) }).environment, environment);
@@ -324,4 +325,41 @@ test('a rejected login names what failed: the local check lists fields, World\'s
   const refused = await opened(t, { fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ success: false, code: 'invalid_action', detail: 'Action not found for this app' }) }) });
   const r = refused.challenge();
   await assert.rejects(refused.login({ challengeToken: r.challengeToken, proof: proofFor(r) }), (error) => error.code === 'WORLD_LOGIN_REJECTED' && /invalid_action · Action not found for this app/.test(error.message));
+});
+
+test('production login takes a real World App Orb proof, v3 or v4, under the action, and refuses a staging one', async (t) => {
+  const forwarded = [];
+  const login = await opened(t, { mode: undefined, action: 'login', fetchImpl: async (_url, init) => {
+    const body = JSON.parse(init.body); forwarded.push(body);
+    return { ok: true, json: async () => ({ success: true, environment: 'production', action: 'login', results: [{ identifier: body.responses[0].identifier, success: true }] }) };
+  } });
+  const c = login.challenge({ mode: 'production' });
+  assert.equal(c.environment, 'production');
+  assert.equal(c.action, 'login');
+  const v3 = { ...legacyProofFor(c), environment: 'production' };
+  const first = await login.login({ challengeToken: c.challengeToken, proof: v3 });
+  assert.equal(first.account.environment, 'production');
+  assert.equal(first.account.credential, 'orb');
+  assert.equal(forwarded[0].environment, 'production', 'forwarded unchanged');
+
+  const d = login.challenge({ mode: 'production' });
+  const v4 = { protocol_version: '4.0', environment: 'production', nonce: d.rp_context.nonce, action: 'login',
+    responses: [{ identifier: 'proof_of_human', issuer_schema_id: 1, signal_hash: hashSignal(d.signal), nullifier: v3.responses[0].nullifier, proof: ['0x1', '0x2', '0x3', '0x4', '0x5'], expires_at_min: 0 }] };
+  const second = await login.login({ challengeToken: d.challengeToken, proof: v4 });
+  assert.equal(second.account.id, first.account.id, 'the same Orb nullifier is the same account');
+
+  const e = login.challenge({ mode: 'production' });
+  await assert.rejects(login.login({ challengeToken: e.challengeToken, proof: legacyProofFor(e) }), (error) => error.code === 'INVALID_LOGIN_PROOF' && /production World App proof .*environment/.test(error.message));
+});
+
+test('the simulator\'s device-level identity signs in on v3; production still requires an Orb', async (t) => {
+  const login = await opened(t, { ...legacyOptions, mode: undefined });
+  const c = login.challenge({ mode: 'v3' });
+  const proof = legacyProofFor(c);
+  proof.responses[0].identifier = 'device';
+  assert.equal((await login.login({ challengeToken: c.challengeToken, proof })).account.environment, 'staging');
+  const p = login.challenge({ mode: 'production' });
+  const device = { ...legacyProofFor(p), environment: 'production' };
+  device.responses[0].identifier = 'device';
+  await assert.rejects(login.login({ challengeToken: p.challengeToken, proof: device }), (error) => /: identifier\./.test(error.message));
 });

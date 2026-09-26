@@ -3,7 +3,7 @@ import { safeOrigin } from "./world-diagnostics";
 export type WorldAccount = {
   id: string;
   provider: "world-id" | "world-id-mock";
-  environment: "sandbox" | "staging" | "mock";
+  environment: "sandbox" | "staging" | "production" | "mock";
   mock: boolean;
   credential: "proof_of_human" | "selfie" | "orb" | null;
   passportVerified: false;

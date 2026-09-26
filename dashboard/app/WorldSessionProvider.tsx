@@ -17,9 +17,14 @@ import "./world-login.css";
 import { observeWorldTransport, safeOrigin, worldDebugSummary } from "@/lib/world-diagnostics";
 
 const Context = createContext<WorldSession | null>(null);
-type LoginMode = "mock" | "sandbox" | "v3";
+type LoginMode = "mock" | "sandbox" | "v3" | "production";
 type ModeOption = { mode: LoginMode; environment: string; configured: boolean };
-const MODE_LABEL: Record<LoginMode, string> = { mock: "Mock", sandbox: "Sandbox", v3: "Simulator (v3)" };
+const MODE_LABEL: Record<LoginMode, string> = {
+  mock: "Mock",
+  sandbox: "Sandbox",
+  v3: "Simulator (v3)",
+  production: "World App (Orb)",
+};
 export function useWorldAccount() {
   return useContext(Context)?.account ?? null;
 }
@@ -194,7 +199,9 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
               ? "World ID · Mock session"
               : session.account.environment === "staging"
                 ? "World ID · Simulator"
-                : "World ID · Sandbox"}{" "}
+                : session.account.environment === "production"
+                  ? "World ID · Orb"
+                  : "World ID · Sandbox"}{" "}
             <span className="world-account-id">{session.account.id.slice(-8)}</span>
           </span>
           <button onClick={logout} disabled={busy}>
@@ -213,7 +220,7 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
           mirr0tech
         </span>
         <span className="world-sandbox">
-          {mode === "mock" ? "Mock login" : mode === "v3" ? "Simulator" : "Sandbox"}
+          {MODE_LABEL[mode]}
         </span>
       </header>
       <section className="world-hero">
@@ -267,6 +274,8 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
           )}
           {mode === "mock" ? (
             <p className="world-login-note">Continue with a placeholder account. No QR code required.</p>
+          ) : mode === "production" ? (
+            <p className="world-login-note">Scan with World App on your phone. Needs an Orb-verified World ID.</p>
           ) : (
             <a
               href={mode === "v3" ? "https://simulator.worldcoin.org/" : "https://sandbox.auth.world.org/"}

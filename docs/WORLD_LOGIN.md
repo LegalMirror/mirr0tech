@@ -1,6 +1,6 @@
 # World ID application login
 
-The login screen has a **Mock / Sandbox / Simulator (v3)** toggle. All three modes are always available; there is no mode variable. The screen starts on **Sandbox** when the RP keys are configured, otherwise on **Mock**. A mode whose keys are missing is shown disabled.
+The login screen has a **Mock / Sandbox / Simulator (v3) / World App (Orb)** toggle. **World App (Orb)** is a legacy Orb request with `environment: production` under the login action, scanned with a real World App; it accepts the v3 or v4 proof the app returns. The simulator (v3) also accepts device-level simulator identities, and needs a staging window open in the Developer Portal (`environment_not_allowed` otherwise). All three modes are always available; there is no mode variable. The screen starts on **Sandbox** when the RP keys are configured, otherwise on **Mock**. A mode whose keys are missing is shown disabled.
 
 - **Mock** creates a placeholder session at once (`POST /v1/auth/world/mock`): no QR code, no World credentials. The account is marked `mock: true`, with no credential and no passport. Anyone can use it, so it is a demo convenience, not a gate.
 - **Sandbox** and **Simulator (v3)** each ask the backend for a challenge in that mode (`POST /challenge { mode }`). The challenge records its mode, and the proof that answers it is judged by that mode, not by the screen's current choice.

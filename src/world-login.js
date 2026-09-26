@@ -11,8 +11,10 @@ const hex = (value) => typeof value === 'string' && /^0x[\da-f]{1,64}$/i.test(va
 const sameHex = (a, b) => hex(a) && hex(b) && BigInt(a) === BigInt(b);
 const sessionId = (value) => typeof value === 'string' && /^session_[\da-f]{128}$/i.test(value);
 const LOGIN_TTL = 24 * 3600;
-export const LOGIN_MODES = ['mock', 'sandbox', 'v3'];
+export const LOGIN_MODES = ['mock', 'sandbox', 'v3', 'production'];
+// v3 is the staging simulator; production is a real World App with an Orb credential. Both are uniqueness requests under an action.
 const environmentOf = (mode) => (mode === 'v3' ? 'staging' : mode);
+const UNIQUENESS = new Set(['v3', 'production']);
 
 /** Application login is independent of wallet-bound document verification. */
 export class WorldLogin {
@@ -49,7 +51,7 @@ export class WorldLogin {
   now() { return Math.floor(this.clock() / 1000); }
   close() { this.db.close(); }
   environment(mode = this.mode) { return environmentOf(mode); }
-  configured(mode = this.mode) { return mode === 'mock' || ((mode !== 'v3' || (typeof this.action === 'string' && this.action.trim().length > 0)) && /^app_[a-z0-9]+$/i.test(this.appId || '') && /^rp_[a-z0-9]+$/i.test(this.rpId || '') && /^(0x)?[\da-f]{64}$/i.test(this.signingKey || '')); }
+  configured(mode = this.mode) { return mode === 'mock' || ((!UNIQUENESS.has(mode) || (typeof this.action === 'string' && this.action.trim().length > 0)) && /^app_[a-z0-9]+$/i.test(this.appId || '') && /^rp_[a-z0-9]+$/i.test(this.rpId || '') && /^(0x)?[\da-f]{64}$/i.test(this.signingKey || '')); }
   /// `mode` is the screen's default; `modes` lists every choice with whether the backend can serve it.
   config() {
     return { configured: this.configured(), environment: environmentOf(this.mode), mode: this.mode,
@@ -81,13 +83,13 @@ export class WorldLogin {
     this.db.prepare('DELETE FROM world_sessions WHERE expires <= ?').run(this.now());
     ensure(this.db.prepare('SELECT count(*) AS n FROM login_challenges').get().n < 100, 429, 'LOGIN_LIMIT', 'Too many login attempts. Try again in five minutes.');
     // Only v3 uniqueness requests have an action; v4 session requests must omit it.
-    const signed = signRequest({ signingKeyHex: this.signingKey, ttl: 300, ...(mode === 'v3' ? { action: this.action } : {}) });
+    const signed = signRequest({ signingKeyHex: this.signingKey, ttl: 300, ...(UNIQUENESS.has(mode) ? { action: this.action } : {}) });
     const challengeToken = secret();
     // No 0x prefix: IDKit's hashSignal reads `0x`+hex as bytes and anything else as UTF-8 text; this signal is text on both sides.
     const signal = secret();
     this.db.prepare('INSERT INTO login_challenges (hash, nonce, signal, expires, expected_session, mode) VALUES (?, ?, ?, ?, ?, ?)').run(hash(challengeToken), signed.nonce, signal, signed.expiresAt, existingSessionId || null, mode);
     return { challengeToken, signal, app_id: this.appId, environment: environmentOf(mode),
-      ...(mode === 'v3' ? { action: this.action } : {}),
+      ...(UNIQUENESS.has(mode) ? { action: this.action } : {}),
       rp_context: { rp_id: this.rpId, nonce: signed.nonce, created_at: signed.createdAt, expires_at: signed.expiresAt, signature: signed.sig } };
   }
 
@@ -100,14 +102,18 @@ export class WorldLogin {
     const mode = challenge.mode;
     ensure(mode !== 'mock' && this.enabled(mode), 403, 'SANDBOX_LOGIN_DISABLED', 'Verified login is disabled.');
     const item = proof?.responses?.[0];
-    const legacy = mode === 'v3';
+    const legacy = UNIQUENESS.has(mode);
+    // A legacy Orb request answers with a v3 proof, or with a v4 proof when the user's credential is already v4.
+    const v4 = proof?.protocol_version === '4.0';
     // Each check is named, so a rejection says which part of the proof did not fit this login attempt.
     const checks = legacy ? {
-      protocol_version: proof?.protocol_version === '3.0', environment: proof?.environment === 'staging',
+      protocol_version: proof?.protocol_version === '3.0' || (mode === 'production' && v4), environment: proof?.environment === environmentOf(mode),
       nonce: proof?.nonce === challenge.nonce, action: proof?.action === this.action, no_session_id: !('session_id' in (proof ?? {})),
       one_response: Array.isArray(proof?.responses) && proof.responses.length === 1,
-      identifier: ['orb', 'proof_of_human'].includes(item?.identifier), nullifier: hex(item?.nullifier), merkle_root: hex(item?.merkle_root),
-      proof: typeof item?.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof),
+      // The simulator's identities are often device-level; a real World App login must be an Orb credential.
+      identifier: [...(mode === 'v3' ? ['device'] : []), 'orb', 'proof_of_human'].includes(item?.identifier), nullifier: hex(item?.nullifier),
+      merkle_root: v4 || hex(item?.merkle_root),
+      proof: v4 ? Array.isArray(item?.proof) && item.proof.length === 5 && item.proof.every(hex) : typeof item?.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof),
       signal_hash: sameHex(item?.signal_hash, hashSignal(challenge.signal)),
     } : {
       protocol_version: proof?.protocol_version === '4.0', environment: proof?.environment === 'sandbox', nonce: proof?.nonce === challenge.nonce,
@@ -122,7 +128,7 @@ export class WorldLogin {
     };
     const failed = Object.keys(checks).filter((name) => !checks[name]);
     if (failed.length) console.warn('[World ID] login proof rejected locally', { requestId, mode, failed, identifier: typeof item?.identifier === 'string' ? item.identifier.slice(0, 32) : typeof item?.identifier, protocol: proof?.protocol_version, environment: proof?.environment });
-    ensure(!failed.length, 400, 'INVALID_LOGIN_PROOF', `The ${legacy ? 'staging v3' : 'sandbox v4'} proof did not match this login attempt: ${failed.join(', ')}.`);
+    ensure(!failed.length, 400, 'INVALID_LOGIN_PROOF', `The ${{ v3: 'staging v3', production: 'production World App', sandbox: 'sandbox v4' }[mode]} proof did not match this login attempt: ${failed.join(', ')}.`);
     let response, result;
     const started = Date.now();
     const diagnosticCode = (value) => typeof value === 'string' && /^[a-zA-Z_]{1,64}$/.test(value) ? value : undefined;
@@ -156,10 +162,10 @@ export class WorldLogin {
       && result.results[0]?.identifier === item.identifier && result.results[0].success === true && !result.results[0].code,
     400, 'WORLD_LOGIN_REJECTED', `World ID did not verify this login proof${reason ? ` (${reason})` : ''}. Start again.`);
     ensure(challenge.expires > this.now(), 400, 'LOGIN_CHALLENGE', 'Login expired. Start again.');
-    const proofHash = legacy ? hash(`v3:${this.rpId}:${this.action}:${item.proof.toLowerCase()}`) : hash(`${this.rpId}:${item.session_nullifier.map((value) => BigInt(value).toString(16)).join(':')}`);
+    const proofHash = legacy ? hash(`${mode}:${this.rpId}:${this.action}:${JSON.stringify(item.proof).toLowerCase()}`) : hash(`${this.rpId}:${item.session_nullifier.map((value) => BigInt(value).toString(16)).join(':')}`);
     // A v3 nullifier identifies the account and legitimately repeats on each fresh login.
     const subject = legacy
-      ? hash(JSON.stringify(['staging', 'v3', this.appId, this.rpId, this.action, BigInt(item.nullifier).toString(16)]))
+      ? hash(JSON.stringify([environmentOf(mode), mode, this.appId, this.rpId, this.action, BigInt(item.nullifier).toString(16)]))
       : hash(`sandbox:${this.rpId}:${proof.session_id}`);
     const accessToken = `world_${secret()}`;
     const expiresAt = this.now() + LOGIN_TTL;
@@ -176,7 +182,7 @@ export class WorldLogin {
   }
   context(id, expiresAt, mode = 'sandbox') {
     const mock = mode === 'mock';
-    return { account: { id, provider: mock ? 'world-id-mock' : 'world-id', environment: mode === 'v3' ? 'staging' : mode, mock, credential: mock ? null : mode === 'v3' ? 'orb' : 'selfie', passportVerified: false }, expiresAt };
+    return { account: { id, provider: mock ? 'world-id-mock' : 'world-id', environment: environmentOf(mode), mock, credential: mock ? null : UNIQUENESS.has(mode) ? 'orb' : 'selfie', passportVerified: false }, expiresAt };
   }
   authenticate(token) {
     const row = typeof token === 'string' && /^world_[\da-f]{64}$/.test(token)

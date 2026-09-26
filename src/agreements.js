@@ -12,7 +12,7 @@ import { compilePolicy } from './policy/compile.js';
 import { cashierFixture } from './onchain/cashier.js';
 import { ACTIONS, validateAst } from './policy/schema.js';
 import { CREDENTIALS, DEFAULT_ACTION } from './worldid.js';
-import { extractWorkspace } from './openai-extract.js';
+import { extractWorkspace, GENERATIONS } from './openai-extract.js';
 import { isLegalAst, legalAstGraph } from './legal/ast.js';
 import { PROFILES, exportCompiled } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
@@ -136,7 +136,7 @@ export class Agreements {
   async create({ name, documents, profile = 'rwa-secondary', config = null, generation = undefined }) {
     const spec = PROFILES.find((entry) => entry.profile === profile);
     ensure(spec, 400, 'UNKNOWN_PROFILE', `Unknown profile ${profile}`);
-    ensure(generation === undefined || ['demo', 'openai'].includes(generation), 400, 'INVALID_BODY', 'generation must be demo or openai');
+    ensure(generation === undefined || GENERATIONS.includes(generation), 400, 'INVALID_BODY', `generation must be ${GENERATIONS.join(', ')}`);
     let document;
     try { document = bundleDocuments(documents.map((part) => documentFrom(part.name, part.text))); } catch (error) { throw new AppError(400, 'INVALID_DOCUMENT', error.message); }
     let deploymentConfig = config ?? JSON.parse(await readFile(spec.config, 'utf8'));
@@ -149,7 +149,7 @@ export class Agreements {
       id: `agr_${randomBytes(6).toString('hex')}`, name, profile, status: 'uploaded', createdAt: now(), updatedAt: now(),
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       documents, config: deploymentConfig, ...(generation ? { generation } : {}),
-      extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, history: [],
+      extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, progress: null, history: [],
     };
     if (this.uploadsPath) {
       const directory = join(this.uploadsPath, record.id);
@@ -179,7 +179,10 @@ export class Agreements {
         await this.persist();
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
-        const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation });
+        // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
+        const onProgress = (state) => { record.progress = { job: state.job_id, status: state.status, at: now() }; };
+        const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation, onProgress, config: record.config });
+        record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
         if (isLegalAst(envelope.ast)) {
           this.transition(record, 'analyzed');
@@ -188,7 +191,7 @@ export class Agreements {
         const exported = this.export(id);
         this.transition(record, 'compiled', { policyHash: exported.policyHash, clauseTableHash: exported.clauseTableHash, coverage: { total: exported.coverage.total, counts: exported.coverage.counts, rules: exported.coverage.rules, terms: exported.coverage.terms } });
       } catch (error) {
-        this.transition(record, 'failed', { error: error.message });
+        this.transition(record, 'failed', { error: error.message, progress: null });
       } finally {
         try { await this.persist(); } finally { this.jobs.delete(id); }
       }

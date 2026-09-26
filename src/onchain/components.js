@@ -97,12 +97,21 @@ export const componentById = (id) => {
 
 // Links the AST against the profile's components. Every rule needs an enforcing venue component for
 // its action and every term needs a component that consumes it; otherwise compilation fails.
-export function resolveComponents(ast, config) {
+/// The components a deployment config links against: the profile's list, with the cashier in place of the plain gate when enabled.
+export function profileComponents(config) {
   const profile = config.profile ?? 'custodial-rwa';
   const base = PROFILES[profile];
   const ids = config.cashier?.enabled && base ? [...base.filter((id) => id !== 'v4-transfer-gate'), 'v4-nav-cashier'] : base;
   if (!ids) throw new Error(`Unknown deployment profile: ${profile}`);
-  const components = ids.map(componentById);
+  return ids.map(componentById);
+}
+
+/// Which of `actions` a venue component of this config can enforce.
+export const enforceableActions = (config, actions) => actions.filter((action) => profileComponents(config).some((component) => component.kind === 'venue' && component.coversRule({ action, effect: 'require', condition: { type: 'fact', name: 'kycApproved' } }, config)));
+
+export function resolveComponents(ast, config) {
+  const profile = config.profile ?? 'custodial-rwa';
+  const components = profileComponents(config);
   const rules = {};
   for (const rule of ast.rules) {
     const enforcers = components.filter((component) => component.kind === 'venue' && component.coversRule(rule, config)).map((component) => component.id);

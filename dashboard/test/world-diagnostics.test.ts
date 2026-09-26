@@ -53,3 +53,12 @@ it("records transport status and failures without URLs containing keys, headers 
   }
   expect(browser.fetch).toBe(original);
 });
+
+it("keeps the World App's error fields from its reply and never proof material", () => {
+  {
+    const base = { version: 1 as const, package_version: "4.3.0", transport: "bridge" as const, generated_at: "t" };
+    expect(worldDebugSummary({ ...base, response_payload: '{"error_code":"credential_unavailable","status":"error"}' }).appError).toEqual({ error_code: "credential_unavailable", status: "error" });
+    expect(worldDebugSummary({ ...base, response_payload: { responses: [{ proof: ["0x1"] }], error: "x" } }).appError).toBeUndefined();
+    expect(worldDebugSummary({ ...base, response_payload: "not json" }).appError).toBeUndefined();
+  }
+});

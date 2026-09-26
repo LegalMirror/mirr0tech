@@ -4,6 +4,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { hashSignal } from '@worldcoin/idkit-core/hashing';
+import { stagingHeaders } from './world-login.js';
 
 export const WORLD_VERIFY_URL = 'https://developer.world.org/api/v4/verify';
 export const DEFAULT_ACTION = 'onboard-investor';
@@ -108,6 +109,7 @@ export class WorldIdVerifier {
     }
     if (response.identifier !== IDENTIFIERS[this.credential]) throw new WorldIdError(400, 'WRONG_CREDENTIAL', 'Proof identifier does not match the requested credential');
     if (!address(wallet)) throw invalid('A target wallet address is required for verification');
+    // A wallet is `0x`+hex, so IDKit hashes it as its 20 bytes, not its 42 characters; only the SDK's own hashSignal matches.
     if (canonical(response.signal_hash) !== canonical(hashSignal(wallet.toLowerCase()))) throw invalid('The proof is bound to another wallet');
     if (payload.environment !== this.environment) throw invalid('Proof environment does not match this deployment');
     if (this.credential === 'selfie') {
@@ -127,7 +129,7 @@ export class WorldIdVerifier {
     try {
       ({ http, body } = await Promise.race([
         (async () => {
-          const http = await this.fetchImpl(`${this.url.replace(/\/+$/, '')}/${this.rpId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: requestBody, signal: controller.signal, redirect: 'error' });
+          const http = await this.fetchImpl(`${this.url.replace(/\/+$/, '')}/${this.rpId}`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...stagingHeaders(this.environment) }, body: requestBody, signal: controller.signal, redirect: 'error' });
           if (!http || typeof http.ok !== 'boolean' || typeof http.json !== 'function') throw badUpstream();
           const body = await http.json().catch(() => { throw badUpstream(); });
           return { http, body };

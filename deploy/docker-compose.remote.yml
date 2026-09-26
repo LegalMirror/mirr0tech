@@ -32,10 +32,11 @@ services:
       WORLD_RP_SIGNING_KEY: ${WORLD_RP_SIGNING_KEY:?Set the RP signing key as a runtime secret}
       WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
       WORLD_CREDENTIAL: document
-      WORLD_ENVIRONMENT: sandbox
-      WORLD_LOGIN_MODE: ${WORLD_LOGIN_MODE:-mock}
+      WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
+      # Staging/sandbox verification window token from the Developer Portal (set_world_id_staging_verification).
+      WORLD_STAGING_VERIFICATION_TOKEN: ${WORLD_STAGING_VERIFICATION_TOKEN:-}
       # Operator uploads use Astra; public demos remain explicit offline fixtures.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-astra}

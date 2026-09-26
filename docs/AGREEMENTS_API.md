@@ -90,6 +90,7 @@ In-memory map, mirrored to `${DATA_DIR:-generated}/agreements-<chainId>.json` af
   "updatedAt": "2026-09-26T04:13:40.000Z",
   "source": { "name": "ea026411904ex10-9.htm", "sha256": "9c1e…", "textSha256": "b7a0…" },
   "extraction": { "provider": "openai", "model": "gpt-5.4-mini", "reasoningEffort": "none", "analysisMode": "light", "responseId": "resp_…" },
+  "progress": null,
   "verification": { "confidence": { "overall": 0.93, "verified": 22, "total": 25, "counts": { "verified": 22, "contested": 2, "unverified": 1, "wrong": 0, "unknown": 0 } }, "contested": 2 },
   "policyHash": "0x8d2f…",
   "clauseTableHash": "0x41aa…",
@@ -104,6 +105,8 @@ In-memory map, mirrored to `${DATA_DIR:-generated}/agreements-<chainId>.json` af
   ]
 }
 ```
+
+`progress` while `extracting` on the live engine: `{ job, status, at }` with the orchestrator's status line (`running: round 2 — Starting`). `extraction.demoted` lists what the engine read but this deployment cannot enforce (rules for actions no venue covers, terms no component consumes); those entries are appended to `unresolved` instead of failing the compile.
 
 `deployment` once deployed: `{ chainId, policyHash, oracle, token, hook, hookSalt, poolManager, poolKey: { currency0, currency1, fee, tickSpacing, hooks }, poolId, txs: { oracle, token, hook, configure, pool }, deployedAt }`. The token's on-chain `policyHash()` equals the record's; the hook address carries the mined flag bits.
 

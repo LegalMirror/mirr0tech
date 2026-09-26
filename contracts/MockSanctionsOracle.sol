@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 /// @notice Stand-in for the Chainalysis sanctions oracle the agreement names as definitive.

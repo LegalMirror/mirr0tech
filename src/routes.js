@@ -6,7 +6,7 @@ import { ensure, AppError } from './errors.js';
 import { openapiDocument, swaggerHtml } from './openapi.js';
 import { SIGNATURE_HEADER, verifySignature, paymentFrom } from './payments.js';
 import { compilerVersions } from './onchain/solc.js';
-import { extractWorkspace, extractDemo, OPENAI_MODEL } from './openai-extract.js';
+import { extractWorkspace, extractDemo, OPENAI_MODEL, GENERATIONS } from './openai-extract.js';
 import { PROFILES, exportProfile } from '../scripts/export-ui.js';
 import { auditEvents } from './onchain/audit-events.js';
 import { PoolSwaps } from './onchain/pool-swaps.js';
@@ -151,8 +151,8 @@ export function createWorkspaceApp(agreements, { apiKey = process.env.OPENAI_API
   app.use(express.json({ limit: '4mb' }));
   app.post('/v1/agreements', (req, res, next) => {
     const body = req.body ?? {};
-    if (!['demo', 'openai'].includes(body.generation) || !Array.isArray(body.documents) || !body.documents.length || body.documents.length > 20)
-      return res.status(400).json({ error: { code: 'INVALID_UPLOAD', message: 'Choose Demo or Upload files, with 1–20 documents.' } });
+    if (!GENERATIONS.includes(body.generation) || !Array.isArray(body.documents) || !body.documents.length || body.documents.length > 20)
+      return res.status(400).json({ error: { code: 'INVALID_UPLOAD', message: 'Choose a generation (demo, openai or noolog) and 1–20 documents.' } });
     next();
   });
   app.use('/v1', agreementRoutes(agreements, async () => ({
@@ -179,7 +179,7 @@ export function worldLoginRoutes(login) {
     res.on('finish', () => console.info('[World ID] API request', {
       requestId: req.worldRequestId, method: req.method,
       endpoint,
-      mode: login.mode, status: res.statusCode, durationMs: Date.now() - started,
+      mode: req.body?.mode ?? login.mode, status: res.statusCode, durationMs: Date.now() - started,
       errorCode: res.locals.worldErrorCode,
     }));
     next();

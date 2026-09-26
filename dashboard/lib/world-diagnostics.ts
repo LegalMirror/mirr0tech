@@ -20,7 +20,27 @@ export function worldDebugSummary(report?: IDKitDebugReport) {
     generatedAt: label(report?.generated_at),
     requestCreated: !!report?.request_payload,
     responseReceived: !!report?.response_payload,
+    appError: appError(report?.response_payload),
   };
+}
+
+/** The World App's own reason for a refused request. Only error fields are kept, never proof material. */
+function appError(payload: unknown): Record<string, string> | undefined {
+  let value = payload;
+  if (typeof value === "string") {
+    try {
+      value = JSON.parse(value);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!value || typeof value !== "object" || "responses" in value || "proof" in value) return undefined;
+  const picked = Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .filter(([key, field]) => /error|code|reason|message|detail|status/i.test(key) && typeof field === "string")
+      .map(([key, field]) => [key, (field as string).slice(0, 200)])
+  );
+  return Object.keys(picked).length ? picked : undefined;
 }
 
 /** Observe only World transport and WASM fetches while the login widget is mounted. */

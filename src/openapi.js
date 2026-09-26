@@ -35,6 +35,7 @@ export const schemas = {
   Agreement: obj({
     id: str('agr_<12 hex>'), name: str('Display name'), profile: str('Deployment profile'),
     status: str('uploaded | extracting | verified | analyzed | compiled | deploying | deployed | failed'),
+    progress: { type: ['object', 'null'], description: 'While extracting on the live orchestrator: the job and its status line', properties: { job: str('Deliberation job id'), status: str('e.g. running: round 2 — Starting'), at: str('ISO time') } },
     createdAt: str('ISO time'), updatedAt: str('ISO time'),
     source: obj({ name: str('Document name'), sha256: str('Bytes hash'), textSha256: str('Normalized text hash') }),
     extraction: { type: ['object', 'null'], properties: { provider: str('openai | demo'), model: str('Model id'), responseId: str('OpenAI response id'), analysisMode: str('light'), compilerMapping: { type: 'object', description: 'Explicit MVP mapping identifier, source hashes and scope; absent for analysis-only uploads' } } },

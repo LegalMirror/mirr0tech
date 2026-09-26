@@ -17,6 +17,14 @@ import "./world-login.css";
 import { observeWorldTransport, safeOrigin, worldDebugSummary } from "@/lib/world-diagnostics";
 
 const Context = createContext<WorldSession | null>(null);
+type LoginMode = "mock" | "sandbox" | "v3" | "production";
+type ModeOption = { mode: LoginMode; environment: string; configured: boolean };
+const MODE_LABEL: Record<LoginMode, string> = {
+  mock: "Mock",
+  sandbox: "Sandbox",
+  v3: "Simulator (v3)",
+  production: "World App (Orb)",
+};
 export function useWorldAccount() {
   return useContext(Context)?.account ?? null;
 }
@@ -28,7 +36,8 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [configured, setConfigured] = useState<boolean | null>(null);
-  const [mode, setMode] = useState<"mock" | "sandbox" | "v3">("mock");
+  const [mode, setMode] = useState<LoginMode>("mock");
+  const [modes, setModes] = useState<ModeOption[]>([]);
   const [challenge, setChallenge] = useState<LoginChallenge | null>(null);
   const [existingSession, setExistingSession] = useState<`session_${string}` | undefined>();
   const transport = useRef<ReturnType<typeof observeWorldTransport> | null>(null);
@@ -73,13 +82,14 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
     }
     (async () => {
       try {
-        const config = await worldRequest<{ configured: boolean; mode: "mock" | "sandbox" | "v3" }>(
+        const config = await worldRequest<{ configured: boolean; mode: LoginMode; modes?: ModeOption[] }>(
           url,
           "config"
         );
         if (!active) return;
         setConfigured(config.configured);
         setMode(config.mode);
+        setModes(config.modes ?? []);
         if (restoreWorldToken(url)) {
           const restored = await worldRequest<WorldSession>(url, "session");
           if (!active) return;
@@ -128,6 +138,7 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
       setChallenge(
         await worldRequest<LoginChallenge>(url, "challenge", {
           existingSessionId: mode === "sandbox" ? existingSession : undefined,
+          mode,
         })
       );
     } catch (cause) {
@@ -188,7 +199,9 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
               ? "World ID · Mock session"
               : session.account.environment === "staging"
                 ? "World ID · Simulator"
-                : "World ID · Sandbox"}{" "}
+                : session.account.environment === "production"
+                  ? "World ID · Orb"
+                  : "World ID · Sandbox"}{" "}
             <span className="world-account-id">{session.account.id.slice(-8)}</span>
           </span>
           <button onClick={logout} disabled={busy}>
@@ -207,7 +220,7 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
           mirr0tech
         </span>
         <span className="world-sandbox">
-          {mode === "mock" ? "Mock login" : mode === "v3" ? "Simulator" : "Sandbox"}
+          {MODE_LABEL[mode]}
         </span>
       </header>
       <section className="world-hero">
@@ -223,6 +236,28 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
             ◎
           </span>
           <h2>Start tokenizing</h2>
+          {modes.length > 1 && (
+            <div className="world-mode-toggle" role="radiogroup" aria-label="Login mode">
+              {modes.map((option) => (
+                <button
+                  key={option.mode}
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === option.mode}
+                  className={mode === option.mode ? "on" : ""}
+                  disabled={busy || !option.configured}
+                  title={option.configured ? option.environment : "Not configured on the backend"}
+                  onClick={() => {
+                    setMode(option.mode);
+                    setConfigured(option.configured);
+                    setError("");
+                  }}
+                >
+                  {MODE_LABEL[option.mode]}
+                </button>
+              ))}
+            </div>
+          )}
           <button className="world-login-button" onClick={begin} disabled={busy || configured === false}>
             {busy ? "Preparing login…" : "Sign in with World ID"}
           </button>
@@ -239,6 +274,8 @@ export function WorldSessionProvider({ children }: { children: ReactNode }) {
           )}
           {mode === "mock" ? (
             <p className="world-login-note">Continue with a placeholder account. No QR code required.</p>
+          ) : mode === "production" ? (
+            <p className="world-login-note">Scan with World App on your phone. Needs an Orb-verified World ID.</p>
           ) : (
             <a
               href={mode === "v3" ? "https://simulator.worldcoin.org/" : "https://sandbox.auth.world.org/"}

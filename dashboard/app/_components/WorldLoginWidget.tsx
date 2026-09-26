@@ -14,7 +14,7 @@ export type LoginChallenge = {
   signal: string;
   app_id: `app_${string}`;
   rp_context: RpContext;
-} & ({ environment: "staging"; action: string } | { environment: "sandbox" });
+} & ({ environment: "staging" | "production"; action: string } | { environment: "sandbox" });
 
 export function WorldLoginWidget({
   challenge,
@@ -40,10 +40,11 @@ export function WorldLoginWidget({
     onSuccess: onClose,
     onError,
   };
-  return challenge.environment === "staging" ? (
+  // Staging is the simulator; production is a real World App. Both are legacy Orb requests under an action.
+  return challenge.environment !== "sandbox" ? (
     <RequestWidget
       {...shared}
-      environment="staging"
+      environment={challenge.environment}
       action={challenge.action}
       allow_legacy_proofs={true}
       preset={orbLegacy({ signal: challenge.signal })}
@@ -52,7 +53,8 @@ export function WorldLoginWidget({
     <SessionWidget
       {...shared}
       environment="sandbox"
-      constraints={{ type: "proof_of_human", signal: challenge.signal }}
+      // Selfie Check is the credential World documents for sandbox; the React session widget takes it as a constraint.
+      constraints={{ type: "selfie", signal: challenge.signal }}
       existing_session_id={existingSession}
     />
   );

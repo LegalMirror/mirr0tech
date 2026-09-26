@@ -140,3 +140,29 @@ test('OpenAI retries invalid references once using only the approved source inpu
   } }), /Dangling clause relationship/);
   assert.equal(calls, 2, 'invalid output never loops indefinitely');
 });
+
+test('noolog is a generation: accepted per upload, the default under EXTRACTOR=noolog, and routed to the live deliberation', async () => {
+  const { GENERATIONS, defaultGeneration, extractWorkspace } = await import('../src/openai-extract.js');
+  const { Agreements } = await import('../src/agreements.js');
+  const { readFile } = await import('node:fs/promises');
+  assert.deepEqual(GENERATIONS, ['demo', 'openai', 'noolog']);
+  const previous = { EXTRACTOR: process.env.EXTRACTOR, NOOLOG_API_KEY: process.env.NOOLOG_API_KEY };
+  try {
+    delete process.env.EXTRACTOR;
+    assert.equal(defaultGeneration(), 'openai');
+    process.env.EXTRACTOR = 'noolog';
+    assert.equal(defaultGeneration(), 'noolog');
+    delete process.env.NOOLOG_API_KEY;
+    const document = { name: 'a.md', text: 'x', sha256: '00', textSha256: '00' };
+    await assert.rejects(extractWorkspace({ generation: 'noolog', document, profile: 'rwa-secondary' }), /NOOLOG_API_KEY/, 'the live path, not OpenAI');
+  } finally {
+    for (const [key, value] of Object.entries(previous)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+  const seen = [];
+  const agreements = new Agreements({ extract: async (input) => { seen.push(input.generation); throw new Error('stop'); } });
+  const html = await readFile('test/human_contracts/ea026411904ex10-9.htm', 'utf8');
+  await agreements.create({ name: 'x', documents: [{ name: 'ea026411904ex10-9.htm', text: html }], generation: 'noolog' });
+  await agreements.settled();
+  assert.deepEqual(seen, ['noolog']);
+  await assert.rejects(agreements.create({ name: 'x', documents: [{ name: 'a.md', text: 'x' }], generation: 'llama' }), /generation must be demo, openai, noolog/);
+});

@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { ensure, AppError } from './errors.js';
 import { venueRoutes } from './venues-api.js';
 import { dashboardRoutes } from './dashboard-api.js';
+import { agreementRoutes, stackStatus } from './agreements-api.js';
 
 function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
@@ -12,7 +13,7 @@ function bodyFields(body, required, optional = []) {
 const VIEWER_POSTS = new Set(['/stack/credit/buyback/quote']);
 
 /// `viewerKey`, when set, opens the GET routes and quotes only: a dashboard build can carry it without carrying the operator key.
-export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null) {
+export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
   if (viewerKey && (viewerKey.length < 24 || viewerKey === apiKey)) throw new Error('Set VIEWER_KEY to at least 24 characters, different from API_KEY');
   const app = express();
@@ -35,8 +36,11 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
     if (presents(apiKey) || (viewerKey && readOnly && presents(viewerKey))) return next();
     next(new AppError(401, 'UNAUTHORIZED', 'A valid operator bearer token is required'));
   });
+  // An upload is a whole agreement; everything else is small.
+  if (agreements) app.use('/v1/agreements', express.json({ limit: '4mb' }));
   app.use(express.json({ limit: '32kb' }));
   if (venues) app.use('/v1/stack', venueRoutes(venues));
+  if (agreements) app.use('/v1', agreementRoutes(agreements, () => stackStatus(venues)));
   // The dashboard's routes take the place of the custodial ledger's when only the stack is served.
   if (venues && policyData && !service) app.use('/v1', dashboardRoutes(venues, policyData));
   if (service) {
@@ -75,6 +79,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
   app.use((_req, _res, next) => next(new AppError(404, 'NOT_FOUND', 'Endpoint not found')));
   app.use((error, _req, res, _next) => {
     const status = error.status >= 400 && error.status < 600 ? error.status : 500;
+    if (status === 500) console.error(error);
     res.status(status).json({ error: {
       code: error.code ?? (status === 400 ? 'INVALID_JSON' : status === 413 ? 'BODY_TOO_LARGE' : 'INTERNAL_ERROR'),
       message: status === 500 ? 'Internal server error' : error.message,

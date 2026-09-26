@@ -5,7 +5,8 @@ import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet } from 'ethers';
-import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
+import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/deploy.js';
+import { Agreements } from '../src/agreements.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
@@ -40,6 +41,10 @@ const venues = await new VenueService({ provider, signer, record, multibaas, wor
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
-const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null).listen(Number(process.env.PORT ?? 3000), host, () =>
+const agreements = await new Agreements({
+  path: `${dataDir}/agreements-${record.chainId}.json`, log: (line) => console.log(`agreement ${line}`),
+  deployer: ({ sources }) => deployFund(signer, { record, sources, log: console.log }),
+}).init();
+const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null, agreements).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

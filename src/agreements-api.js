@@ -1,0 +1,38 @@
+// The agreement lifecycle over HTTP: upload, watch it generate and compile, see the tree, deploy.
+import { Router } from 'express';
+import { ensure } from './errors.js';
+import { MODEL } from './noolog/extract.js';
+import { compilerVersions } from './solc.js';
+
+const NOOLOG_URL = 'https://api.peeramid.xyz';
+
+/// The three health lights: the model behind extraction, the compilers, the chain this gateway signs on.
+export async function stackStatus(venues) {
+  return {
+    model: { provider: 'noolog', mode: process.env.NOOLOG_API_KEY ? 'live' : 'mock', url: process.env.NOOLOG_URL ?? NOOLOG_URL, model: MODEL },
+    compiler: { solidity: await compilerVersions() },
+    chain: venues ? { chainId: venues.record.chainId, deployer: venues.record.deployer, attestor: venues.record.attestor, poolManager: venues.record.rwa.poolManager } : null,
+  };
+}
+
+const isPart = (part) => part && typeof part === 'object' && typeof part.name === 'string' && typeof part.text === 'string' && part.text.length > 0;
+
+export function agreementRoutes(agreements, status) {
+  const router = Router();
+  const wrap = (code, handler) => (req, res, next) => Promise.resolve().then(() => handler(req)).then((value) => res.status(code).json(value)).catch(next);
+  router.get('/status', wrap(200, () => status()));
+  router.get('/agreements', wrap(200, () => agreements.list()));
+  router.post('/agreements', wrap(201, (req) => {
+    const body = req.body ?? {};
+    // The short form is one file: `filename` says what kind (.md, .txt, .htm), plain text when absent.
+    const documents = body.documents ?? (typeof body.text === 'string' ? [{ name: body.filename ?? `${body.name}.txt`, text: body.text }] : null);
+    ensure(typeof body.name === 'string' && body.name.trim() && Array.isArray(documents) && documents.length && documents.every(isPart), 400, 'INVALID_BODY', 'Expected fields: name, documents [{ name, text }] (or name, text, filename)');
+    ensure(body.config === undefined || (body.config && typeof body.config === 'object'), 400, 'INVALID_BODY', 'config must be an object');
+    return agreements.create({ name: body.name.trim(), documents, profile: body.profile, config: body.config ?? null });
+  }));
+  router.get('/agreements/:id', wrap(200, (req) => agreements.get(req.params.id)));
+  router.get('/agreements/:id/ast', wrap(200, (req) => agreements.ast(req.params.id)));
+  router.post('/agreements/:id/regenerate', wrap(202, (req) => agreements.regenerate(req.params.id)));
+  router.post('/agreements/:id/deploy', wrap(202, (req) => agreements.deploy(req.params.id)));
+  return router;
+}

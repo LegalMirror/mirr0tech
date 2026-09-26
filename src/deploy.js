@@ -2,7 +2,7 @@
 // canonical venue contracts are supplied. One attestor and one sanctions oracle serve both
 // policies; everything policy-bound is deployed once per compiled profile.
 import { readFile } from 'node:fs/promises';
-import { AbiCoder, Contract, ContractFactory, concat, id } from 'ethers';
+import { AbiCoder, Contract, ContractFactory, concat, id, keccak256 } from 'ethers';
 import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER } from './policy/hookAddress.js';
 
 export const ANVIL_CHAIN_ID = 31337n;
@@ -86,4 +86,40 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
     record, policies: { rwa: rwa.policy, credit: credit.policy }, clauseTables: { rwa: rwa.clauseTable, credit: credit.clauseTable },
     contracts: { attestor, sanctions, usdc, rwaOracle, token, poolManager, v4Router, hook, creditOracle, roleProvider, market, aqua, swapRouter },
   };
+}
+
+const POOL_MANAGER_ABI = ['function initialize((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) returns (int24)'];
+const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
+
+/// Act 1 for one more agreement on a running stack: its own oracle, token and hook (compiled now,
+/// from the generated Solidity), and a policy-managed pool against the stack's mock USD on the shared
+/// PoolManager. Facts and sanctions stay on the stack's attestor and oracle.
+export async function deployFund(signer, { record, sources, log = () => {} }) {
+  const { compileBundle } = await import('./solc.js');
+  const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy, 'generated/CompiledMirrorToken.sol': sources.token };
+  const core = await compileBundle('core', [['contracts/PolicyOracle.sol', 'PolicyOracle'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken']], { overrides });
+  const v4 = await compileBundle('uniswap-v4', [['contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook']], { overrides });
+  const deployer = await signer.getAddress();
+  const txs = {};
+  const deploy = async (artifact, label, ...args) => {
+    const contract = await new ContractFactory(artifact.abi, artifact.bytecode, signer).deploy(...args);
+    await contract.waitForDeployment();
+    txs[label] = contract.deploymentTransaction().hash;
+    log(`${label.padEnd(24)} ${await contract.getAddress()}`);
+    return contract;
+  };
+  const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
+  const token = await deploy(core.CompiledMirrorToken, 'token', deployer, deployer);
+  const [oracleAddress, tokenAddress] = await Promise.all([oracle.getAddress(), token.getAddress()]);
+  const initCode = concat([v4.MirrorPolicyHook.bytecode, AbiCoder.defaultAbiCoder().encode(['address', 'address', 'address', 'address'], [record.rwa.poolManager, oracleAddress, record.rwa.router, tokenAddress])]);
+  const mined = mineHookAddress(initCode);
+  txs.hook = (await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait()).hash;
+  log(`${'hook'.padEnd(24)} ${mined.address} (${mined.attempts} tries)`);
+  txs.configure = (await (await token.configureSecondary(oracleAddress, mined.address)).wait()).hash;
+  const [currency0, currency1] = BigInt(tokenAddress) < BigInt(record.usdc) ? [tokenAddress, record.usdc] : [record.usdc, tokenAddress];
+  const poolKey = { currency0, currency1, fee: 3000, tickSpacing: 60, hooks: mined.address };
+  const poolManager = new Contract(record.rwa.poolManager, POOL_MANAGER_ABI, signer);
+  txs.pool = (await (await poolManager.initialize(poolKey, SQRT_PRICE_1_1)).wait()).hash;
+  const poolId = keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,address,uint24,int24,address)'], [[currency0, currency1, 3000, 60, mined.address]]));
+  return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, hook: mined.address, hookSalt: mined.salt, poolManager: record.rwa.poolManager, poolKey, poolId, txs, deployedAt: new Date().toISOString() };
 }

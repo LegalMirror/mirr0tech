@@ -188,3 +188,21 @@ describe("workbench actions while pending", () => {
     expect(faucet).not.toContain("wb-spinner");
   });
 });
+
+describe("public demo minting", () => {
+  it("a demo session may mint but the pool-seeding card says liquidity needs an operator session", async () => {
+    const { MintView } = await import("@/app/_workbench/MintView");
+    const record = {
+      id: "agr_demo00000001",
+      status: "deployed",
+      profile: "rwa-secondary",
+      policyHash: "0xabc",
+      deployment: { chainId: 11155111, token: "0x5B29d2549bC93C719f982DcF604a2875cF77b684", policyHash: "0xabc" },
+      history: [],
+    } as never;
+    const status = { chain: { chainId: 11155111, deployer: "0x8583AD4a0F59Ba45C7E201318C6F774F31f7bbC8" } } as never;
+    const html = renderToStaticMarkup(createElement(MintView, { record, client: {} as never, sample: false, writable: true, status, demo: true }));
+    expect(html).not.toContain("Minting requires an authorized");
+    expect(html).toContain("Pool liquidity is managed from an operator session");
+  });
+});

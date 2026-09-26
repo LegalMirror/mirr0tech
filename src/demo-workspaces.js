@@ -20,6 +20,7 @@ const DEFAULT_LIMITS = Object.freeze({
   maxRequestBytes: 4 * 1024 * 1024, maxParts: 4,
 });
 const PUBLIC_PROFILES = ['rwa-secondary', 'custodial-rwa'];
+const PUBLIC_MINT_CAP = 10000;
 const digest = (value) => createHash('sha256').update(value).digest('hex');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const integer = (value) => Number.isSafeInteger(value) && value >= 0;
@@ -199,6 +200,13 @@ export class DemoWorkspaces {
     });
   }
 
+  mintOperation(token, id, requestId) {
+    return this.run(() => {
+      this.owned(token, id);
+      return safeRecord(this.agreements.mintOperation(id, requestId));
+    });
+  }
+
   mockOnly() {
     unavailable([extractWorkspace, extractDemo].includes(this.agreements.extract), 'Public demos only support the bundled deterministic fixtures; custom extractors require the operator API.');
   }
@@ -282,7 +290,11 @@ export class DemoWorkspaces {
   mutate(token, id, method, body) {
     return this.run(async () => {
       const session = this.owned(token, id);
-      ensure(['constrain', 'regenerate', 'deploy'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
+      ensure(['constrain', 'regenerate', 'deploy', 'mint'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
+      if (method === 'mint') {
+        invalid(fields(body, ['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit']), 'Unsupported mint field');
+        invalid(typeof body.amount === 'string' && /^\d+(\.\d{1,6})?$/.test(body.amount) && Number(body.amount) <= PUBLIC_MINT_CAP, `A public demo mint is at most ${PUBLIC_MINT_CAP} shares`);
+      }
       if (method === 'regenerate') this.mockOnly();
       if (method === 'constrain') {
         invalid(fields(body, ['identity']) && Object.hasOwn(body, 'identity'), 'Expected identity constraint');
@@ -292,6 +304,8 @@ export class DemoWorkspaces {
           && (identity.actions === undefined || (Array.isArray(identity.actions) && identity.actions.length > 0 && identity.actions.length <= 3 && identity.actions.every((action) => ['mint', 'burn', 'transfer'].includes(action))))
           && ['quote', 'clause'].every((key) => identity[key] === undefined || (typeof identity[key] === 'string' && identity[key].length <= 4000))), 'Invalid or oversized identity constraint');
       }
+      // A mint pays gas like a job; ownership, the deployed-policy check and the minter's own rules still apply.
+      if (method === 'mint') ensure(this.agreements.record(id).status === 'deployed', 409, 'NOT_DEPLOYED', 'Minting requires the current deployed agreement.');
       await this.reserve(session, method === 'deploy' ? ['jobs', 'deploys'] : ['jobs']);
       if (method === 'regenerate') {
         const record = this.agreements.record(id);

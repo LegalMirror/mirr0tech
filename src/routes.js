@@ -2,6 +2,7 @@
 // Keep webhook raw-body parsing and public/session routes ahead of operator authentication.
 import express, { Router, json } from 'express';
 import { randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
+import { isAddress } from 'ethers';
 import { ensure, AppError } from './errors.js';
 import { openapiDocument, swaggerHtml } from './openapi.js';
 import { SIGNATURE_HEADER, verifySignature, paymentFrom } from './payments.js';
@@ -206,7 +207,7 @@ function publicStatus(value, workspaces) {
     const version = value?.compiler?.solidity?.[key];
     if (typeof version === 'string' && /^\d+\.\d+\.\d+(?:[+.-][A-Za-z0-9.+-]+)?$/.test(version) && version.length <= 100) solidity[key] = version;
   }
-  return { model: noologDefault() ? noologStatus() : { provider: 'demo', mode: [extractWorkspace, extractDemo].includes(workspaces.agreements.extract) ? 'mock' : 'unavailable' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
+  return { model: noologDefault() ? noologStatus() : { provider: 'demo', mode: [extractWorkspace, extractDemo].includes(workspaces.agreements.extract) ? 'mock' : 'unavailable' }, compiler: { solidity }, chain: { chainId: workspaces.chainId, ...(isAddress(value?.chain?.deployer) ? { deployer: value.chain.deployer } : {}) } };
 }
 
 // Mount at /v1 BEFORE operator auth/body parsers. Non-demo credentials always leave this router.
@@ -240,6 +241,8 @@ export function demoWorkspaceRoutes(workspaces, status = async () => ({})) {
   for (const method of ['get', 'ast', 'constraints']) router.get(`/agreements/:id${method === 'get' ? '' : `/${method}`}`, wrap(200, (req) => workspaces.read(tokenOf(req), method, req.params.id)));
   router.put('/agreements/:id/constraints', json({ limit: '32kb', inflate: false }), wrap(200, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'constrain', req.body)));
   for (const method of ['regenerate', 'deploy']) router.post(`/agreements/:id/${method}`, wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, method)));
+  router.post('/agreements/:id/mint', json({ limit: '2kb', inflate: false }), wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'mint', req.body)));
+  router.get('/agreements/:id/mints/:requestId', wrap(200, (req) => workspaces.mintOperation(tokenOf(req), req.params.id, req.params.requestId)));
   router.get('/agreements/:id/swap/state', wrap(200, async req => swaps.state(await workspaces.read(tokenOf(req), 'get', req.params.id), req.query.wallet)));
   router.get('/agreements/:id/swap/receipts/:hash', wrap(200, async req => { await workspaces.read(tokenOf(req), 'get', req.params.id); return swaps.receipt(req.params.hash); }));
   for (const [path, method] of [['quote', 'quote'], ['approval', 'approval'], ['transaction', 'swap']]) {

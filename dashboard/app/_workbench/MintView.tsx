@@ -22,12 +22,15 @@ export function MintView({
   sample,
   writable,
   status,
+  demo = false,
 }: {
   record: AgreementDetail;
   client: AgreementsClient;
   sample: boolean;
   writable: boolean;
   status: StackStatus | null;
+  /** Public demo sessions may mint (quota-limited) but not manage pool liquidity. */
+  demo?: boolean;
 }) {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
@@ -343,7 +346,12 @@ export function MintView({
           )}
         </section>
       )}
-      <SeedPoolCard record={record} client={client} blocked={blocked} refresh={refresh} />
+      <SeedPoolCard
+        record={record}
+        client={client}
+        blocked={blocked ?? (demo ? "Pool liquidity is managed from an operator session; the public demo can mint and swap." : null)}
+        refresh={refresh}
+      />
       {review && (
         <Modal
           title="Confirm backend mint"

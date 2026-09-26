@@ -318,16 +318,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           </Notice>
         )}
         {record?.error && <Notice error>{record.error}</Notice>}
-        {policy && view !== "identity" && (
-          <button className="wb-trust-launch" onClick={() => setView("identity")}>
-            <Icon name="shield" />
-            <strong>World ID</strong>
-            <span>From a source clause to wallet access—not automatic compliance.</span>
-            <span className="wb-trust-cta">
-              Review identity & access <Icon name="arrow" size={14} />
-            </span>
-          </button>
-        )}
         {!record && (
           <div className="wb-empty">
             <Icon name="tree" size={40} />
@@ -414,8 +404,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               record={record}
               client={client}
               sample={sample}
-              writable={writable && !session.demoToken}
+              writable={writable || (!sample && !!session.demoToken)}
               status={status}
+              demo={!!session.demoToken}
             />
           ) : view === "swap" ? (
             <SwapView

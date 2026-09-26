@@ -477,3 +477,26 @@ test('a failed public job says why, with credentials redacted and the reason cap
   assert.equal(publicError('RPC down: https://eth.drpc.org/key-abc'), 'RPC down: [url]');
   assert.ok(publicError('x'.repeat(1000)).length <= 300);
 });
+
+test('a demo workspace mints on its own deployed agreement: capped amount, counted as a job, polled by request id', async () => {
+  const calls = [];
+  const minter = async ({ operation }) => { calls.push(operation); return { status: 'confirmed', stage: 'complete', minted: true }; };
+  const agreements = new Agreements({ extract: extractDemo, minter, deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xtest', policyHash }) });
+  const { workspaces } = await service({ agreements });
+  const { accessToken: token } = await workspaces.session('1.1.1.1');
+  const id = await created(workspaces, agreements, token);
+  const body = { recipient: '0x55da01025ea2F709f746eA32dB8444596B0d78EC', amount: '100', requestId: 'demo-mint-request-0001' };
+  await assert.rejects(workspaces.mutate(token, id, 'mint', body), rejected(409, 'NOT_DEPLOYED'), 'deploy first');
+  await workspaces.mutate(token, id, 'deploy');
+  await agreements.settled();
+  const operation = await workspaces.mutate(token, id, 'mint', body);
+  assert.equal(operation.requestId, body.requestId);
+  await agreements.settled();
+  assert.equal((await workspaces.mintOperation(token, id, body.requestId)).status, 'confirmed');
+  assert.equal(calls[0].recipient, body.recipient);
+  await assert.rejects(workspaces.mutate(token, id, 'mint', { ...body, requestId: 'demo-mint-request-0002', amount: '10001' }), rejected(400, 'INVALID_BODY'), 'the public cap is 10000 shares');
+  await assert.rejects(workspaces.mutate(token, id, 'mint', { ...body, requestId: 'demo-mint-request-0003', extra: true }), rejected(400, 'INVALID_BODY'));
+  const { accessToken: stranger } = await workspaces.session('2.2.2.2');
+  await assert.rejects(workspaces.mutate(stranger, id, 'mint', { ...body, requestId: 'demo-mint-request-0004' }), (error) => [403, 404].includes(error.status), 'only its own agreement');
+  await assert.rejects(workspaces.mintOperation(stranger, id, body.requestId), (error) => [403, 404].includes(error.status));
+});

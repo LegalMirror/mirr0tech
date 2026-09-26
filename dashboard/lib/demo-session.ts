@@ -124,8 +124,6 @@ export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void>
             stack: false,
             admin: false,
           },
-          demoNotice:
-            "Your demo workspace is ready. It contains only documents created in this session. Reloading starts a new workspace; tokens are not saved.",
         });
     } catch (error) {
       if (stillCurrent())

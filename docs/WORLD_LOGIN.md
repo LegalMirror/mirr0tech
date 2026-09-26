@@ -18,7 +18,7 @@ WORLD_RP_ID=rp_...
 WORLD_RP_SIGNING_KEY=...
 ```
 
-Use your registered app/RP credentials and replace `login` with the exact action registered in the Developer Portal. Configure that action to allow repeat verifications so returning users can sign in again. Restart the backend and reload the dashboard. When first deploying this feature, deploy the updated dashboard too; subsequent mode changes only require a backend restart and page reload. Docker Compose forwards both login settings.
+Without `WORLD_LOGIN_ACTION` the action is `login`, so the Simulator toggle works with no extra variable; register an action with that name, or set `WORLD_LOGIN_ACTION` to the one you registered in the Developer Portal. Configure that action to allow repeat verifications so returning users can sign in again. Restart the backend and reload the dashboard. When first deploying this feature, deploy the updated dashboard too; subsequent mode changes only require a backend restart and page reload. Docker Compose forwards both login settings.
 
 This mode uses IDKit v4's legacy Orb preset with `allow_legacy_proofs=true`, requests v3 proofs on **staging**, and links to the simulator. No SDK downgrade or `NEXT_PUBLIC_*` setting is needed. `WORLD_ENVIRONMENT` and `WORLD_ACTION` continue to configure the separate investor verification flow, not login.
 

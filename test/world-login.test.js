@@ -215,6 +215,12 @@ test('every mode is offered unless one is pinned; the screen picks per challenge
   const c = login.challenge({ mode: 'sandbox' });
   await assert.rejects(login.login({ challengeToken: c.challengeToken, proof: legacyProofFor(c) }), { code: 'INVALID_LOGIN_PROOF' });
 
+  const saved = process.env.WORLD_LOGIN_ACTION;
+  delete process.env.WORLD_LOGIN_ACTION;
+  const defaulted = await opened(t, { mode: undefined, action: undefined });
+  if (saved !== undefined) process.env.WORLD_LOGIN_ACTION = saved;
+  assert.equal(defaulted.challenge({ mode: 'v3' }).action, 'login', 'without WORLD_LOGIN_ACTION the v3 action is "login"');
+  assert.equal(defaulted.config().modes.find((m) => m.mode === 'v3').configured, true);
   const unconfigured = await opened(t, { mode: undefined, appId: '', rpId: '', signingKey: '' });
   assert.equal(unconfigured.config().mode, 'mock', 'without RP keys the screen starts on mock');
   assert.deepEqual(unconfigured.config().modes.map((m) => m.configured), [true, false, false]);

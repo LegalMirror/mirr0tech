@@ -23,7 +23,8 @@ export class WorldLogin {
 
   constructor({ DatabaseSync, path = process.env.WORLD_SESSION_DB || resolve(process.env.DATA_DIR || '.data', 'world-sessions.sqlite'),
     appId = process.env.WORLD_APP_ID, rpId = process.env.WORLD_RP_ID, signingKey = process.env.WORLD_RP_SIGNING_KEY,
-    action = process.env.WORLD_LOGIN_ACTION || '',
+    // v3 proofs are signed for an action registered in the Developer Portal (staging, repeat verifications allowed).
+    action = process.env.WORLD_LOGIN_ACTION || 'login',
     fetchImpl = fetch, clock = Date.now, mode = null } = {}) {
     // The login screen chooses the mode; `mode` pins one (tests, or a deployment that wants a single mode).
     ensure(mode === null || LOGIN_MODES.includes(mode), 500, 'WORLD_LOGIN_CONFIG', 'Login mode must be mock, sandbox or v3.');

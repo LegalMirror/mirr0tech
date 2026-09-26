@@ -19,6 +19,10 @@ Bearer token `local-dev-stack-operator-key-only` (or `API_KEY`). Demo wallets (`
 
 Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { name, clause: { clause, quote, ruleId } } } } }`.
 
+## Payment webhook
+
+`POST /webhooks/payments` takes a payment rail's event (Stripe shape; a wire notification in the same shape works) signed with `PAYMENT_WEBHOOK_SECRET` under `Stripe-Signature` (`t=<unix>,v1=<HMAC-SHA256 of "<t>.<raw body>">`, 5-minute tolerance). No bearer: the signature is the credential. A settled USD event (`payment_intent.succeeded`, `charge.succeeded`, `wire.received`) with `metadata.wallet` attests `depositConfirmed` for that wallet (merged into its facts), then asks the policy about `mint`: allowed → mint to custody and release to the wallet; refused → the money is **held** and the audit names the sentence. Same event id twice settles once (`replay: true`). Other event types answer `{ received: true, ignored }`. Always 2xx once the signature verifies, so the rail never retries a policy decision. `src/payments.js`, `VenueService.settlePayment`; tests `test/payments.test.js`, `test/chain/payments.test.js`.
+
 ## Operator API (custodial issuance)
 
 The original MVP's REST gateway (`npm start`, bearer token, `Idempotency-Key`, restart recovery) still drives Act 1's issuance: `GET /v1/policy`, `POST /v1/investors`, `POST /v1/deposits`, `POST /v1/mints`, `POST /v1/redemptions`, `GET /v1/audit`, plus mock compliance/settlement endpoints. `npm run demo` exercises it on a mock chain; `CHAIN_MODE=evm` uses the deployed token (`.env.example`).

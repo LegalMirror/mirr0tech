@@ -156,6 +156,17 @@ export class VenueService {
     const now = (await this.provider.getBlock('latest')).timestamp;
     return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, now + days * 86400));
   }
+  /// Adds facts to what is already attested instead of replacing the set.
+  async attestMerged(kind, wallet, facts, days = 30) {
+    const address = this.address(wallet);
+    const { known, value } = this.pack(kind, facts);
+    const { policy } = this.policy(kind);
+    const now = (await this.provider.getBlock('latest')).timestamp;
+    return this.run('attest', { policy: kind, wallet: this.name(address), facts }, async () => {
+      const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
+      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, now + days * 86400);
+    });
+  }
   /// A World ID credential proof for `wallet`: verified, its nullifier bound to this wallet, then
   /// attested as `identityVerified` under the fund policy so every venue reads it.
   async verifyHuman(wallet, proof, days = 30) {
@@ -207,6 +218,26 @@ export class VenueService {
     await (await this.c.token.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
     await (await this.c.market.connect(signer).approve(this.record.credit.router, MaxUint256)).wait();
     return { wallet: this.name(address), funded: amount };
+  }
+  /// A settled payment from the rail: the funds fact is attested, then the policy decides the mint.
+  /// The same payment id settles once; a refusal holds the money and records the sentence.
+  async settlePayment({ id: paymentId, wallet, amount, reference = null }) {
+    const seen = this.audit.find((entry) => entry.type === 'payment.settle' && entry.paymentId === paymentId);
+    if (seen) return { ...seen, replay: true };
+    const address = this.address(wallet);
+    await this.attestMerged('rwa', address, { depositConfirmed: true });
+    const decision = await this.explain('rwa', address, 'mint');
+    const entry = { id: id(`payment:${paymentId}`).slice(0, 18), at: new Date().toISOString(), type: 'payment.settle', policy: 'rwa', paymentId, reference, wallet: this.name(address), amount };
+    if (!decision.allowed) {
+      Object.assign(entry, { status: 'held', refusal: { name: 'PolicyRefused', clause: decision.clause, subject: this.name(address) } });
+    } else {
+      const minted = await this.mint(amount);
+      const released = await this.release(address, amount);
+      Object.assign(entry, { status: 'ok', txHash: released.txHash, mintTxHash: minted.txHash });
+    }
+    this.audit.push(entry);
+    await this.persist();
+    return entry;
   }
   mint(amount) { return this.run('rwa.mint', { policy: 'rwa', amount }, () => this.c.token.mint(id(`mint:${Date.now()}`), parseUnits(amount, 6))); }
   release(wallet, amount) {

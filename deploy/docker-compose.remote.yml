@@ -32,7 +32,6 @@ services:
       WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
       WORLD_CREDENTIAL: document
       WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
-      WORLD_LOGIN_MODE: ${WORLD_LOGIN_MODE:-mock}
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
       # Operator uploads use Astra; public demos remain explicit offline fixtures.

@@ -67,7 +67,7 @@ The Securitize/BlackRock transfer-agent agreement compiles into a permissioned f
 
 A World ID credential proves one onboarding condition. It is not a full KYC, AML, sanctions or accreditation decision; those facts stay separate in the policy.
 
-**Login:** the dashboard itself opens with World ID (`src/world-login.js`, [docs/WORLD_LOGIN.md](docs/WORLD_LOGIN.md)): mock by default, sandbox session proofs or staging simulator proofs by `WORLD_LOGIN_MODE`. Login proves a person, not a document; the wallet document check above stays separate.
+**Login:** the dashboard itself opens with World ID (`src/world-login.js`, [docs/WORLD_LOGIN.md](docs/WORLD_LOGIN.md)): the login screen toggles between mock, sandbox session proofs and staging simulator (v3) proofs. Login proves a person, not a document; the wallet document check above stays separate.
 
 **Status:** the Sepolia attestations below come from mock proofs. A live World Sandbox proof has not been demonstrated yet.
 
@@ -123,7 +123,7 @@ pnpm run start
 pnpm --dir dashboard run dev
 ```
 
-Open **http://localhost:3100**, click **Sign in with World ID** to enter with a placeholder account, then choose **Upload a contract**. Mock login is the default (`WORLD_LOGIN_MODE=mock`); no QR code or World credentials are needed. Login sessions persist in SQLite; see [sandbox login setup and boundaries](docs/WORLD_LOGIN.md).
+Open **http://localhost:3100**, click **Sign in with World ID** to enter with a placeholder account, then choose **Upload a contract**. The login screen has a **Mock / Sandbox / Simulator (v3)** toggle; Mock needs no QR code or World credentials, and it is the starting choice until the RP keys are configured. Login sessions persist in SQLite; see [sandbox login setup and boundaries](docs/WORLD_LOGIN.md).
 
 Once signed in:
 

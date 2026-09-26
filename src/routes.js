@@ -177,7 +177,7 @@ export function worldLoginRoutes(login) {
     res.on('finish', () => console.info('[World ID] API request', {
       requestId: req.worldRequestId, method: req.method,
       endpoint,
-      mode: login.mode, status: res.statusCode, durationMs: Date.now() - started,
+      mode: req.body?.mode ?? login.mode, status: res.statusCode, durationMs: Date.now() - started,
       errorCode: res.locals.worldErrorCode,
     }));
     next();

@@ -35,6 +35,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
   app.get('/health', (_req, res) => res.json({
     status: service?.pending() ? 'reconciliation_required' : 'ok', mode: service?.chain.mode ?? 'stack',
     policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,
+    demo: demoWorkspaces ? (demoWorkspaces.broken ? 'broken' : 'ok') : null,
   }));
   // The payment rail signs its events instead of carrying the bearer; the raw body is what it signed.
   if (venues) app.use('/webhooks', paymentWebhook(venues, paymentSecret, agreements));

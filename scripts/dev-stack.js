@@ -14,7 +14,7 @@ import { SigningSettings } from '../src/signing.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp } from '../src/app.js';
 import { loadPolicyData } from '../src/dashboard-api.js';
-import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment, assertWritableDataDir } from '../src/runtime-config.js';
 
 const { apiKey, viewerKey, expectedChainId } = stackRuntime();
 const verifier = new WorldIdVerifier();
@@ -46,6 +46,7 @@ const record = reuse ? saved : (await deployStack(signer, { borrower: process.en
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const dataDir = process.env.DATA_DIR ?? 'generated';
+await assertWritableDataDir(dataDir);
 // Never mix forgeable demo bindings with a live RP's credential/action namespace.
 const registries = new Map();
 const identityFor = (verifier) => {

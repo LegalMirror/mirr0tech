@@ -152,7 +152,7 @@ function openapiBase(serverUrl, agreementId) {
         }),
       },
       '/v1/agreements/{id}/regenerate': { post: op('Agreements', 'Run a new deliberation', { params: [agreementId], responses: { 202: json(ref('Agreement'), 'Extracting again; the earlier hash stays in history'), 404: error('Unknown id'), 409: error('A job is in flight, or the state does not allow it') } }) },
-      '/v1/agreements/{id}/deploy': { post: op('Agreements', 'Deploy oracle, token, hook and pool for this agreement', { description: 'Compiles the generated Solidity at runtime and deploys on the chain the gateway signs on. 202 with `deploying`; poll for `deployed`.', params: [agreementId], responses: { 202: json(ref('Agreement'), 'Deploying'), 404: error('Unknown id'), 409: error('Deploy needs `compiled`'), 503: error('NO_CHAIN: no signer') } }) },
+      '/v1/agreements/{id}/deploy': { post: op('Agreements', 'Deploy oracle, token, hook and pool for this agreement', { description: 'Compiles the generated Solidity at runtime and deploys on the chain the gateway signs on. 202 with `deploying`; poll for `deployed`.', params: [agreementId], responses: { 202: json(ref('Agreement'), 'Deploying'), 404: error('Unknown id'), 409: error('INVALID_STATE: deploy needs `compiled`; UNSUPPORTED_PROFILE: the credit profile has no token of its own'), 503: error('NO_CHAIN: no signer') } }) },
 
       '/webhooks/payments': {
         post: {

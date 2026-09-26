@@ -134,6 +134,14 @@ describe("buyback export", () => {
     expect(`0x${buyback.instructions.map((ins) => ins.bytes.slice(2)).join("")}`).toBe(buyback.program);
     expect(buyback.terms).toMatchObject({ price: "0.96", cap: "1000000", deadline: "2026-12-31" });
     expect(buyback.strategyHash).toMatch(/^0x[0-9a-f]{64}$/);
+    expect(buyback.auction).not.toBeNull();
+    expect(buyback.auction!.instructions.map((ins) => ins.name)[3]).toBe(
+      "DutchAuction._dutchAuctionBalanceOut1D"
+    );
+    expect(buyback.auction).toMatchObject({ ceiling: "1.00", windowHours: "6" });
+    expect(`0x${buyback.auction!.instructions.map((ins) => ins.bytes.slice(2)).join("")}`).toBe(
+      buyback.auction!.program
+    );
   });
 });
 

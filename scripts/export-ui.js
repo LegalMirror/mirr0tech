@@ -11,7 +11,7 @@ import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { buildOnchainPolicy } from '../src/policy/onchain.js';
 import { auditEvents } from '../src/audit-events.js';
-import { buildAquaOrder, buildBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
+import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const at = (path) => `${root}${path}`;
@@ -172,8 +172,26 @@ function buybackOf(policy) {
   const program = buildBuybackProgram(inputs);
   if (`0x${instructions.map((entry) => entry.bytes.slice(2)).join('')}` !== program) throw new Error('Decoded buyback instructions do not reassemble the program');
   const order = buildAquaOrder(placeholders.maker, program);
+  // The same addendum as a tender offer (A1.5): the bid opens at the floor and improves to the ceiling.
+  let auction = null;
+  if (terms.ceiling && terms.windowSeconds) {
+    const startTime = 0; // set when the borrower ships
+    const decayFactor = BigInt(Math.round(Math.pow(Number(terms.price) / Number(terms.ceiling), 1 / terms.windowSeconds) * 1e18));
+    const auctionInstructions = [
+      instructions[0], instructions[1], instructions[2],
+      { name: 'DutchAuction._dutchAuctionBalanceOut1D', opcode: opcodes['DutchAuction._dutchAuctionBalanceOut1D'],
+        bytes: encoders.dutchAuctionBalanceOut(opcodes, startTime, terms.windowSeconds, decayFactor),
+        args: { floor: terms.price, ceiling: terms.ceiling, windowHours: String(terms.windowHours), decayFactor: String(decayFactor), startTime: 'set when shipped' },
+        source: 'buybackCeiling · buybackWindowHours' },
+      instructions[3], instructions[4],
+    ];
+    const auctionProgram = buildDutchBuybackProgram({ ...inputs, capAssetFloor: terms.capAsset, floor: terms.price, ceiling: terms.ceiling, startTime, windowSeconds: terms.windowSeconds });
+    if (`0x${auctionInstructions.map((entry) => entry.bytes.slice(2)).join('')}` !== auctionProgram) throw new Error('Decoded auction instructions do not reassemble the program');
+    auction = { ceiling: terms.ceiling, windowHours: String(terms.windowHours), capAssetCeiling: String(terms.capAssetCeiling), instructions: auctionInstructions, program: auctionProgram };
+  }
   return {
     available: true,
+    auction,
     terms: { price: terms.price, cap: terms.cap, deadline: terms.deadline, deadlineTimestamp: terms.deadlineTimestamp,
       capPosition: String(terms.capPosition), capAsset: String(terms.capAsset) },
     placeholders,

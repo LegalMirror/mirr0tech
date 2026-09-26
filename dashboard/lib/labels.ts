@@ -78,7 +78,7 @@ export const INSTRUCTION_LABEL: Record<string, string> = {
   "Controls._deadline": "Open until the deadline",
   "PolicyGuard._policyGuard": "Both sides must pass the agreement",
   "FixedRateBalances._fixedRateBalances": "Fixed price and cap",
-  "DutchAuctionBalanceOut._dutchAuctionBalanceOut": "Price improves over the window",
+  "DutchAuction._dutchAuctionBalanceOut1D": "Price improves over the window",
   "LimitSwap._limitSwap1D": "Swap at that price",
   "Invalidators._invalidateTokenIn1D": "Fill once, up to the cap",
 };

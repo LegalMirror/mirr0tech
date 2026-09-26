@@ -146,6 +146,14 @@ export type Buyback =
       program: string;
       order: { maker: string; traits: string; data: string };
       strategyHash: string;
+      /** The tender-offer variant (addendum A1.5), when the agreement carries a ceiling and a window */
+      auction: {
+        ceiling: string;
+        windowHours: string;
+        capAssetCeiling: string;
+        instructions: BuybackInstruction[];
+        program: string;
+      } | null;
     };
 
 export type PolicyData = {

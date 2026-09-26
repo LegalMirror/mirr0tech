@@ -5,6 +5,7 @@ import { explain } from "@/lib/evaluate";
 import { fromMicro, short } from "@/lib/format";
 import { effectiveFacts } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
+import { auctionCurve, auctionPrice } from "@/lib/auction";
 import { instructionLabel, termLabel } from "@/lib/labels";
 import {
   ClauseTableBadge,
@@ -27,7 +28,7 @@ type QuoteResult =
 const MICRO = 1_000_000n;
 
 /** PolicyGuard evaluates the maker, then the taker, against the transfer program; then the rate applies. */
-function quote(policy: PolicyData, maker: Party, taker: Party, amountIn: bigint): QuoteResult {
+function quote(policy: PolicyData, maker: Party, taker: Party, amountIn: bigint, price: string): QuoteResult {
   const buyback = policy.buyback;
   if (!buyback?.available) throw new Error("No buyback strategy in this policy");
   if (Date.now() / 1000 > buyback.terms.deadlineTimestamp) return { ok: false, deadline: true };
@@ -35,8 +36,42 @@ function quote(policy: PolicyData, maker: Party, taker: Party, amountIn: bigint)
     const decision = explain(policy, "transfer", effectiveFacts(policy, subject)).onchain;
     if (!decision.allowed) return { ok: false, subject, clauseId: decision.clauseId };
   }
-  const priceMicro = BigInt(Math.round(Number(buyback.terms.price) * 1_000_000));
+  const priceMicro = BigInt(Math.round(Number(price) * 1_000_000));
   return { ok: true, amountOut: String((amountIn * priceMicro) / MICRO) };
+}
+
+/** The tender offer's price path over the window, with the moment the reader picked. */
+function PriceCurve({
+  floor,
+  ceiling,
+  windowHours,
+  at,
+}: {
+  floor: number;
+  ceiling: number;
+  windowHours: number;
+  at: number;
+}) {
+  const W = 320;
+  const H = 72;
+  const pad = 6;
+  const y = (p: number) => H - pad - ((p - floor) / (ceiling - floor)) * (H - 2 * pad);
+  const x = (h: number) => pad + (h / windowHours) * (W - 2 * pad);
+  const points = auctionCurve(floor, ceiling, windowHours)
+    .map(([h, p]) => `${x(h).toFixed(1)},${y(p).toFixed(1)}`)
+    .join(" ");
+  const now = auctionPrice(floor, ceiling, windowHours, at);
+  return (
+    <figure className="curve" aria-label={`price from ${floor} to ${ceiling} over ${windowHours} hours`}>
+      <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H}>
+        <polyline points={points} fill="none" stroke="var(--permit)" strokeWidth={2} />
+        <circle cx={x(at)} cy={y(now)} r={4} fill="var(--flame)" />
+      </svg>
+      <figcaption className="meta">
+        {floor} at open → {ceiling} at hour {windowHours} · now {now.toFixed(4)} after {at} h
+      </figcaption>
+    </figure>
+  );
 }
 
 function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) {
@@ -47,6 +82,8 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
   const [amount, setAmount] = useState("10000");
   const [result, setResult] = useState<QuoteResult | null>(null);
   const [fills, setFills] = useState<{ taker: string; amountIn: string; amountOut: string }[]>([]);
+  const [mode, setMode] = useState<"bid" | "tender">("bid");
+  const [hours, setHours] = useState(0);
   if (!buyback) return <p className="muted">This policy carries no buyback terms.</p>;
   if (!buyback.available)
     return (
@@ -60,18 +97,59 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
     ? BigInt(Math.round(Number(amount) * 1_000_000))
     : null;
   const termOf = (name: string) => policy.terms.find((term) => term.name === name);
+  const tender = mode === "tender" && buyback.auction ? buyback.auction : null;
+  const windowHours = tender ? Number(tender.windowHours) : 0;
+  const price = tender
+    ? auctionPrice(Number(buyback.terms.price), Number(tender.ceiling), windowHours, hours).toFixed(4)
+    : buyback.terms.price;
+  const shown = tender ?? buyback;
   const refused = result && !result.ok && "subject" in result ? result : null;
 
   return (
     <>
       <section className="card">
-        <div className="eyebrow">Standing buyback · Aqua strategy · maker {maker?.name ?? "borrower"}</div>
+        <div className="eyebrow">
+          {tender ? "Tender offer" : "Standing buyback"} · Aqua strategy · maker {maker?.name ?? "borrower"}
+        </div>
+        {buyback.auction && (
+          <div
+            className="cov-filters"
+            role="radiogroup"
+            aria-label="Buyback shape"
+            style={{ margin: "6px 0" }}
+          >
+            {(["bid", "tender"] as const).map((value) => (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={mode === value}
+                className={`cov-filter ${mode === value ? "on" : ""}`}
+                onClick={() => setMode(value)}
+              >
+                {value === "bid" ? "Standing bid" : "Tender offer"}
+              </button>
+            ))}
+          </div>
+        )}
         <h2 style={{ marginTop: 4 }}>
-          Buy position tokens at {buyback.terms.price}, up to {Number(buyback.terms.cap).toLocaleString()},
-          until {buyback.terms.deadline}
+          {tender
+            ? `Buy position tokens from ${buyback.terms.price} improving to ${tender.ceiling} over ${tender.windowHours} hours, up to ${Number(buyback.terms.cap).toLocaleString()}, until ${buyback.terms.deadline}`
+            : `Buy position tokens at ${buyback.terms.price}, up to ${Number(buyback.terms.cap).toLocaleString()}, until ${buyback.terms.deadline}`}
         </h2>
+        {tender && (
+          <PriceCurve
+            floor={Number(buyback.terms.price)}
+            ceiling={Number(tender.ceiling)}
+            windowHours={windowHours}
+            at={hours}
+          />
+        )}
         <div className="grid-2" style={{ marginTop: 12 }}>
-          {["buybackPrice", "buybackCap", "buybackDeadline"].map((name) => {
+          {(tender
+            ? ["buybackPrice", "buybackCeiling", "buybackWindowHours", "buybackCap", "buybackDeadline"]
+            : ["buybackPrice", "buybackCap", "buybackDeadline"]
+          ).map((name) => {
             const term = termOf(name);
             return term ? (
               <div key={name} className="venue">
@@ -97,7 +175,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
           <h2>What the venue checks on every trade</h2>
           <p className="small muted">The program the borrower posted, one instruction at a time.</p>
           <ol className="program">
-            {buyback.instructions.map((ins) => (
+            {shown.instructions.map((ins) => (
               <li key={ins.name} className={ins.name.startsWith("PolicyGuard") ? "guard" : ""}>
                 <span title={`${ins.name} · opcode ${ins.opcode}`}>
                   <span className="ins-name">{instructionLabel(ins.name)}</span>
@@ -161,6 +239,20 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
               ))}
             </select>
           </label>
+          {tender && (
+            <label>
+              Hours since the offer opened: {hours}
+              <br />
+              <input
+                type="range"
+                min={0}
+                max={windowHours}
+                step={0.5}
+                value={hours}
+                onChange={(e) => setHours(Number(e.target.value))}
+              />
+            </label>
+          )}
           <label>
             Position tokens in
             <br />
@@ -170,7 +262,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
             <button
               className="primary"
               disabled={!taker || !maker || amountIn === null}
-              onClick={() => setResult(quote(policy, maker!, taker!, amountIn!))}
+              onClick={() => setResult(quote(policy, maker!, taker!, amountIn!, price))}
             >
               Quote
             </button>
@@ -193,7 +285,8 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
                 ✓ {amount} position tokens → {fromMicro(result.amountOut)} asset
               </span>
               <span className="small muted">
-                Both sides passed the agreement · price {buyback.terms.price}
+                Both sides passed the agreement · price {price}
+                {tender ? ` after ${hours} h` : ""}
               </span>
             </div>
           )}
@@ -305,7 +398,7 @@ function plainInstruction(
   if (ins.name.startsWith("FixedRateBalances"))
     return `${terms.price} per token, up to ${Number(terms.cap).toLocaleString()} tokens.`;
   if (ins.name.startsWith("DutchAuction"))
-    return "The price improves from the floor to the ceiling over the window.";
+    return `The bid opens at ${ins.args.floor} and improves to ${ins.args.ceiling} over ${ins.args.windowHours} hours; the lender picks the moment.`;
   if (ins.name.startsWith("LimitSwap")) return "The taker's tokens are swapped at that price.";
   if (ins.name.startsWith("Invalidators")) return "Each fill counts against the cap; nothing beyond it.";
   return "";

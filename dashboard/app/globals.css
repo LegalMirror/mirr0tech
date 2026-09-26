@@ -1939,3 +1939,12 @@ blockquote.why {
 .parties > .card {
   min-width: 0;
 }
+
+.curve {
+  margin: 8px 0 4px;
+}
+.curve svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}

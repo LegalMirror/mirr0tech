@@ -57,7 +57,8 @@ const identityFor = (verifier) => {
 const worldId = identityFor(verifier);
 const venues = await new VenueService({ provider, signer, record, multibaas, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json` }).init();
 const host = process.env.HOST ?? '127.0.0.1';
-const policyData = loadPolicyData();
+// The demo readings for the dashboard routes; a failure here is a boot failure, not a silent crash later.
+const policyData = await loadPolicyData();
 const agreements = await new Agreements({
   path: `${dataDir}/agreements-${record.chainId}.json`, log: (line) => console.log(`agreement ${line}`),
   deployer: ({ sources }) => deployFund(venues.signer, { record, sources, log: console.log }),

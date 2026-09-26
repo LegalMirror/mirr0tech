@@ -401,8 +401,9 @@ export function coverageOf({ parts, rules, terms, unresolved, enforcedBy }) {
 
 export async function exportProfile(spec) {
   const document = await readDocuments(spec.documents.map(at));
-  // The extraction is a Noolog deliberation over the document (the hand-authored reading is the draft it starts from).
-  const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast });
+  // The demo readings are deliberated by the in-process mock over the hand-authored draft, whatever
+  // engine uploads use: the static site and the build stay deterministic and spend no credits.
+  const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast, live: false });
   const config = JSON.parse(await readFile(at(spec.config), 'utf8'));
   const raws = await Promise.all(spec.documents.map(async (path) => ({ name: path.split('/').pop(), raw: await readFile(at(path), 'utf8') })));
   return exportCompiled({ profile: spec.profile, act: spec.act, label: spec.label, venue: spec.venue, document, raws, envelope, verification, config });

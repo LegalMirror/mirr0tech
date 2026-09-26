@@ -27,7 +27,7 @@ const defaults = args.includes('--cashier')
 
 // Several documents may be compiled as one bundle: pass them comma-separated.
 const document = await readDocuments((paths[1] ?? defaults.document).split(','));
-const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : (await extractWithNoolog({ profile: defaults.profile, document, draft: defaults.fixture(document).ast })).envelope;
+const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : (await extractWithNoolog({ profile: defaults.profile, document, draft: defaults.fixture(document).ast, live: false })).envelope;
 const config = JSON.parse(await readFile(paths[2] ?? defaults.config, 'utf8'));
 const result = compilePolicy(envelope, config, document, { demo });
 

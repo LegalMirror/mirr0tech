@@ -154,7 +154,7 @@ export class Agreements {
         if (!draft && extractorMode() === 'mock') throw new Error('Reading a new document needs a model: EXTRACTOR=noolog with NOOLOG_API_KEY, or EXTRACTOR=openai with OPENAI_API_KEY. The mock only generates the demo agreements.');
         // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
         const onProgress = (state) => { record.progress = { job: state.job_id, status: state.status, at: now() }; };
-        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft, onProgress });
+        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft, onProgress, config: record.config });
         record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
         const exported = this.export(id);

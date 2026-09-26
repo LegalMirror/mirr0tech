@@ -5,7 +5,8 @@
 // mock, no model), or `openai` (one model call on any OpenAI-compatible endpoint, no deliberation
 // and no verdicts). Unset, it follows the keys present: noolog, then openai, then mock.
 import { once } from 'node:events';
-import { astSchema, validateAst } from '../policy/schema.js';
+import { ACTIONS, astSchema, validateAst } from '../policy/schema.js';
+import { enforceableActions, profileComponents } from '../policy/components.js';
 import { NoologClient } from './client.js';
 import { createMockNoolog } from './mock.js';
 import { verificationFrom } from './verify.js';
@@ -22,6 +23,36 @@ export function extractorMode(env = process.env) {
 
 const INSTRUCTIONS = `Read the agreement and return only JSON matching this schema: the executable rules and numeric terms, each quoting the document verbatim, and what cannot be compiled under "unresolved". Answer with the JSON object only: no prose, no headings, no code fence.
 Schema: ${JSON.stringify(astSchema)}`;
+
+/// The instructions for one deployment: only the actions its venue components enforce become rules.
+export function instructionsFor(config = { profile: 'rwa-secondary' }) {
+  const actions = enforceableActions(config, ACTIONS);
+  return `${INSTRUCTIONS}
+This deployment enforces these actions only: ${actions.join(', ')}. Emit rules for no other action; put obligations about anything else under "unresolved". Emit a term only for a number the agreement states that a venue must enforce (a price, a cap, a period); every other number belongs under "unresolved".`;
+}
+
+/// What the deployment cannot enforce is demoted to "unresolved" rather than failing the compile:
+/// rules for actions no venue component covers, terms no component consumes. Returns the fitted AST
+/// and what moved, so the record can say so.
+export function fitToProfile(ast, config = { profile: 'rwa-secondary' }) {
+  const components = profileComponents(config);
+  const demoted = [];
+  const rules = ast.rules.filter((rule) => {
+    const kept = components.some((component) => component.kind === 'venue' && component.coversRule(rule, config));
+    if (!kept) demoted.push({ kind: 'rule', id: rule.id, action: rule.action, clause: rule.source.clause });
+    return kept;
+  });
+  const terms = ast.terms.filter((term) => {
+    const kept = components.some((component) => component.coversTerm(term, config));
+    if (!kept) demoted.push({ kind: 'term', name: term.name, clause: term.source.clause });
+    return kept;
+  });
+  const unresolved = [...ast.unresolved, ...demoted.map((entry) => ({
+    clause: entry.clause,
+    description: entry.kind === 'rule' ? `No venue in this deployment enforces the action "${entry.action}" (rule ${entry.id}); it stays a contractual obligation.` : `No component in this deployment consumes the term "${entry.name}"; it stays a contractual value.`,
+  }))];
+  return { ast: { ...ast, rules, terms, unresolved }, demoted };
+}
 
 // A policy model (nsed:legal_rwa_pro …) brings its own seats; only the generic model needs agents named.
 const SEATED = (model) => model === 'nsed:deep';
@@ -44,13 +75,13 @@ export function chatRequest({ profile, document, draft = null, rounds = 2, model
 
 /// The native submit: the job id is the room id, so progress and the reference tree can be read back.
 /// Instructions travel in the user turn (the orchestrator folds no system turn); the draft is the assistant turn.
-export function deliberationRequest({ profile, document, draft = null, rounds = 2, model = MODEL, policyId = null, room: nonce = room() }) {
+export function deliberationRequest({ profile, document, draft = null, rounds = 2, model = MODEL, policyId = null, config = { profile }, room: nonce = room() }) {
   return {
     room_id: `mirr0tech-${profile}-${document.sha256.slice(2, 10)}-${nonce}`,
     deliberation_rounds: rounds,
     ...(policyId ? { policy_id: policyId } : { agent_names: AGENTS }),
     messages: [
-      { role: 'user', content: `${INSTRUCTIONS}\n\nAGREEMENT:\n${document.text}` },
+      { role: 'user', content: `${instructionsFor(config)}\n\nAGREEMENT:\n${document.text}` },
       ...(draft ? [{ role: 'assistant', content: JSON.stringify(draft) }] : []),
     ],
   };
@@ -72,7 +103,7 @@ const budgetError = (error) => {
 
 /// Returns { envelope, verification }: the AST the deliberation produced, and what it established about it.
 /// `live` forces the orchestrator (default: EXTRACTOR=noolog); otherwise the in-process mock serves.
-export async function extractWithNoolog({ profile, document, draft = null, client = null, pollMs = 10, onProgress = null, live = null } = {}) {
+export async function extractWithNoolog({ profile, document, draft = null, client = null, pollMs = 10, onProgress = null, live = null, config = { profile } } = {}) {
   let server = null;
   const orchestrator = live ?? extractorMode() === 'noolog';
   if (!client) {
@@ -87,17 +118,17 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     const policyId = SEATED(MODEL) ? null : (await client.policyFor(tagOf(MODEL))).policy_id;
     // The legal seats review a draft instead of answering; live, they read the document alone. The mock needs the draft.
     let jobId;
-    try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft: server ? draft : null, policyId }))); } catch (error) { throw budgetError(error); }
+    try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft: server ? draft : null, policyId, config }))); } catch (error) { throw budgetError(error); }
     // A live deliberation with a legal seat list takes ~10 minutes per round on a whole agreement; the
     // wait matches the policy's own job timeout (an hour). The mock answers at once.
     const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 3000), timeoutMs: 60 * 60_000, onProgress });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
-    const ast = validateAst(parseAstText(state.result), document.text);
+    const { ast, demoted } = fitToProfile(validateAst(parseAstText(state.result), document.text), config);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);
     const verification = { ...verificationFrom({ jobId, details, references }), mock: Boolean(server), model: MODEL };
     return {
       envelope: {
-        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents },
+        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents, demoted },
         // No undefined keys: the source object is inside the policy hash.
         source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       },
@@ -110,24 +141,24 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
 
 /// One model call on an OpenAI-compatible endpoint (OPENAI_BASE_URL, OPENAI_API_KEY, OPENAI_MODEL):
 /// the AST without deliberation, so the agreement carries no verdicts and no confidence.
-export async function extractWithOpenAI({ document, draft = null, fetchImpl = fetch, env = process.env } = {}) {
+export async function extractWithOpenAI({ profile = 'rwa-secondary', document, draft = null, fetchImpl = fetch, env = process.env, config = { profile } } = {}) {
   const { OPENAI_API_KEY: apiKey, OPENAI_MODEL: model = 'gpt-4.1', OPENAI_BASE_URL: base = 'https://api.openai.com/v1' } = env;
   if (!apiKey) throw new Error('Set OPENAI_API_KEY (and OPENAI_BASE_URL for another OpenAI-compatible endpoint)');
   const response = await fetchImpl(`${base.replace(/\/$/, '')}/chat/completions`, {
     method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(180_000),
     body: JSON.stringify({
       model, temperature: 0, response_format: { type: 'json_object' },
-      messages: [{ role: 'system', content: INSTRUCTIONS }, { role: 'user', content: document.text }, ...(draft ? [{ role: 'assistant', content: JSON.stringify(draft) }, { role: 'user', content: 'Return the corrected JSON only.' }] : [])],
+      messages: [{ role: 'system', content: instructionsFor(config) }, { role: 'user', content: document.text }, ...(draft ? [{ role: 'assistant', content: JSON.stringify(draft) }, { role: 'user', content: 'Return the corrected JSON only.' }] : [])],
     }),
   });
   if (!response.ok) throw new Error(`Model call failed (HTTP ${response.status}): ${(await response.text().catch(() => '')).slice(0, 200)}`);
   const completion = await response.json();
   const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error('The model returned no content');
-  const ast = validateAst(parseAstText(content), document.text);
+  const { ast, demoted } = fitToProfile(validateAst(parseAstText(content), document.text), config);
   return {
     envelope: {
-      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base },
+      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted },
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
     },
     verification: null,

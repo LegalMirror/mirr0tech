@@ -168,7 +168,7 @@ test('the OpenAI-compatible bypass returns the AST with no verdicts, on any base
   const env = { OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'astra-legal', OPENAI_BASE_URL: 'https://astra.example/v1/' };
   const { envelope: out, verification } = await extractWithOpenAI({ document, draft: envelope.ast, fetchImpl, env });
   assert.equal(verification, null, 'one model call, nobody checked it');
-  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/' });
+  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/', demoted: [] });
   assert.equal(out.ast.rules.length, envelope.ast.rules.length);
   assert.equal(calls[0].url, 'https://astra.example/v1/chat/completions');
   assert.equal(calls[0].auth, 'Bearer sk-test');
@@ -222,4 +222,25 @@ test('the report reads the orchestrator\'s own tree: winner from final_result, c
   const bare = verificationFrom({ jobId: 'j', details: { history: [], rounds: [], final_result: { round: 1, author_agent_id: 'X', aggregated_score: -0.5 } }, references: { rounds: [{ round: 1, proposals: [{ author_agent_id: 'X', aggregated_score: -0.5, on_winner_path: true, claims: [] }] }] } });
   assert.equal(bare.confidence.basis, 'winner');
   assert.equal(bare.confidence.overall, 0.25, 'no claims, no scores: the winner\'s aggregate mapped to [0, 1]');
+});
+
+test('what the deployment cannot enforce is demoted to unresolved, and the instructions name the actions it can', async () => {
+  const { fitToProfile, instructionsFor } = await import('../src/noolog/extract.js');
+  const { compilePolicy } = await import('../src/policy/compile.js');
+  const { sampleFixture } = await import('../src/policy/fixture.js');
+  const { readFile } = await import('node:fs/promises');
+  const config = JSON.parse(await readFile('examples/rwa-secondary-config.json', 'utf8'));
+  const envelope = sampleFixture(document, { secondary: true });
+  assert.match(instructionsFor(config), /enforces these actions only: mint, burn, transfer\./);
+  assert.match(instructionsFor({ profile: 'wildcat-credit', venue: 'wildcat' }), /deposit, withdraw/);
+  const rule = (id, action) => ({ id, action, effect: 'require', condition: { type: 'fact', name: 'kycApproved' }, source: { clause: '2.2', quote: 'redemption is legally authorized.' }, rationale: 'r' });
+  const wide = { ...envelope.ast, rules: [...envelope.ast.rules, rule('withdraw-redemption-payment', 'withdraw')], terms: [{ name: 'noticeWindow', value: '30', unit: 'days', source: { clause: '9.1', quote: 'redemption is legally authorized.' }, rationale: 'r' }] };
+  const { ast, demoted } = fitToProfile(wide, config);
+  assert.deepEqual(demoted, [{ kind: 'rule', id: 'withdraw-redemption-payment', action: 'withdraw', clause: '2.2' }, { kind: 'term', name: 'noticeWindow', clause: '9.1' }]);
+  assert.equal(ast.rules.length, envelope.ast.rules.length);
+  assert.equal(ast.terms.length, 0);
+  assert.equal(ast.unresolved.length, envelope.ast.unresolved.length + 2);
+  assert.match(ast.unresolved.at(-1).description, /term "noticeWindow"/);
+  assert.doesNotThrow(() => compilePolicy({ ...envelope, ast }, config, document, { demo: true }));
+  assert.throws(() => compilePolicy({ ...envelope, ast: wide }, config, document, { demo: true }), /withdraw/);
 });

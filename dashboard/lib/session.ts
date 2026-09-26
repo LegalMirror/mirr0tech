@@ -57,12 +57,13 @@ export function demoPathAllowed(method: string, path: string): boolean {
       /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/swap\/(?:state(?:\?wallet=0x[a-fA-F0-9]{40})?|receipts\/0x[a-fA-F0-9]{64})$/.test(
         path
       ) ||
-      /^\/v1\/agreements(?:\/[a-zA-Z0-9_-]+(?:\/(?:ast|constraints))?)?$/.test(path)
+      /^\/v1\/agreements(?:\/[a-zA-Z0-9_-]+(?:\/(?:ast|constraints))?)?$/.test(path) ||
+      /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:liquidity(?:\/seeds\/[a-zA-Z0-9_-]+)?|mints\/[a-zA-Z0-9_-]+)$/.test(path)
     );
   if (method === "POST")
     return (
       path === "/v1/agreements" ||
-      /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:regenerate|deploy|swap\/(?:quote|approval|transaction))$/.test(
+      /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:regenerate|deploy|mint|liquidity\/seeds|swap\/(?:quote|approval|transaction))$/.test(
         path
       )
     );

@@ -206,3 +206,18 @@ describe("public demo minting", () => {
     expect(html).not.toContain("Pool liquidity is managed from an operator session");
   });
 });
+
+describe("demo path allowlist", () => {
+  it("lets a demo session mint, seed and poll their operations", async () => {
+    const { demoPathAllowed } = await import("@/lib/session");
+    for (const [method, path] of [
+      ["POST", "/v1/agreements/agr_0123456789ab/mint"],
+      ["GET", "/v1/agreements/agr_0123456789ab/mints/demo-mint-request-0001"],
+      ["GET", "/v1/agreements/agr_0123456789ab/liquidity"],
+      ["POST", "/v1/agreements/agr_0123456789ab/liquidity/seeds"],
+      ["GET", "/v1/agreements/agr_0123456789ab/liquidity/seeds/demo-seed-request-0001"],
+    ])
+      expect(demoPathAllowed(method, path), `${method} ${path}`).toBe(true);
+    expect(demoPathAllowed("POST", "/v1/agreements/agr_0123456789ab/stack/rwa/mint")).toBe(false);
+  });
+});

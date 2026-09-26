@@ -145,7 +145,7 @@ test('placeholder login opens a workspace without World credentials or a proof, 
   await once(server, 'listening');
   t.after(() => { server.close(); server.closeAllConnections(); });
   const url = `http://127.0.0.1:${server.address().port}`;
-  assert.deepEqual(await (await fetch(`${url}/v1/auth/world/config`)).json(), { configured: true, environment: 'mock', mode: 'mock' });
+  assert.deepEqual(await (await fetch(`${url}/v1/auth/world/config`)).json(), { configured: true, environment: 'mock', mode: 'mock', modes: [{ mode: 'mock', environment: 'mock', configured: true }] });
   const response = await fetch(`${url}/v1/auth/world/mock`, { method: 'POST' });
   assert.equal(response.status, 200);
   const session = await response.json();
@@ -190,22 +190,38 @@ async function legacySignIn(login) {
   return login.login({ challengeToken: c.challengeToken, proof: legacyProofFor(c) });
 }
 
-test('v3 environment config selects staging and requires a registered login action', async (t) => {
-  const previous = { mode: process.env.WORLD_LOGIN_MODE, action: process.env.WORLD_LOGIN_ACTION };
-  t.after(() => {
-    for (const [key, value] of [['WORLD_LOGIN_MODE', previous.mode], ['WORLD_LOGIN_ACTION', previous.action]]) {
-      if (value === undefined) delete process.env[key]; else process.env[key] = value;
-    }
-  });
-  process.env.WORLD_LOGIN_MODE = 'v3';
-  process.env.WORLD_LOGIN_ACTION = 'registered-login';
-  const login = await opened(t, { mode: undefined });
-  assert.deepEqual(login.config(), { configured: true, mode: 'v3', environment: 'staging' });
-  assert.equal(login.challenge().action, 'registered-login');
-  const missing = await opened(t, { ...legacyOptions, action: '' });
-  assert.equal(missing.config().configured, false);
-  assert.throws(() => missing.challenge(), { code: 'WORLD_LOGIN_CONFIG' });
-  assert.throws(() => login.challenge({ existingSessionId: worldSessionId }), { code: 'LOGIN_SESSION' });
+test('every mode is offered unless one is pinned; the screen picks per challenge, and a session outlives a change of choice', async (t) => {
+  const login = await opened(t, { mode: undefined, action: 'registered-login' });
+  const config = login.config();
+  assert.equal(config.mode, 'sandbox', 'the default choice is sandbox when the RP is configured');
+  assert.deepEqual(config.modes, [
+    { mode: 'mock', environment: 'mock', configured: true },
+    { mode: 'sandbox', environment: 'sandbox', configured: true },
+    { mode: 'v3', environment: 'staging', configured: true },
+  ]);
+  const v3 = login.challenge({ mode: 'v3' });
+  assert.equal(v3.environment, 'staging');
+  assert.equal(v3.action, 'registered-login');
+  assert.equal(login.challenge({ mode: 'sandbox' }).environment, 'sandbox');
+  assert.throws(() => login.challenge({ mode: 'mock' }), { code: 'SANDBOX_LOGIN_DISABLED' });
+  assert.throws(() => login.challenge({ mode: 'production' }), { code: 'SANDBOX_LOGIN_DISABLED' });
+  assert.throws(() => login.challenge({ mode: 'v3', existingSessionId: worldSessionId }), { code: 'LOGIN_SESSION' });
+  // A sandbox login and a mock login both authenticate on the same backend.
+  const sandbox = await signIn(login);
+  const mock = login.mockLogin();
+  assert.equal(login.authenticate(sandbox.accessToken).account.environment, 'sandbox');
+  assert.equal(login.authenticate(mock.accessToken).account.mock, true);
+  // The challenge fixes the mode: a staging proof cannot answer a sandbox challenge.
+  const c = login.challenge({ mode: 'sandbox' });
+  await assert.rejects(login.login({ challengeToken: c.challengeToken, proof: legacyProofFor(c) }), { code: 'INVALID_LOGIN_PROOF' });
+
+  const unconfigured = await opened(t, { mode: undefined, appId: '', rpId: '', signingKey: '' });
+  assert.equal(unconfigured.config().mode, 'mock', 'without RP keys the screen starts on mock');
+  assert.deepEqual(unconfigured.config().modes.map((m) => m.configured), [true, false, false]);
+  assert.throws(() => unconfigured.challenge({ mode: 'sandbox' }), { code: 'WORLD_LOGIN_CONFIG' });
+  const missing = await opened(t, { mode: undefined, action: '' });
+  assert.equal(missing.config().modes.find((m) => m.mode === 'v3').configured, false, 'v3 needs a registered login action');
+  assert.throws(() => missing.challenge({ mode: 'v3' }), { code: 'WORLD_LOGIN_CONFIG' });
 });
 
 test('v3 forwards complete proofs and restores the same account with fresh proofs and a stable nullifier', async (t) => {
@@ -269,18 +285,16 @@ test('v3 blocks races, replayed proofs and provider rejection without blocking r
   }
 });
 
-test('login and the wallet document check are configured independently: neither reads the other\'s variable', async (t) => {
+test('login and the wallet document check are configured independently: login never reads WORLD_ENVIRONMENT', async (t) => {
   const { WorldIdVerifier } = await import('../src/worldid.js');
-  const saved = { WORLD_ENVIRONMENT: process.env.WORLD_ENVIRONMENT, WORLD_LOGIN_MODE: process.env.WORLD_LOGIN_MODE };
-  t.after(() => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } });
+  const saved = process.env.WORLD_ENVIRONMENT;
+  t.after(() => { if (saved === undefined) delete process.env.WORLD_ENVIRONMENT; else process.env.WORLD_ENVIRONMENT = saved; });
   for (const environment of ['staging', 'sandbox', 'production']) {
     process.env.WORLD_ENVIRONMENT = environment;
-    for (const mode of ['mock', 'sandbox', 'v3']) {
-      process.env.WORLD_LOGIN_MODE = mode;
-      const login = await opened(t, { mode: undefined, action: 'login' });
-      assert.equal(login.config().mode, mode);
-      assert.equal(login.config().environment, { mock: 'mock', sandbox: 'sandbox', v3: 'staging' }[mode], `login ${mode} under WORLD_ENVIRONMENT=${environment}`);
-      assert.equal(new WorldIdVerifier({ mock: false, rpId: 'rp_test', appId: 'app_test', signingKeyHex: '12'.repeat(32) }).environment, environment, `verifier under WORLD_LOGIN_MODE=${mode}`);
-    }
+    const login = await opened(t, { mode: undefined, action: 'login' });
+    assert.deepEqual(login.config().modes.map((m) => m.environment), ['mock', 'sandbox', 'staging'], `login under WORLD_ENVIRONMENT=${environment}`);
+    assert.equal(login.challenge({ mode: 'sandbox' }).environment, 'sandbox');
+    assert.equal(login.challenge({ mode: 'v3' }).environment, 'staging');
+    assert.equal(new WorldIdVerifier({ mock: false, rpId: 'rp_test', appId: 'app_test', signingKeyHex: '12'.repeat(32) }).environment, environment);
   }
 });

@@ -41,7 +41,6 @@ services:
       WORLD_RP_ID: ${WORLD_RP_ID:-}
       WORLD_RP_SIGNING_KEY: ${WORLD_RP_SIGNING_KEY:-}
       WORLD_ENVIRONMENT: sandbox
-      WORLD_LOGIN_MODE: ${WORLD_LOGIN_MODE:-mock}
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
       BORROWER_ADDRESS: ${BORROWER_ADDRESS:-}

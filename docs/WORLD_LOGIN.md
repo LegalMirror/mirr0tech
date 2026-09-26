@@ -1,15 +1,17 @@
 # World ID application login
 
-The current default is **mock login** (`WORLD_LOGIN_MODE=mock`). Clicking **Sign in with World ID** immediately creates a placeholder session on the backend and opens the application without a QR code or World credentials. The normal SQLite persistence, expiry, logout, and workspace access checks still apply. The account is explicitly marked `mock: true`, with no verified credential or passport.
+The login screen has a **Mock / Sandbox / Simulator (v3)** toggle. All three modes are always available; there is no mode variable. The screen starts on **Sandbox** when the RP keys are configured, otherwise on **Mock**. A mode whose keys are missing is shown disabled.
 
-Set `WORLD_LOGIN_MODE=sandbox` and restart the backend to restore the verified flow described below. Mock tokens are rejected in sandbox mode. `POST /v1/auth/world/mock` is available only in mock mode.
+- **Mock** creates a placeholder session at once (`POST /v1/auth/world/mock`): no QR code, no World credentials. The account is marked `mock: true`, with no credential and no passport. Anyone can use it, so it is a demo convenience, not a gate.
+- **Sandbox** and **Simulator (v3)** each ask the backend for a challenge in that mode (`POST /challenge { mode }`). The challenge records its mode, and the proof that answers it is judged by that mode, not by the screen's current choice.
+
+Sessions from every mode stay valid side by side, and switching the toggle does not sign anyone out. `new WorldLogin({ mode })` pins a single mode, as the tests do.
 
 ## v3 simulator login
 
 Set these backend environment variables to use https://simulator.worldcoin.org/:
 
 ```dotenv
-WORLD_LOGIN_MODE=v3
 WORLD_LOGIN_ACTION=login
 WORLD_APP_ID=app_...
 WORLD_RP_ID=rp_...
@@ -22,7 +24,6 @@ This mode uses IDKit v4's legacy Orb preset with `allow_legacy_proofs=true`, req
 
 The backend verifies the full v3 payload with World's v4 verification endpoint, checks the configured action and fresh challenge signal, and issues the usual 24-hour application token. Returning accounts use the staging app/action-scoped Orb nullifier. That account identifier may repeat; each login must supply a fresh proof for its single-use challenge. v3 accounts and tokens are separate from sandbox and mock accounts. v3 does not use World session IDs and does not attest passport verification.
 
-Set `WORLD_LOGIN_MODE=sandbox` for v4 sandbox session proofs, or `mock` for placeholder login.
 
 Reference: [IDKit legacy proofs and staging simulator](https://docs.world.org/world-id/idkit/integrate).
 
@@ -35,7 +36,6 @@ The dashboard displays a landing page until the backend verifies a World ID 4.0 
 Use Node **22.13 or newer** (built-in `node:sqlite`) and set these backend-only values in `.env` or the hosting environment:
 
 ```dotenv
-WORLD_LOGIN_MODE=sandbox
 WORLD_APP_ID=app_...
 WORLD_RP_ID=rp_...
 WORLD_RP_SIGNING_KEY=...

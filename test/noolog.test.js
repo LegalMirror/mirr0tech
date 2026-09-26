@@ -168,7 +168,7 @@ test('the OpenAI-compatible bypass returns the AST with no verdicts, on any base
   const env = { OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'astra-legal', OPENAI_BASE_URL: 'https://astra.example/v1/' };
   const { envelope: out, verification } = await extractWithOpenAI({ document, draft: envelope.ast, fetchImpl, env });
   assert.equal(verification, null, 'one model call, nobody checked it');
-  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/', demoted: [] });
+  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/', demoted: [], unanchored: [] });
   assert.equal(out.ast.rules.length, envelope.ast.rules.length);
   assert.equal(calls[0].url, 'https://astra.example/v1/chat/completions');
   assert.equal(calls[0].auth, 'Bearer sk-test');
@@ -296,4 +296,24 @@ test('the report carries each model\'s score of the final answer, mapped to [0, 
   ]);
   assert.equal(v.confidence.basis, 'evaluations');
   assert.equal(v.confidence.overall, 0.625);
+});
+
+test('a live answer whose quotes differ from the source only in spacing or punctuation still compiles; an invented quote is set aside', async () => {
+  const answer = structuredClone(envelope.ast);
+  const [first] = answer.rules;
+  first.source.quote = first.source.quote.replace(/ /g, '  ').replace(/'/g, '’');
+  answer.rules.push({ ...structuredClone(first), id: 'invented-rule', source: { clause: 'X', quote: 'a sentence this agreement never contains' } });
+  const client = {
+    policyFor: async () => ({ policy_id: 'p', max_rounds: 2 }),
+    startDeliberation: async () => ({ job_id: 'job-quotes' }),
+    waitForResult: async () => ({ status: 'completed', result: JSON.stringify(answer) }),
+    details: async () => ({ history: [], rounds: [] }),
+    references: async () => ({ rounds: [], edges: [], hunk_edges: [], winner: null }),
+  };
+  const { envelope: generated } = await extractWithNoolog({ profile: 'rwa-secondary', document, client, live: true });
+  const anchored = generated.ast.rules.find((rule) => rule.id === first.id);
+  assert.ok(document.text.includes(anchored.source.quote), 'the quote is the verbatim source span');
+  assert.equal(generated.ast.rules.some((rule) => rule.id === 'invented-rule'), false);
+  assert.deepEqual(generated.extraction.unanchored, [{ kind: 'rule', id: 'invented-rule', clause: 'X' }]);
+  assert.ok(generated.ast.unresolved.some((item) => /invented-rule was not found in the source/.test(item.description)));
 });

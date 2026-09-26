@@ -6,6 +6,7 @@
 // and no verdicts). Unset, it follows the keys present: noolog, then openai, then mock.
 import { once } from 'node:events';
 import { ACTIONS, astSchema, validateAst } from '../policy/schema.js';
+import { anchorQuotes } from '../policy/anchor.js';
 import { enforceableActions, profileComponents } from '../onchain/components.js';
 import { NoologClient } from './client.js';
 import { createMockNoolog } from './mock.js';
@@ -162,12 +163,13 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
     // Demote first: what this deployment cannot enforce need not be well-formed to be set aside.
     const { ast: fitted, demoted } = fitToProfile(parseAstText(state.result), config);
-    const ast = validateAst(fitted, document.text);
+    const { ast: anchored, unanchored } = anchorQuotes(fitted, document.text);
+    const ast = validateAst(anchored, document.text);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);
     const verification = { ...verificationFrom({ jobId, details, references }), mock: Boolean(server), model: MODEL };
     return {
       envelope: {
-        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents, demoted },
+        ast, extraction: { provider: 'noolog', model: MODEL, responseId: jobId, agents: verification.agents, demoted, unanchored },
         // No undefined keys: the source object is inside the policy hash.
         source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       },
@@ -195,10 +197,11 @@ export async function extractWithOpenAI({ profile = 'rwa-secondary', document, d
   const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error('The model returned no content');
   const { ast: fitted, demoted } = fitToProfile(parseAstText(content), config);
-  const ast = validateAst(fitted, document.text);
+  const { ast: anchored, unanchored } = anchorQuotes(fitted, document.text);
+  const ast = validateAst(anchored, document.text);
   return {
     envelope: {
-      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted },
+      ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted, unanchored },
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
     },
     verification: null,

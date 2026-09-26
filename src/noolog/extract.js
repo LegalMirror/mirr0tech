@@ -15,16 +15,20 @@ export const MODEL = process.env.NOOLOG_MODEL ?? 'nsed:deep';
 const INSTRUCTIONS = `Read the agreement and return only JSON matching this schema: the executable rules and numeric terms, each quoting the document verbatim, and what cannot be compiled under "unresolved".
 Schema: ${JSON.stringify(astSchema)}`;
 
-export function chatRequest({ profile, document, draft = null, rounds = 2 }) {
+// A policy model (nsed:legal_rwa_pro …) brings its own seats; only the generic model needs agents named.
+const SEATED = (model) => model === 'nsed:deep';
+
+/// One room per run: the orchestrator holds a room slot per id, so a repeat would collide.
+export function chatRequest({ profile, document, draft = null, rounds = 2, model = MODEL, room = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}` }) {
   return {
-    model: MODEL,
+    model,
     stream: false,
     messages: [
       { role: 'system', content: INSTRUCTIONS },
       { role: 'user', content: document.text },
       ...(draft ? [{ role: 'assistant', content: JSON.stringify(draft) }] : []),
     ],
-    nsed: { room_id: `mirr0tech-${profile}-${document.sha256.slice(2, 10)}`, agent_names: AGENTS, deliberation_rounds: rounds },
+    nsed: { room_id: `mirr0tech-${profile}-${document.sha256.slice(2, 10)}-${room}`, ...(SEATED(model) ? { agent_names: AGENTS } : {}), deliberation_rounds: rounds },
   };
 }
 
@@ -40,10 +44,16 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     }
   }
   try {
-    const { completion, jobId } = await client.chatCompletion(chatRequest({ profile, document, draft }));
+    let started;
+    try { started = await client.chatCompletion(chatRequest({ profile, document, draft })); } catch (error) {
+      if ([402, 429].includes(error.status) && /budget|quota|credit/i.test(error.message)) throw new Error(`The model account is out of credits (${error.status}); top up the Noolog account, or unset NOOLOG_API_KEY for the mock`);
+      throw error;
+    }
+    const { completion, jobId } = started;
     const content = completion.choices?.[0]?.message?.content ?? '';
     const ast = validateAst(JSON.parse(content), document.text);
-    const state = await client.waitForResult(jobId, { pollMs });
+    // A live deliberation with a legal seat list takes minutes; the mock answers at once.
+    const state = await client.waitForResult(jobId, server ? { pollMs } : { pollMs: Math.max(pollMs, 2000), timeoutMs: 15 * 60_000 });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);
     const verification = { ...verificationFrom({ jobId, details, references }), mock: Boolean(server), model: MODEL };

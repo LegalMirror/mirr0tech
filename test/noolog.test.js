@@ -101,3 +101,21 @@ test('the critic contests quotes that repeat in the agreement or are too short t
   assert.equal(report.confidence.byRef['rule:deposit-not-insolvent'], (0.25 + 1) / 2, 'one contested claim and one verified claim about the rule');
   assert.ok(report.confidence.overall < 1 && report.confidence.overall > 0.8);
 });
+
+test('a request names a fresh room each run, seats only the generic model, and an empty budget reads plainly', async () => {
+  const { chatRequest, extractWithNoolog } = await import('../src/noolog/extract.js');
+  const { NoologError } = await import('../src/noolog/client.js');
+  const a = chatRequest({ profile: 'rwa-secondary', document, model: 'nsed:deep' });
+  const b = chatRequest({ profile: 'rwa-secondary', document, model: 'nsed:deep' });
+  assert.notEqual(a.nsed.room_id, b.nsed.room_id, 'a repeated room id collides on the orchestrator');
+  assert.match(a.nsed.room_id, /^mirr0tech-rwa-secondary-[0-9a-f]{8}-/);
+  assert.deepEqual(a.nsed.agent_names, ['extractor', 'critic']);
+  const policy = chatRequest({ profile: 'rwa-secondary', document, model: 'nsed:legal_rwa_pro' });
+  assert.equal(policy.model, 'nsed:legal_rwa_pro');
+  assert.equal(policy.nsed.agent_names, undefined, 'the policy brings its own seats');
+  assert.equal(policy.nsed.deliberation_rounds, 2);
+  const broke = { chatCompletion: async () => { throw new NoologError(429, 'POST /v1/chat/completions: 429 {"error":{"message":"Insufficient budget: 0.00 remaining, 50.00 estimated","type":"insufficient_quota"}}'); } };
+  await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: broke }), /out of credits \(429\)/);
+  const down = { chatCompletion: async () => { throw new NoologError(500, 'boom'); } };
+  await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: down }), /boom/);
+});

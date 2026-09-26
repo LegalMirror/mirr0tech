@@ -349,7 +349,7 @@ export function MintView({
       <SeedPoolCard
         record={record}
         client={client}
-        blocked={blocked ?? (demo ? "Pool liquidity is managed from an operator session; the public demo can mint and swap." : null)}
+        blocked={blocked}
         refresh={refresh}
       />
       {review && (

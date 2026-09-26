@@ -500,3 +500,18 @@ test('a demo workspace mints on its own deployed agreement: capped amount, count
   await assert.rejects(workspaces.mutate(stranger, id, 'mint', { ...body, requestId: 'demo-mint-request-0004' }), (error) => [403, 404].includes(error.status), 'only its own agreement');
   await assert.rejects(workspaces.mintOperation(stranger, id, body.requestId), (error) => [403, 404].includes(error.status));
 });
+
+test('a demo workspace seeds its own pool: bounded budgets, counted as a job, status by request id', async () => {
+  const seeded = [];
+  const seeder = { state: async (record) => ({ poolId: record.deployment?.poolId ?? null }), seed: async ({ operation }) => { seeded.push(operation); return { status: 'confirmed' }; } };
+  const agreements = new Agreements({ extract: extractDemo, seeder, deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xtest', policyHash }) });
+  const { workspaces } = await service({ agreements });
+  const { accessToken: token } = await workspaces.session('1.1.1.1');
+  const id = await created(workspaces, agreements, token);
+  await assert.rejects(workspaces.mutate(token, id, 'seed', { requestId: 'demo-seed-request-0001', rwaAmount: '10', usdAmount: '10', extra: 1 }), rejected(400, 'INVALID_BODY'));
+  await assert.rejects(workspaces.mutate(token, id, 'seed', { requestId: 'demo-seed-request-0002', rwaAmount: '10001', usdAmount: '10' }), rejected(400, 'INVALID_BODY'), 'the public cap is 10000 per side');
+  await assert.rejects(workspaces.liquidity(token, id), rejected(409, 'NO_POOL'), 'its own agreement, not yet deployed');
+  const { accessToken: stranger } = await workspaces.session('2.2.2.2');
+  await assert.rejects(workspaces.liquidity(stranger, id), (error) => [403, 404].includes(error.status));
+  await assert.rejects(workspaces.seedOperation(stranger, id, 'demo-seed-request-0001'), (error) => [403, 404].includes(error.status));
+});

@@ -243,6 +243,9 @@ export function demoWorkspaceRoutes(workspaces, status = async () => ({})) {
   for (const method of ['regenerate', 'deploy']) router.post(`/agreements/:id/${method}`, wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, method)));
   router.post('/agreements/:id/mint', json({ limit: '2kb', inflate: false }), wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'mint', req.body)));
   router.get('/agreements/:id/mints/:requestId', wrap(200, (req) => workspaces.mintOperation(tokenOf(req), req.params.id, req.params.requestId)));
+  router.get('/agreements/:id/liquidity', wrap(200, (req) => workspaces.liquidity(tokenOf(req), req.params.id)));
+  router.post('/agreements/:id/liquidity/seeds', json({ limit: '2kb', inflate: false }), wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'seed', req.body)));
+  router.get('/agreements/:id/liquidity/seeds/:requestId', wrap(200, (req) => workspaces.seedOperation(tokenOf(req), req.params.id, req.params.requestId)));
   router.get('/agreements/:id/swap/state', wrap(200, async req => swaps.state(await workspaces.read(tokenOf(req), 'get', req.params.id), req.query.wallet)));
   router.get('/agreements/:id/swap/receipts/:hash', wrap(200, async req => { await workspaces.read(tokenOf(req), 'get', req.params.id); return swaps.receipt(req.params.hash); }));
   for (const [path, method] of [['quote', 'quote'], ['approval', 'approval'], ['transaction', 'swap']]) {

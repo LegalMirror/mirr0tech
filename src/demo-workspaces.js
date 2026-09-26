@@ -12,7 +12,7 @@ import { PROFILES } from '../scripts/export-ui.js';
 const DEFAULT_LIMITS = Object.freeze({
   sessionTtlSeconds: 3 * 3600, intervalSeconds: 3600,
   maxSessions: 200, sessionsPerIp: 10, sessionsPerInterval: 100,
-  requestsPerIp: 1800, requestsPerInterval: 6000, maxPendingRequests: 128,
+  requestsPerIp: 30000, requestsPerInterval: 200000, maxPendingRequests: 128,
   // A deploy costs the operator about 0.01 Sepolia ETH; the hourly deploy cap bounds that spend.
   uploadsPerWorkspace: 25, uploadsPerInterval: 200,
   jobsPerWorkspace: 100, jobsPerInterval: 400,
@@ -200,6 +200,20 @@ export class DemoWorkspaces {
     });
   }
 
+  liquidity(token, id) {
+    return this.run(() => {
+      this.owned(token, id);
+      return this.agreements.liquidityState(id);
+    });
+  }
+
+  seedOperation(token, id, requestId) {
+    return this.run(() => {
+      this.owned(token, id);
+      return safeRecord(this.agreements.seedOperation(id, requestId));
+    });
+  }
+
   mintOperation(token, id, requestId) {
     return this.run(() => {
       this.owned(token, id);
@@ -290,9 +304,13 @@ export class DemoWorkspaces {
   mutate(token, id, method, body) {
     return this.run(async () => {
       const session = this.owned(token, id);
-      ensure(['constrain', 'regenerate', 'deploy', 'mint'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
+      ensure(['constrain', 'regenerate', 'deploy', 'mint', 'seed'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
+      if (method === 'seed') {
+        invalid(fields(body, ['requestId', 'rwaAmount', 'usdAmount']), 'Unsupported seed field');
+        invalid(['rwaAmount', 'usdAmount'].every((key) => typeof body[key] === 'string' && /^\d+(\.\d{1,6})?$/.test(body[key]) && Number(body[key]) <= PUBLIC_MINT_CAP), `A public demo seed is at most ${PUBLIC_MINT_CAP} of each token`);
+      }
       if (method === 'mint') {
-        invalid(fields(body, ['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit']), 'Unsupported mint field');
+        invalid(fields(body, ['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit', 'testAttestations']), 'Unsupported mint field');
         invalid(typeof body.amount === 'string' && /^\d+(\.\d{1,6})?$/.test(body.amount) && Number(body.amount) <= PUBLIC_MINT_CAP, `A public demo mint is at most ${PUBLIC_MINT_CAP} shares`);
       }
       if (method === 'regenerate') this.mockOnly();

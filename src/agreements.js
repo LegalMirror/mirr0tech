@@ -319,7 +319,7 @@ export class Agreements {
     const job = this.deployQueue.then(async () => {
       try {
         await this.persist();
-        await progress(await this.seeder.seed({ record, operation, progress }));
+        await progress(await this.seeder.seed({ record, operation, progress, policy: record.envelope ? this.export(id) : null }));
       } catch (error) {
         await progress({ status: 'failed', error: error instanceof AppError ? error.message : 'Pool seeding failed. Check the transaction hashes and retry this same request.' });
       } finally { this.jobs.delete(id); }

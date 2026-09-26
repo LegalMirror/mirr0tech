@@ -1,3 +1,4 @@
+import { attestTestFact } from './mint.js';
 import { readFileSync } from 'node:fs';
 import { AbiCoder, Contract, formatUnits, keccak256, parseUnits, toBeHex } from 'ethers';
 import { UniswapLiquidity } from '../uniswap-liquidity.js';
@@ -126,7 +127,7 @@ export function createPoolSeeder(signer, api = new UniswapLiquidity()) {
         usdBalance: formatUnits(c.usdBalance, 6),
       };
     },
-    async seed({ record, operation, progress }) {
+    async seed({ record, operation, progress, policy = null }) {
       const c = await context(record);
       const { d, backend } = c;
       await progress({ backend });
@@ -163,11 +164,17 @@ export function createPoolSeeder(signer, api = new UniswapLiquidity()) {
         ],
         signer.provider,
       );
-      const [router, positions, decision] = await Promise.all([
-        hook.router(),
-        hook.positionManager(),
-        hook.explain(backend),
-      ]);
+      const [router, positions] = await Promise.all([hook.router(), hook.positionManager()]);
+      let decision = await hook.explain(backend);
+      // On a test network the issuer vouches for its own liquidity wallet, the way the mint's test
+      // flags do for a recipient: labelled test attestations, never a real World ID proof.
+      if (!decision[0] && policy && [11155111, 31337].includes(Number(d.chainId))) {
+        const oracle = new Contract(d.oracle, ['function attestor() view returns(address)'], signer);
+        for (const fact of ['kycApproved', 'amlApproved', 'identityVerified'].filter((name) => policy.factOrder?.includes(name))) {
+          await attestTestFact({ signer, oracle, record, policy, operation: { recipient: backend }, progress, chainId: Number(d.chainId), fact, label: `${fact} for the issuer's liquidity wallet`, txField: `provider_${fact}TxHash` });
+        }
+        decision = await hook.explain(backend);
+      }
       ensure(
         router.toLowerCase() === UNISWAP.router.toLowerCase() &&
           positions.toLowerCase() === UNISWAP.positionManager.toLowerCase(),

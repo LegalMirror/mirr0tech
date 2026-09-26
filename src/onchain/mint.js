@@ -101,7 +101,7 @@ export function createRwaMinter(signer, { sanctionsAdmin = signer, mockSanctions
 
 // Merge one test attestation while preserving other live facts and their validity window.
 // Explicit test flags may simulate identity and compliance; they never verify real-world evidence.
-async function attestTestFact({ signer, oracle, record, policy, operation, progress, chainId, fact, label, txField }) {
+export async function attestTestFact({ signer, oracle, record, policy, operation, progress, chainId, fact, label, txField }) {
   ensure(chainId === 11155111 || chainId === 31337, 403, 'TESTNET_ONLY', 'Automatic test attestations are available on test networks only.');
   const index = policy.factOrder?.indexOf(fact) ?? -1;
   ensure(index >= 0, 409, 'NO_ATTESTATION_FACT', `This policy does not define ${fact}.`);

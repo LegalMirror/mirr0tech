@@ -116,7 +116,7 @@ function QuoteStep({
       (p) => p.part === first.part && first.displayStart < p.displayEnd && first.displayEnd > p.displayStart
     );
   return (
-    <Step n={1} title="The sentence" hint="verbatim from the agreement" tone={tone}>
+    <Step n={1} title="The sentence" hint="verbatim from the contract" tone={tone}>
       <blockquote className="quote">“{quote}”</blockquote>
       <div className="quote-meta">
         <span className="chip chip-action">{clause}</span>
@@ -435,7 +435,7 @@ function consumerOf(policy: PolicyData, term: Term): ReactNode {
     return (
       <>
         Caps how long an attestation may live ({String(policy.config.attestationValiditySeconds)} s ≤{" "}
-        {String(policy.config.rescreeningIntervalSeconds)} s); a deployment that would outlive the agreement
+        {String(policy.config.rescreeningIntervalSeconds)} s); a deployment that would outlive the contract
         is refused at compile time.
       </>
     );
@@ -490,5 +490,5 @@ export function Pipeline({
   const term = kind === "term" ? policy.terms.find((entry) => entry.name === name) : undefined;
   if (rule) return <RuleSteps policy={policy} rule={rule} evaluator={evaluator} />;
   if (term) return <TermSteps policy={policy} term={term} />;
-  return <p className="muted">Select a highlighted sentence in the agreement.</p>;
+  return <p className="muted">Select a highlighted sentence in the contract.</p>;
 }

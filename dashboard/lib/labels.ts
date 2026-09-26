@@ -13,7 +13,7 @@ export const FACT_LABEL: Record<string, string> = {
   depositConfirmed: "Deposit confirmed",
   depositAvailable: "Deposit available",
   sufficientBalance: "Sufficient balance",
-  mlaCountersigned: "Signed the loan agreement",
+  mlaCountersigned: "Signed the loan contract",
   lenderCheckPassed: "Passed the lender check",
   amlKycProvided: "Provided AML/KYC information",
   notInsolvent: "Not insolvent",
@@ -79,7 +79,7 @@ export const KIND_LABEL: Record<string, string> = {
 /** What each instruction of the buyback program does, without its opcode. */
 export const INSTRUCTION_LABEL: Record<string, string> = {
   "Controls._deadline": "Open until the deadline",
-  "PolicyGuard._policyGuard": "Both sides must pass the agreement",
+  "PolicyGuard._policyGuard": "Both sides must pass the contract",
   "FixedRateBalances._fixedRateBalances": "Fixed price and cap",
   "DutchAuction._dutchAuctionBalanceOut1D": "Price improves over the window",
   "LimitSwap._limitSwap1D": "Swap at that price",
@@ -91,7 +91,7 @@ export const REFUSAL_LABEL: Record<string, string> = {
   NoDepositCredential: "No deposit credential",
   CounterpartyRefused: "Counterparty refused",
   LegalClauseViolation: "A clause was violated",
-  PolicyDenied: "Refused by the agreement",
+  PolicyDenied: "Refused by the contract",
   NoPolicyDoor: "Pool carries no policy hook",
   TransferRefused: "Transfer refused",
   WithdrawalRefused: "Withdrawal refused",

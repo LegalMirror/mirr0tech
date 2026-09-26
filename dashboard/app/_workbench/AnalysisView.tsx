@@ -166,7 +166,7 @@ export function AnalysisView({
               })}
               {!claims.length && (
                 <p className="wb-muted">
-                  No claims match this filter. This does not establish that the agreement is complete.
+                  No claims match this filter. This does not establish that the contract is complete.
                 </p>
               )}
               {!!report.contested.length && (

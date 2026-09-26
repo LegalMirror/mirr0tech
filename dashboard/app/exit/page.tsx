@@ -226,7 +226,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
         <section className="card">
           <h2>Try a quote</h2>
           <p className="small muted">
-            Ask for a price as any wallet. A wallet the agreement refuses is refused before any transaction is
+            Ask for a price as any wallet. A wallet the contract refuses is refused before any transaction is
             sent.
           </p>
           <label>
@@ -286,7 +286,7 @@ function Buyback({ policy, parties }: { policy: PolicyData; parties: Party[] }) 
                 ✓ {amount} position tokens → {fromMicro(result.amountOut)} asset
               </span>
               <span className="small muted">
-                Both sides passed the agreement · price {price}
+                Both sides passed the contract · price {price}
                 {tender ? ` after ${hours} h` : ""}
               </span>
             </div>
@@ -334,14 +334,14 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
   const transferRules = policy.rules.filter((rule) => rule.action === "transfer");
   return (
     <section className="card">
-      <h2>The pool asks the agreement first</h2>
+      <h2>The pool asks the contract first</h2>
       <p className="small muted">
-        Every deposit into the pool, withdrawal from it and swap through it runs the agreement for the wallet
+        Every deposit into the pool, withdrawal from it and swap through it runs the contract for the wallet
         behind it. A pool opened without the hook is inert: its first settlement is refused by the token.
       </p>
       {transferRules.length === 0 && (
         <p className="small">
-          This reading of the agreement allows no transfers at all, so every pool operation is refused and the
+          This reading of the contract allows no transfers at all, so every pool operation is refused and the
           token itself refuses to move. The <strong>Trade on v4</strong> profile adds the transfer rules the
           hook enforces.
         </p>
@@ -367,7 +367,7 @@ function HookCard({ policy, parties }: { policy: PolicyData; parties: Party[] })
                   </td>
                   <td>
                     {decision.allowed ? (
-                      <span className="meta">passes the agreement</span>
+                      <span className="meta">passes the contract</span>
                     ) : (
                       <span
                         title={`revert LegalClauseViolation(${decision.clauseId}, ${short(policy.policyHash, 8, 4)})`}
@@ -395,7 +395,7 @@ function plainInstruction(
   if (ins.name.startsWith("Controls._deadline"))
     return `The offer closes on ${ins.args.date ?? terms.deadline}.`;
   if (ins.name.startsWith("PolicyGuard"))
-    return `Maker and taker are both checked against this agreement (policy ${short(policy.policyHash, 8, 4)}) on every quote and fill.`;
+    return `Maker and taker are both checked against this contract (policy ${short(policy.policyHash, 8, 4)}) on every quote and fill.`;
   if (ins.name.startsWith("FixedRateBalances"))
     return `${terms.price} per token, up to ${Number(terms.cap).toLocaleString()} tokens.`;
   if (ins.name.startsWith("DutchAuction"))
@@ -414,8 +414,8 @@ export default function ExitPage() {
     <>
       <PageHead title={credit ? "How a lender exits" : "How the token trades"}>
         {credit
-          ? "The borrower stands a bid for its own debt on 1inch Aqua; the agreement is checked on every quote and fill."
-          : "Anyone may open a pool, but only a pool that carries the agreement's hook can take the token."}
+          ? "The borrower stands a bid for its own debt on 1inch Aqua; the contract is checked on every quote and fill."
+          : "Anyone may open a pool, but only a pool that carries the contract's hook can take the token."}
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="venue" />}

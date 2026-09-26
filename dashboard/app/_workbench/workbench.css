@@ -252,19 +252,6 @@
   font-size: 11px;
   outline-offset: 4px;
 }
-.wb-library-label {
-  display: flex;
-  justify-content: space-between;
-  gap: 6px;
-  font-size: 8px;
-  letter-spacing: 0.12em;
-  color: #8b99a8;
-  padding: 0 9px 9px;
-}
-.wb-library-label > span {
-  font-size: 7px;
-  color: #a9b4bf;
-}
 .wb-agreement-list {
   flex: 1;
   min-height: 0;
@@ -332,28 +319,6 @@
   min-height: 39px;
   font-size: 12px;
 }
-.wb-root .wb-connection-button {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 12px 0 0;
-  background: transparent;
-  border: 0;
-  border-top: 1px solid #27323e;
-  border-radius: 0;
-  font-size: 11px;
-  text-align: left;
-}
-.wb-connection-button > span:last-child {
-  margin-left: auto;
-  color: var(--muted);
-}
-.wb-connection-button small {
-  display: block;
-  color: #96a3b1;
-  font-size: 9px;
-  margin-top: 2px;
-}
 .wb-legacy-link {
   color: #9dabb9;
   display: flex;
@@ -410,9 +375,9 @@
   background: var(--cyan);
 }
 .wb-services {
-  margin-top: auto;
-  border-top: 1px solid #27323a;
-  padding: 19px 8px 0;
+  border-bottom: 1px solid #27323a;
+  padding-bottom: 20px;
+  overflow-wrap: anywhere;
 }
 .wb-services > div {
   display: flex;
@@ -1316,9 +1281,6 @@
   line-height: 1.85;
 }
 .wb-mobile-head,
-.wb-mobile-services {
-  display: none;
-}
 @media (min-width: 1650px) {
   .wb-clause-quote {
     font-size: 13px;
@@ -1399,23 +1361,8 @@
     border-bottom: 1px solid #2c3841;
     border-right: 0;
   }
-  .wb-views > div,
-  .wb-services {
+  .wb-views > div {
     display: none;
-  }
-  .wb-mobile-services {
-    display: block;
-    border-top: 1px solid #2c3a45;
-    padding: 10px 17px;
-    background: #121c24;
-  }
-  .wb-mobile-services summary {
-    font-size: 10px;
-  }
-  .wb-mobile-services p {
-    font-size: 10px;
-    color: #a4b7c5;
-    margin-top: 10px;
   }
   .wb-views nav {
     display: flex;
@@ -1700,4 +1647,12 @@
     animation: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+.wb-root .wb-settings-button {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
 }

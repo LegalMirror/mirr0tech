@@ -100,7 +100,7 @@ export default function AuditPage() {
   return (
     <>
       <PageHead title="What happened">
-        Every decision, newest first, with the sentence of the agreement behind it.
+        Every decision, newest first, with the sentence of the contract behind it.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !events.data) && !error && <Loading what="audit stream" />}

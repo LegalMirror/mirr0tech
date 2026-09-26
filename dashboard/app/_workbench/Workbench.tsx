@@ -15,7 +15,7 @@ import {
 import { verificationLabel } from "@/lib/workbench";
 import { startDemoWorkspace } from "@/lib/demo-session";
 import { short } from "@/lib/format";
-import { ConnectionDialog, UploadDialog } from "./Forms";
+import { SettingsDialog, UploadDialog } from "./Forms";
 import { Evidence, GraphPane, HumanView, SourceCards } from "./PolicyPanes";
 import { ApiView, DeployView } from "./ServiceViews";
 import { IdentityView } from "./IdentityView";
@@ -60,7 +60,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
   const [view, setView] = useState<View>("ast");
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<{ id: string; node: string } | null>(null);
-  const [connectionOpen, setConnectionOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<
@@ -101,7 +101,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
     try {
       if (confirmation.recordId !== record.id || confirmation.policyHash !== record.policyHash)
         throw new Error(
-          "The agreement changed while this dialog was open. Cancel and review the current policy before confirming again."
+          "The contract changed while this dialog was open. Cancel and review the current policy before confirming again."
         );
       const result =
         confirmation.kind === "deploy"
@@ -146,7 +146,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
         <div className="wb-sidebar-title">
           <h2>Contracts</h2>
           <span>{state.agreements.length.toString().padStart(2, "0")}</span>
-          <button className="wb-icon-button" aria-label="Refresh agreements" onClick={state.refresh}>
+          <button className="wb-icon-button" aria-label="Refresh contracts" onClick={state.refresh}>
             <Icon name="refresh" size={14} />
           </button>
         </div>
@@ -160,11 +160,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             onChange={(e) => setSearch(e.target.value)}
           />
         </label>
-        <div className="wb-library-label">
-          {sample ? "SAMPLE LIBRARY" : "YOUR AGREEMENTS"}
-          <span>{sample ? "READ ONLY" : session.demoToken ? "YOUR DEMO" : "AUTHORIZED"}</span>
-        </div>
-        <nav className="wb-agreement-list" aria-label="Agreement selection">
+        <nav className="wb-agreement-list" aria-label="Contract selection">
           {state.listLoading && (
             <p className="wb-muted" role="status">
               Loading contracts…
@@ -200,8 +196,8 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               {search
                 ? "No matching contracts."
                 : state.listError
-                  ? "Unable to load agreements."
-                  : "Your workspace is empty. Upload your first agreement."}
+                  ? "Unable to load contracts."
+                  : "Your workspace is empty. Upload your first contract."}
             </p>
           )}
         </nav>
@@ -218,29 +214,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             <Icon name="plus" />
             Upload Contracts
           </button>
-          <button className="wb-connection-button" onClick={() => setConnectionOpen(true)}>
-            <Icon name="settings" size={16} />
-            <span>
-              Connection
-              <small>
-                {session.url
-                  ? sample
-                    ? hasGatewaySession(session)
-                      ? "Gateway set · viewing samples"
-                      : session.demoState === "starting"
-                        ? "Creating demo workspace…"
-                        : "Demo API · retry connection"
-                    : session.demoToken
-                      ? "Your workspace · session only"
-                      : "Authorized session"
-                  : "No gateway · sample mode"}
-              </small>
-            </span>
-            <span>↗</span>
-          </button>
-          <Link href="/overview" className="wb-legacy-link">
+          {/* <Link href="/overview" className="wb-legacy-link">
             Open classic dashboard <span>↗</span>
-          </Link>
+          </Link> */}
         </div>
       </aside>
       <aside className="wb-views" aria-label="Workbench views">
@@ -261,68 +237,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             </button>
           ))}
         </nav>
-        <section className="wb-services" aria-label="Actual gateway status">
-          <span className="wb-eyebrow">ENVIRONMENT</span>
-          <div>
-            <i
-              className={`wb-state-dot ${!sample && status?.model.mode === "live" ? "wb-state-compiled" : "wb-state-sample"}`}
-            />
-            <span>
-              Model
-              <small>
-                {sample
-                  ? "Offline · export only"
-                  : status
-                    ? `${status.model.provider} · ${status.model.mode}`
-                    : "Not available"}
-              </small>
-              {!sample && status && <code>{status.model.model}</code>}
-            </span>
-          </div>
-          <div>
-            <i className={`wb-state-dot ${!sample && status ? "wb-state-compiled" : "wb-state-sample"}`} />
-            <span>
-              Compiler
-              <small>
-                {sample
-                  ? "Exported artifact"
-                  : status
-                    ? `Solidity ${status.compiler.solidity.core ?? "not reported"}`
-                    : "Not available"}
-              </small>
-              {!sample && status && (
-                <details>
-                  <summary>All compiler versions</summary>
-                  {Object.entries(status.compiler.solidity).map(([name, version]) => (
-                    <small key={name}>
-                      {name}: {version}
-                    </small>
-                  ))}
-                </details>
-              )}
-            </span>
-          </div>
-          <div>
-            <i
-              className={`wb-state-dot ${!sample && status?.chain ? "wb-state-compiled" : "wb-state-sample"}`}
-            />
-            <span>
-              Chain
-              <small>
-                {sample
-                  ? "Not connected"
-                  : status?.chain
-                    ? `Chain ${status.chain.chainId} · ${session.demoToken ? "demo gateway" : status.chain.deployer ? "signer configured" : "gateway target"}`
-                    : "No signer reported"}
-              </small>
-            </span>
-          </div>
-          {state.statusError && !sample && (
-            <p className="wb-service-error" role="status">
-              Status unavailable: {state.statusError}
-            </p>
-          )}
-        </section>
       </aside>
       <main id="workbench-main" className="wb-main" tabIndex={-1}>
         <header className="wb-topbar">
@@ -340,7 +254,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           </div>
           <div className="wb-top-actions">
             <button
-              aria-label="Regenerate agreement"
+              aria-label="Regenerate contract"
               title={
                 !writable ? "An active demo workspace is required" : "Regenerate from the original documents"
               }
@@ -369,7 +283,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               {policy && <span>↗</span>}
             </button>
             {record && (
-              <span className="wb-record-state">{sample ? "Not a live agreement" : record.status}</span>
+              <span className="wb-record-state">{sample ? "Not a live contract" : record.status}</span>
             )}
           </div>
           <div>
@@ -395,7 +309,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <strong>Sample workspace.</strong> Real compiler export; not a live upload, model run, or
               deployment.
             </span>
-            <button onClick={() => (hasGatewaySession(session) ? setSample(false) : setConnectionOpen(true))}>
+            <button onClick={() => (hasGatewaySession(session) ? setSample(false) : setSettingsOpen(true))}>
               {hasGatewaySession(session) ? "Return to gateway" : "Connect gateway"}
               <Icon name="arrow" size={14} />
             </button>
@@ -405,7 +319,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           <Notice>
             {session.demoNotice}
             {["unavailable", "expired"].includes(session.demoState ?? "") && (
-              <button onClick={() => setConnectionOpen(true)}>Start / retry demo workspace</button>
+              <button onClick={() => setSettingsOpen(true)}>Start / retry demo workspace</button>
             )}
           </Notice>
         )}
@@ -437,10 +351,10 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             <Icon name="tree" size={40} />
             <h2>
               {state.id
-                ? "Opening your agreement…"
+                ? "Opening your contract…"
                 : state.listLoading
                   ? "Loading workspace…"
-                  : "Start with the agreement."}
+                  : "Start with the contract."}
             </h2>
             <p>
               {state.id
@@ -453,7 +367,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                   Upload a contract
                 </button>
                 {!sample && <button onClick={() => setSample(true)}>Explore sample exports</button>}
-                <button onClick={() => setConnectionOpen(true)}>Connection</button>
               </div>
             )}
           </div>
@@ -482,7 +395,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               writable={writable && !session.demoToken}
               client={client}
               onConfigure={() => setView("deploy")}
-              onConnect={() => setConnectionOpen(true)}
+              onConnect={() => setSettingsOpen(true)}
               onTrace={() => {
                 const rule = policy.rules.find((rule) => rule.id.endsWith("-identity-verified"));
                 if (rule) onSelect(`rule:${rule.id}`);
@@ -544,8 +457,8 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <span className="wb-eyebrow">{record.status}</span>
               <h2>
                 {record.status === "failed"
-                  ? "This agreement needs attention."
-                  : "Your agreement is becoming a policy."}
+                  ? "This contract needs attention."
+                  : "Your contract is becoming a policy."}
               </h2>
               <p>
                 {record.status === "failed"
@@ -555,27 +468,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <button onClick={state.refresh}>Refresh status</button>
             </div>
           ))}
-        <details className="wb-mobile-services">
-          <summary>
-            Environment ·{" "}
-            {sample
-              ? "offline sample"
-              : status
-                ? `${status.model.mode} model · chain ${status.chain?.chainId ?? "not configured"}`
-                : "status unavailable"}
-          </summary>
-          <p>
-            {sample
-              ? "No live model, compiler version or chain status is asserted for sample exports."
-              : status
-                ? `Model: ${status.model.provider} / ${status.model.model} (${status.model.mode}). Solidity: ${Object.entries(
-                    status.compiler.solidity
-                  )
-                    .map(([name, version]) => `${name} ${version}`)
-                    .join(", ")}. Chain: ${status.chain?.chainId ?? "no signer"}.`
-                : state.statusError || "Waiting for /v1/status."}
-          </p>
-        </details>
         <footer className="wb-statusbar">
           <span>
             <i
@@ -593,17 +485,28 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             {record?.policyHash ? `policy ${short(record.policyHash, 8, 6)}` : "No compiled policy"}
           </span>
           <span>
-            {!sample && inFlight(record?.status)
-              ? "Polling every 2s"
-              : sample
-                ? "Read only"
-                : session.demoToken
-                  ? "Scoped demo workspace"
-                  : "Authorized session"}
+            {!sample && inFlight(record?.status) ? "Polling every 2s" : sample ? "Read only" : null}
           </span>
+          <button
+            className="wb-icon-button wb-settings-button"
+            aria-label="Settings"
+            title="Settings"
+            aria-haspopup="dialog"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <Icon name="settings" size={18} />
+          </button>
         </footer>
       </main>
-      {connectionOpen && <ConnectionDialog session={session} onClose={() => setConnectionOpen(false)} />}
+      {settingsOpen && (
+        <SettingsDialog
+          session={session}
+          sample={sample}
+          status={status}
+          statusError={state.statusError}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {uploadOpen && (
         <UploadDialog
           onClose={() => setUploadOpen(false)}
@@ -628,7 +531,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             confirmation.kind === "deploy"
               ? "Deploy this policy?"
               : confirmation.kind === "regenerate"
-                ? "Regenerate this agreement?"
+                ? "Regenerate this contract?"
                 : "Recompile identity policy?"
           }
           busy={busy}

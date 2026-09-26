@@ -102,7 +102,7 @@ const VENUES: Record<ProfileId, Record<string, Venue[]>> = {
         contract: "MirrorToken",
         file: TOKEN,
         calls: ["_update(from, to, value)"],
-        when: "every peer transfer; this agreement compiles no transfer permit",
+        when: "every peer transfer; this contract compiles no transfer permit",
         refusal: { name: "TransfersDisabled", params: [] },
       },
     ],

@@ -7,7 +7,7 @@ export const ACTS: { profile: ProfileId; act: number; label: string; doc: string
     profile: "rwa-secondary",
     act: 1,
     label: "Fund",
-    doc: "Securitize transfer-agent agreement, with the transfer rules the Uniswap v4 hook enforces",
+    doc: "Securitize transfer-agent contract, with the transfer rules the Uniswap v4 hook enforces",
   },
   { profile: "wildcat-credit", act: 2, label: "Loan", doc: "Wildcat MLA + Lender Check Policy + addendum" },
 ];

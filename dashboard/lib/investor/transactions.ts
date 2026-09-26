@@ -89,7 +89,7 @@ export function tradingBlocked(fund: PublicFund, snapshot: Snapshot | null): str
   if (!fund.cashier)
     return (
       fund.disabledReason ||
-      "Read-only legacy fund. Ask the issuer to publish a cashier-enabled agreement with the bounded router."
+      "Read-only legacy fund. Ask the issuer to publish a cashier-enabled contract with the bounded router."
     );
   if (fund.disabledReason) return fund.disabledReason;
   if (!snapshot) return "Sign in and refresh the on-chain snapshot before preparing a transaction.";

@@ -2,65 +2,54 @@
 
 | | |
 | --- | --- |
-| **Status** | **v3**. Supersedes v2 and v1 (`PRD_v1.pdf`). Decisions locked unless marked ⚠️. Both acts green on anvil, deployed and seeded on Sepolia; dashboard public on GitHub Pages; World ID document credential live as a policy fact; extraction generated and verified by a deliberation. In progress: Agreements API (branch `feat/agreements-api`), then the workbench UI (§10) |
-| **Owner** | Lam (PM) |
-| **Team** | Lam (PM, pitch, legal content, QA) · Eng A (contracts + chain) · Eng B (backend, integrations) · UI shared |
+| **Status** | **v4** (2026-09-26). Supersedes v3. One flow: login → upload → constrain with World ID → deploy → trade through the hook. Green on anvil end to end (`test/chain/flow.test.js`); the base stack is on Sepolia; the CLI (`scripts/mirr0.js`) is the front end; the workbench UI (§10) is deferred. Decisions locked unless marked ⚠️ |
+| **Owner / team** | Lam (PM, pitch, legal content, QA) · Eng A (contracts + chain) · Eng B (backend, integrations) · UI shared |
 | **Deadline** | **Sun 27 Sep 2026, 09:00 JST** submission. Code freeze **Sun 03:00 JST** |
 | **Repo** | `LegalMirror/mirr0tech`, branch `main` |
-| **Chain** | **Sepolia, one chain.** Canonical Uniswap v4 `PoolManager` and canonical 1inch Aqua registry reused; our router is a modified SwapVM redeploy, which the 1inch rules allow. MultiBaas registers every contract |
-| **Tracks** | One prize per company. **1inch — Build an Aqua App** · **Curvegrid — Best RWA Tokenization Project** (⚠️ or Digital Asset Dashboard, Lam picks) · **World** — document credential as the KYC fact · Uniswap — hook claim ready, P1. Table in §12 |
-| **Appendices** | [ARCHITECTURE.md](ARCHITECTURE.md) · [AGREEMENTS_API.md](AGREEMENTS_API.md) · [SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md) · [MLA_CLAUSE_MAP.md](MLA_CLAUSE_MAP.md) · [WORLD_ID.md](WORLD_ID.md) · [NOOLOG.md](NOOLOG.md) · [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
+| **Chain** | **Sepolia, one chain.** Canonical Uniswap v4 `PoolManager` reused. MultiBaas indexes the deployment |
+| **Tracks** | One prize per company. **World** — document credential as the KYC fact · **Uniswap** — v4 hook · **Curvegrid** — indexing + HSM custody (⚠️ RWA Tokenization or Digital Asset Dashboard, Lam picks). Table in §12 |
+| **Appendices** | [ARCHITECTURE.md](ARCHITECTURE.md) · [AGREEMENTS_API.md](AGREEMENTS_API.md) · [API.md](API.md) · [WORLD_ID.md](WORLD_ID.md) · [NOOLOG.md](NOOLOG.md) · [DEMO_SCRIPT.md](DEMO_SCRIPT.md) |
 
-> Terms: **MLA** = Wildcat's template Master Loan Agreement. **Term Sheet** = Exhibit A of the MLA. **Lender Check Policy** = the borrower's own admission process document (the MLA delegates to it). **AST** = the structured policy generated from a document. **Credential** = Wildcat's on-chain permission to deposit. **Role Provider** = the contract Wildcat calls to grant it. **Agreement record** = one uploaded document and its lifecycle in the Agreements API.
+> Terms: **Agreement record** = one uploaded document and its lifecycle in the Agreements API. **AST** = the policy generated from it: rules, terms, unresolved items, each quoting the text verbatim. **Constraint** = a rule the issuer adds after generation; today, the World ID identity constraint. **Fact** = a three-valued input to a rule (true / false / unknown). **Policy hash** = hash over source + AST + config.
 
 ## 1. One-sentence pitch
 
-mirr0tech links a tokenized asset's off-chain legal clauses to the on-chain code that executes them: the fund's transfer-agent agreement becomes the token's issuance rules and the Uniswap v4 hook it trades through; the Wildcat MLA under which it is lent becomes the role provider that admits lenders and the 1inch Aqua strategy that gives them an exit. One compiler, one asset, every decision traceable to a verbatim clause.
+mirr0tech compiles a tokenized asset's legal agreement into the token's issuance rules and the Uniswap v4 hook it trades through: upload the document, add the World ID constraint the agreement asks for, deploy, and every decision on chain names the sentence that made it.
 
 ## 2. Problem
 
-A tokenized asset's documents govern who may hold it, where it may trade and on what terms it may be lent. Almost none of that reaches the chain; the translation lives in a spreadsheet, so the chain enforces an allowlist, not the agreement.
-
-- **Issue and trade.** A fund's transfer-agent agreement (Securitize/BlackRock type) names the onboarding a holder must clear. On chain: a custodial ledger and a hand-kept allowlist. A pool would breach the agreement, so counsel says no; billions in primary issuance, negligible secondary volume.
-- **Lend it out.** Market makers borrow through **Wildcat**; each market's MLA delegates lender admission to an on-chain **Role Provider** running the borrower's **Lender Check Process** (§1). Today: manual checks, point-in-time screening, payouts without a fresh check, no compliant exit (§12 permits transfer only to a credentialed wallet; no venue enforces that, so none exists).
-- **Common root.** Nothing proves which clause justified which action. A list cannot tell *not permitted* from *not yet checked*, so it over-admits or over-blocks silently.
-
-Who feels it: the issuer's transfer agent and counsel; the borrower's compliance team; lenders who want out; treasury (cheaper capital when lenders have an exit).
+A fund's transfer-agent agreement (Securitize/BlackRock type) says who may hold the token and what onboarding they must clear. On chain that becomes a hand-kept allowlist. A list cannot tell *not permitted* from *not yet checked*; nothing proves which clause justified which action; a pool would breach the agreement, so counsel says no. Billions in primary issuance, negligible secondary volume. Who feels it: the issuer's transfer agent and counsel; the investor who proves identity twice; the auditor who asks why a wallet was refused.
 
 ## 3. Goals, non-goals, success criteria
 
-**Goals — one asset, two phases, one loop**
+**Goals — one agreement, one issuer, one token**
 
-- G0. **Core loop** (§4): upload any agreement, generate its policy by deliberation, verify every claim against the text, compile, deploy a policy-managed token + pool. Backend: Agreements API. UI: workbench (§10).
-- G1. Compile the Securitize/BlackRock agreement into the permissioned fund token; issue to onboarded investors. Done.
-- G2. Same agreement → Uniswap v4 hook, the token's **only door into Uniswap**: anyone may create a pool; only hooked pools can hold the token; a stranger is refused quoting "Exhibit A — Investor Onboarding". Done.
-- G3. Compile the real Wildcat MLA + Term Sheet + Lender Check Policy + buyback addendum with the proof that on-chain and off-chain decisions agree. Done.
-- G4. Admit, deny and re-screen lenders on Sepolia through Wildcat's real `IRoleProvider`; review for unknowns; no override of prohibitions. Done.
-- G5. Lender exit on 1inch Aqua: shipped buyback, admitted fill, stranger refused at quote time. Done.
-- G6. Payment-time eligibility via `mayWithdraw`. Done.
-- G7. World ID document credential as the KYC fact `identityVerified` for issuance and the pool. Done.
-- G8. UI: policy ↔ clause with verification, lenders, exits, audit; target workbench in §10.
+- G1. Upload any agreement; a deliberation generates its AST with a verdict per claim and a confidence; the policy compiles with proof. Done.
+- G2. The issuer puts a World ID constraint on the agreement; the rule and the credential are in the hash. Done.
+- G3. Deploy from the record: oracle, token, hook, pool on the canonical `PoolManager`. Done.
+- G4. The hook is the token's only door: a verified investor trades; a stranger is refused with the sentence. Done.
+- G5. Platform capabilities around the flow: payments in, key custody, indexing, an OpenAPI contract (§8.5). Done.
 
-**Non-goals**: a real Wildcat V2 market on Sepolia (mock market calls the real provider interface); real KYC/screening vendors or funds (mock USDC); interest/delinquency state machine; PDF/OCR; investor self-service auth (operator API only); legal correctness guarantees.
+**Non-goals**: real KYC/screening vendors or funds (mock USD); PDF/OCR; investor self-service auth (operator API only); legal correctness guarantees; a rebasing token (v4 has no rebasing balances).
 
 **Success criteria at freeze**
 
-- [ ] Golden path (§5) runs on Sepolia from the UI in < 5 min, both acts.
-- [ ] Act 1: one investor verified, minted and pooled; one stranger refused at the pool with the clause; one reused proof refused `HUMAN_ALREADY_BOUND`.
-- [ ] Act 2: one denied onboarding, one held payout, one refused exit fill, each with the quote; `quote()` reverts for an unadmitted taker before any tx.
-- [ ] An agreement uploaded through `POST /v1/agreements` reaches `compiled` with a Verified badge, and `deploy` puts its pool on chain.
+- [ ] §5 runs on Sepolia from the CLI in < 5 min.
+- [ ] One investor verified, minted and pooled; one stranger refused at the pool with the sentence; one reused proof refused `HUMAN_ALREADY_BOUND`; one wrong credential refused `WRONG_CREDENTIAL`; one payment minted through the webhook, one held with the sentence.
 - [ ] §12 items ticked; public repo, README, video, live URL.
 
-## 4. Core loop: upload → generate → verify → compile → deploy
+## 4. The flow: login → upload → constrain → deploy → prove
 
-The product is this loop; the two acts are two agreements run through it. Backend spec: [AGREEMENTS_API.md](AGREEMENTS_API.md).
+Backend spec: [AGREEMENTS_API.md](AGREEMENTS_API.md). Every CLI command is one call of it.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> uploaded: POST /v1/agreements (text, md or html parts)
+    [*] --> uploaded: POST /v1/agreements
     uploaded --> extracting: deliberation started (nsed:deep)
     extracting --> verified: AST validated, quotes verbatim, verdicts attached
     verified --> compiled: policyHash, clause table, DNF, Solidity, equivalence proof
+    compiled --> compiled: PUT /constraints (new hash)
+    deployed --> compiled: PUT /constraints (deploy again)
     compiled --> deploying: POST /deploy
     deploying --> deployed: oracle, token, hook, pool on chain
     deploying --> compiled: deploy error, message on the record
@@ -71,55 +60,53 @@ stateDiagram-v2
     failed --> extracting: POST /regenerate
 ```
 
-| Step | What happens | Evidence in the UI |
+| Step | What happens | Evidence |
 | --- | --- | --- |
-| Upload | document normalized; `sha256` of raw bytes and text | source name, hashes |
-| Generate | a deliberation (extractor + critic agents) proposes rules, terms and open items, each with a verbatim quote; the hand-authored fixture seeds it as a draft when its quotes hold in the document (the mock needs that draft; the live model reads any document) | model mode (mock/live), job id |
-| Verify | every claim gets per-agent verdicts `verified / contested / unverified / wrong`; contested items carry the evaluator's counter-position; the AST is validated against the text | Verified badge with confidence; contested markers on clause cards |
-| Compile | DNF per rule, exhaustive equivalence proof, clause table hash, `policyHash` over source + AST + config, Solidity generated | policy hash, coverage, equivalence checks |
-| Deploy | background job: Solidity compiled at runtime; `PolicyOracle` + `CompiledMirrorToken` + `MirrorPolicyHook` (salt mined) deployed; pool initialized on the stack's `PoolManager` | addresses, five txs, pool id, explorer links, refusal demo |
+| 1 Login | `mirr0 login <url> <key>`. Bearer `API_KEY` writes; `VIEWER_KEY` reads | `GET /v1/status`: model, compiler, chain |
+| 2 Upload → AST | `POST /v1/agreements`. A Noolog deliberation (extractor + critic) proposes rules, terms and open items, each quoting the document verbatim; every claim gets a verdict `verified / contested / unverified / wrong`, the report a confidence; the AST is validated against the text; the policy compiles: `policyHash` over source + AST + config, clause table, DNF programs, generated Solidity, exhaustive equivalence proof. `GET /ast` is the tree agreement → actions → rules → facts/terms | status, confidence, contested count, hash |
+| 3 Constrain | `PUT /constraints { identity: { credential, actions, quote, clause } }` adds `require identityVerified` per action, quoting the sentence that asks for it, and records the credential in the config. Both inside the hash → `compiled` again, `deployment: null` | new hash; `GET /constraints` |
+| 4 Deploy | `POST /deploy`: Solidity compiled at runtime; `PolicyOracle` + `CompiledMirrorToken` + `MirrorPolicyHook` (CREATE2 salt mined) deployed; pool initialized on the shared `PoolManager` with the hook. Venue routes `/v1/agreements/:id/stack/*` open (facts, World ID proof, mint/release, liquidity, swap, audit) | addresses, five txs, pool id |
+| 5 Prove | facts alone do not admit: the refusal names `transfer-identity-verified` and the sentence; `mirr0 verify` (World ID proof) admits; the investor adds liquidity and swaps through the hook; a stranger's swap is `POLICY_REFUSED` with the sentence | audit: `worldid.verify ok`, `rwa.pool.swap refused` |
 
-A record is immutable per hash. `regenerate` starts a new deliberation and keeps the old hash in `history`. Any text change in the AST changes the hash and requires a redeploy. Auth: the gateway bearer (`API_KEY` writes, `VIEWER_KEY` reads).
+A record is immutable per hash. `regenerate` starts a new deliberation and keeps the old hash in `history`. Any change to the AST or config changes the hash and requires a redeploy. With the mock model (`NOOLOG_API_KEY` unset) the demo agreements are read from the hand-authored draft; the live model reads any document.
 
 ## 5. Demo script (golden path)
 
-Narration and timing in [DEMO_SCRIPT.md](DEMO_SCRIPT.md). One asset, start to finish.
+Narration and timing in [DEMO_SCRIPT.md](DEMO_SCRIPT.md). `test/chain/flow.test.js` runs exactly this on anvil.
 
-**Act 1 — tokenize and trade (Securitize agreement)**
+```sh
+mirr0 login http://127.0.0.1:3000 local-dev-stack-operator-key-only
+mirr0 upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL   # → agr_…  extracting
+mirr0 show agr_… --wait compiled && mirr0 ast agr_…                    # Verified, confidence, the tree
+mirr0 constrain agr_… --credential document --actions mint,transfer    # the trust decision, in the hash
+mirr0 deploy agr_… --wait                                              # oracle, token, hook, pool
+mirr0 facts agr_… Investor kycApproved=true amlApproved=true sanctionsClear=true
+mirr0 explain agr_… Investor                                           # refused — transfer-identity-verified
+mirr0 verify agr_… Investor                                            # World ID proof (mock without --proof)
+mirr0 fund agr_… Investor 10000 && mirr0 mint agr_… 10000 && mirr0 release agr_… Investor 5000
+mirr0 pool agr_… liquidity Investor && mirr0 pool agr_… swap Investor  # through the hook
+mirr0 pool agr_… swap Stranger && mirr0 audit agr_…                    # POLICY_REFUSED, with the sentence
+```
 
-| # | View | What happens | Shown |
-| --- | --- | --- | --- |
-| 1 | Human Language | Upload the fund agreement. Generating → Verified: clause cards with quote, rule, verdict; confidence badge; contested items | Noolog |
-| 2 | Contract-AST | agreement → actions → rules → facts/terms; `identityVerified` under mint and transfer | — |
-| 3 | Deploy | Compile + deploy: oracle, token, hook (mined address), pool on the canonical `PoolManager`; hash on chain | Curvegrid, Uniswap |
-| 4 | Investors | Investor verifies with World ID (Document credential) → `identityVerified` attested → onboarding facts → mint. Stranger reusing the proof → `HUMAN_ALREADY_BOUND` | World |
-| 5 | Deploy · refusal demo | Hookless pool: `initialize` ok, first `addLiquidity` reverts at the token (`NoPolicyDoor`). Hooked pool: investor adds liquidity and swaps; stranger refused, "Exhibit A — Investor Onboarding" rendered | Uniswap |
-
-**Act 2 — lend it out (Wildcat MLA)**
-
-| # | View | What happens | Shown |
-| --- | --- | --- | --- |
-| 6 | Human Language | Switch agreement: MLA + Term Sheet + Lender Check Policy + addendum. Same loop, different paper; the MLA's repeated sentences come back contested | Noolog |
-| 7 | Lenders | A: facts attested → auto-approved, `getCredential(A)` returns a timestamp, deposit succeeds. B: `mlaCountersigned` unknown → review. C: oracle-designated → denied, no override | — |
-| 8 | Exit | Borrower ships the buyback to Aqua (0.96, cap, deadline); no capital moves; program disassembled: `Deadline · PolicyGuard(policyHash) · FixedRateBalances · LimitSwap`; hash chain shown. Tender-offer variant: `DutchAuctionBalanceOut` from A1.5 | 1inch |
-| 9 | Exit | A quotes and fills (`pull`/`push`). Stranger quotes → `LegalClauseViolation`, MLA §12(b) rendered | 1inch |
-| 10 | Lenders → Exit | Officer designates A. A's next quote reverts; `mayWithdraw(A)` blocked citing §13. Nothing redeployed | 1inch |
-| 11 | Audit | Timeline of every decision with clause and tx (MultiBaas events on Sepolia). Close: change one word → new `policyHash`; the deployed hook and strategy keep enforcing the document as signed | Curvegrid |
+| # | Shown | Partner |
+| --- | --- | --- |
+| 1 | Generating → Verified: rules with quote and verdict, confidence, contested items. Contract-AST after `constrain`: `identityVerified` under mint and transfer, the hash changed | Noolog |
+| 2 | Deploy: oracle, token, hook (mined address), pool on the canonical `PoolManager`; hash on chain | Curvegrid, Uniswap |
+| 3 | Investor verifies with the Document credential → `identityVerified` → mint. Stranger reusing the proof → `HUMAN_ALREADY_BOUND`; a proof of human → `WRONG_CREDENTIAL` | World |
+| 4 | Investor adds liquidity and swaps; stranger refused, "Exhibit A — Investor Onboarding" rendered. Hookless pool (`pool create --hookless`): `initialize` ok, first `addLiquidity` reverts at the token (`NoPolicyDoor`) | Uniswap |
+| 5 | Audit: every decision with clause and tx; MultiBaas events on Sepolia. Close: change one word → new hash; the deployed hook keeps enforcing the document as signed | Curvegrid |
 
 ## 6. Users and key stories
 
 | As a… | I want to… | So that… | Pri |
 | --- | --- | --- | --- |
-| Compliance officer | upload an agreement and see each rule next to the clause it came from, with who verified it | I can check the machine's reading before anything goes live | P0 |
-| Compliance officer | see contested readings flagged, not hidden | I review the edge cases, not the whole document | P0 |
-| Issuer | deploy the token and its pool from the verified policy in one action | the venue enforces the prospectus without an allowlist | P0 |
+| Compliance officer | upload an agreement and see each rule next to the clause it came from, with who verified it and what is contested | I review the edge cases, not the whole document | P0 |
+| Issuer | choose the credential the agreement's KYC sentence needs, and have that choice in the hash | the deployed token carries my trust decision | P0 |
+| Issuer | deploy the token and its pool from the verified policy in one action | the venue enforces the agreement without an allowlist | P0 |
 | Investor | prove identity once with a document credential | I am onboarded without handing over my data twice | P0 |
-| Compliance officer | have clean lenders auto-approved and only unknowns queued | my time goes to edge cases | P0 |
-| Compliance officer | never be able to approve a sanctioned wallet | a mis-click cannot become a breach | P0 |
-| Lender | sell my position to an admitted buyer before the withdrawal cycle | I have an exit with a price instead of a queue | P0 |
-| Borrower treasury | stand a buyback bid without parking capital | lenders accept a lower rate because they can leave | P0 |
-| Treasury ops | have withdrawals screened at payment time | we never pay a newly sanctioned wallet | P0 |
-| Auditor | see why any wallet was allowed, paid, refused or blocked | regulators get answers in minutes | P0 |
+| Investor | pay in USD and receive shares, or be told which sentence held them | funding and onboarding are one step | P1 |
+| Issuer | keep the operator key in an HSM, not on the gateway's disk | a compromised server cannot sign | P1 |
+| Auditor | see why any wallet was allowed, refused or held | regulators get answers in minutes | P0 |
 
 ## 7. Solution
 
@@ -128,181 +115,145 @@ Detail in [ARCHITECTURE.md](ARCHITECTURE.md).
 ```mermaid
 flowchart LR
   DOC[agreement] --> GEN[generate + verify<br/>deliberation]
-  GEN --> AST[AST + verification]
-  AST --> CMP[compile<br/>DNF · proof · policyHash]
-  CMP --> ATT[PolicyAttestor]
+  GEN --> AST[AST + verdicts]
+  AST --> CON[constrain<br/>World ID rule + credential]
+  CON --> CMP[compile<br/>DNF · proof · policyHash]
+  CMP --> ORC[PolicyOracle]
   CMP --> TOK[CompiledMirrorToken]
-  CMP --> HOOK[MirrorPolicyHook · v4]
-  CMP --> RP[MirrortechRoleProvider · Wildcat]
-  CMP --> RTR[MirrortechRouter · SwapVM/Aqua]
-  GW[gateway: stack API · agreements API · audit] --- ATT
+  CMP --> HOOK[MirrorPolicyHook · v4 pool]
+  GW[gateway: agreements · venue · payments · signing · events · openapi] --- ORC
 ```
 
-One compiler, one evaluator (`PolicyEval.sol`), several venues. The policy never varies logic; it varies two `uint256` words and template parameters. Kept from the original MVP: normalization and provenance, verbatim-quote validation, strict schema, fail-closed evaluator, idempotency and audit in the service layer.
+One compiler, one evaluator (`PolicyEval.sol`), one venue per agreement. The policy never varies logic; it varies two `uint256` words and template parameters. Kept, out of the flow: the credit venue (Wildcat `IRoleProvider`, 1inch Aqua/SwapVM router; `contracts/MirrortechRoleProvider.sol`, `contracts/swapvm/`, [SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md), [MLA_CLAUSE_MAP.md](MLA_CLAUSE_MAP.md)) still builds, tests and sits on Sepolia; it is not the product story.
 
 ## 8. Functional requirements
 
 P0 = in the demo · P1 = if P0 green · P2 = stretch.
 
-### 8.1 Policy and legal content (Lam + Eng B)
+### 8.1 Policy and legal content
 
-- **P0** Source documents in `test/human_contracts/`: Securitize/BlackRock services agreement (public, interpreted as a subset); Wildcat template MLA verbatim with an illustrative Exhibit A ("Demo MM Ltd", mUSDC, transferability (ii)); one-page Lender Check Policy (screening cadence 30 days); one-clause buyback addendum (price, cap, expiry, ceiling, window). No real counterparty names.
-- **P0** Generation by deliberation with the hand-authored fixture as the draft; the verification report ships in every export. **P1** Live extraction diff against the fixture reading.
-- **P0** Fact set; unknown fails closed. Observable facts are read on-chain; attested facts are signed into `PolicyAttestor` with expiry.
+- **P0** Source document in `test/human_contracts/`: the public Securitize/BlackRock services agreement (`ea026411904ex10-9.htm`), interpreted as a subset. No real counterparty names.
+- **P0** Generation by deliberation; the verification report ships in every export. Unknown fails closed. Observable facts are read on chain; attested facts are signed into `PolicyAttestor` with expiry. What the document leaves undecided goes in `unresolved`; the demo profile compiles past it, the report shows it.
 
 | Fact | Source | Type | Clause | Used by |
 | --- | --- | --- | --- | --- |
-| `identityVerified` (bit 17) | World ID Document credential, verified by the gateway | attested | Exhibit A — Investor Onboarding | mint, transfer (fund) |
-| `kycApproved`, `amlApproved`, `subscriptionAccepted`, … | operator | attested | fund agreement, Exhibit A | mint, burn, transfer (fund) |
-| `sanctionsClear` | sanctions oracle (mock on Sepolia) | observable | Exhibit A; MLA §13(b) | all actions |
-| `mlaCountersigned` | operator | attested | §20, Exhibit A signatures | deposit, transfer |
-| `lenderCheckPassed` | operator per Lender Check Policy | attested | §1 Lender Check Process | deposit, transfer |
-| `amlKycProvided`, `notInsolvent` | operator | attested | §3(j), §3(e) | deposit |
-| `screeningCurrent` | attestation not expired | derived | Lender Check Policy | deposit, withdraw, transfer |
-| `openTermState` | market state | observable | §1, §2(f) | withdraw |
-| `borrowerOverride` | borrower role, logged, window-bound | attested | §13(c)(y) | withdraw |
+| `identityVerified` | the World ID credential named by the constraint, verified by the gateway | attested | the sentence the constraint quotes (Exhibit A — Investor Onboarding) | the actions the constraint names |
+| `kycApproved`, `amlApproved`, `subscriptionAccepted` | operator | attested | Exhibit A | mint, transfer |
+| `depositConfirmed` | payment webhook, or operator | attested | subscription and payment | mint |
+| `sanctionsClear` | sanctions oracle (mock on Sepolia) | observable | Exhibit A | all actions |
 
-- **P0** Everything the documents leave undecided goes in `unresolved` and blocks compilation without `--demo`. MLA mapping: [MLA_CLAUSE_MAP.md](MLA_CLAUSE_MAP.md).
-- **P0** Terms: `buybackPrice`, `buybackCap`, `buybackDeadline`, `buybackCeiling`, `buybackWindowHours` from the addendum.
+### 8.2 Decision engine
 
-### 8.2 Decision engine (Eng B)
+Allow when every `require` is true, a `permit` is true, no `forbid` is true and every fact is known; refuse otherwise: `403 POLICY_REFUSED` off chain, `LegalClauseViolation(clauseId, policyHash)` on chain, the audit names the sentence. `explain(wallet, action)` off chain and on chain return the same `(allowed, clauseId)`.
 
-| Outcome | Condition | Effect |
+### 8.3 Contracts — built
+
+`PolicyEval`, `PolicyAttestor` (no reason strings), `PolicyOracle`, `MirrorToken` + generated `CompiledMirrorToken`, `MirrorPolicyHook` (mined address; transient handshake; `NoPolicyDoor` at the token), `MockSanctionsOracle`, `MockERC20`. Hook scope claimed: admission on `beforeAddLiquidity` / `beforeRemoveLiquidity` / `beforeSwap` plus the handshake; no quota, lockup, fee or LVR claims. **P1** counsel EIP-712 signature over `policyHash`; merkleized clause table.
+
+### 8.4 World ID constraint — built
+
+`PUT /v1/agreements/:id/constraints { identity: { credential: document | proof_of_human | selfie, actions: [mint, transfer, burn], quote, clause } }`; `identity: null` lifts it; `400 QUOTE_NOT_FOUND` when the quote is not verbatim in the document. Minimum sufficient credential: **Document** (Passport/NFC, `issuer_schema_id` 9303) for KYC/AML onboarding; `proof_of_human` where only a person is needed; `selfie` for liveness. The verifier for that agreement accepts only that credential (`WRONG_CREDENTIAL`), refuses a proof whose signal is another wallet (`INVALID_PROOF`), binds the nullifier to one wallet (`HUMAN_ALREADY_BOUND`) and attests the fact with expiry. Mock proofs without `WORLD_RP_ID`. [WORLD_ID.md](WORLD_ID.md).
+
+### 8.5 Platform capabilities around the flow — built
+
+Routes: Agreements API `/v1/status`, `/v1/agreements*`, `/v1/agreements/:id/stack/*` ([AGREEMENTS_API.md](AGREEMENTS_API.md)); Stack API `/v1/stack/*` over the base deployment ([API.md](API.md)); the four below. Conventions: decimal-string amounts, `Idempotency-Key` on operations, bearer auth except the webhook and the contract, error envelope `{ error: { code, message } }`.
+
+| Capability | Endpoint and behaviour | Where |
 | --- | --- | --- |
-| approve | every `require` true, a `permit` true, no `forbid` true, facts known | attest → credential |
-| review | no `forbid` true, some fact unknown | queue; officer sets attestations; re-evaluate |
-| deny | any `forbid` true | hard stop; no officer override; only the borrower's §13(c)(y) path |
-
-`explain(wallet, action)` on chain returns the same `(allowed, clauseId)`; the UI shows both.
-
-### 8.3 Contracts (Eng A) — built
-
-`PolicyEval`, `PolicyAttestor` (no reason strings; `overrideFacts` under `BORROWER_ROLE`), `PolicyOracle`, `MirrorToken` + generated `CompiledMirrorToken`, `MirrorPolicyHook` (mined address; transient handshake; `NoPolicyDoor` at the token), `MirrortechRoleProvider` (real `IRoleProvider`), `MockSanctionsOracle`, `MockWildcatMarket` (labeled mock), `MockERC20`. Scope claimed for the hook: admission on `beforeAddLiquidity` / `beforeRemoveLiquidity` / `beforeSwap` plus the handshake; no quota, lockup, fee or LVR claims. **P1** counsel EIP-712 signature over `policyHash`; merkleized clause table.
-
-### 8.4 SwapVM venue (Eng A) — built
-
-[SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md). `PolicyGuard` (view-only, runs in `quote()`), `FixedRateBalances`, `MirrortechRouter is SwapVM, LimitOpcodes`; templates `BuybackFixedPrice` and `BuybackDutchAuction`; Aqua mode (`ship` / `dock`, virtual balance, no capital moves) against the canonical registry. **P1** `PoolPriceAdjuster` (bid follows the v4 TWAP, capped at NAV); signature mode; maker-hook variant.
-
-### 8.5 Integrations (Eng B)
-
-- **World — built.** Document credential (`issuer_schema_id` 9303) verified at the Developer Portal, `rp_context` signed server-side, nullifier bound to one wallet, fact attested. Mock proofs without `WORLD_RP_ID`. §9 and [WORLD_ID.md](WORLD_ID.md).
-- **Noolog — built.** Generation + verification (§4). In-process mock when `NOOLOG_API_KEY` is unset. [NOOLOG.md](NOOLOG.md).
-- **Curvegrid — built.** MultiBaas registers every contract under a policy-hash version; `GET /v1/stack/events` serves indexed events on Sepolia. Fallback per call: ethers direct; README records what worked.
-- **P2** ENSv2 status subnames; screening vendor adapter; payout agent.
-
-### 8.6 API (Eng B)
-
-- **Stack API** `/v1/stack/*` — built; [API.md](API.md).
-- **Agreements API** `/v1/status`, `/v1/agreements*` — in progress; [AGREEMENTS_API.md](AGREEMENTS_API.md).
-- Conventions: decimal-string amounts, `Idempotency-Key` on operations, bearer auth, error envelope `{ error: { code, message } }`.
+| Payments in | `POST /webhooks/payments`. Stripe signature scheme (`Stripe-Signature`, HMAC over `t.body`, 5-min tolerance), no bearer. A settled USD event with `metadata.wallet` attests `depositConfirmed` for that wallet; the policy decides the mint: shares released, or **held** with the sentence. Idempotent by event id (`replay: true`). Always 2xx once verified | [API.md](API.md#payment-webhook), `src/payments.js` |
+| Key custody | `GET/PUT /v1/settings/signing`. The gateway starts on a file key. `{ provider: multibaas, azure?, key?, wallet?, gas? }` registers the Azure Key Vault account and key with MultiBaas (or names a wallet it holds), hands the gateway's roles and gas to the Cloud Wallet and signs from it thereafter; the choice persists across restarts; `{ provider: key }` returns. Proven on anvil with a stand-in vault; the dev MultiBaas deployment has no HSM wallet yet | `src/signing.js`, `src/multibaas-signer.js`, `test/chain/signing.test.js` |
+| Indexing | `GET /v1/stack/events`. MultiBaas indexes the Sepolia deployment: 13 contracts registered under policy-hash versions, 10 linked under the dev plan | `src/multibaas.js`, README |
+| API contract | `GET /openapi.json` (OpenAPI 3.1) + `GET /docs` (Swagger UI); webhooks under a **Webhooks** tag with the signature security scheme. Both open, no bearer | `src/openapi.js`, `test/openapi.test.js` |
 
 ## 9. Trust moments
 
-1. **Reading the document.** The Verified badge is the deliberation's confidence, not a model's self-report. Contested claims are shown on the clause card with the evaluator's counter-position. A quote that is not in the text is dropped before compilation.
-2. **Identity at onboarding.** Exhibit A requires KYC, KYB, AML and sanctions checks. KYC is an identity check: a proof of human says a person exists, a selfie says the person is live and unique, neither says who. A government document does. The credential is **Document (Passport/NFC, 9303)**: one credential, verified once, no Orb, the minimum that satisfies a KYC step. `WORLD_CREDENTIAL` lowers it (`proof_of_human`, `selfie`) for an agreement that asks less. The nullifier binds one human to one wallet; the proof's signal must be that wallet. Refusals: `HUMAN_ALREADY_BOUND`, `INVALID_PROOF`; a closed widget leaves the wallet in review with the sentence that still blocks it.
-3. **Refusal.** Every revert carries `clauseId` and `policyHash`; the UI verifies the clause table against the on-chain hash before rendering the sentence.
-4. **Deploy.** The hash on chain covers source, AST and config. Change one word and the deployed contracts keep enforcing the document as signed; the new reading is a new deployment.
+1. **Reading the document.** The Verified badge is the deliberation's confidence, not a model's self-report. Contested claims are shown with the evaluator's counter-position. A quote that is not in the text is dropped before compilation.
+2. **Choosing the credential.** Exhibit A requires KYC, KYB, AML and sanctions checks. KYC is an identity check: a proof of human says a person exists, a selfie says the person is live, neither says who. A government document does. The issuer chooses per agreement; the choice is a rule quoting the sentence plus the credential in the config, both in the hash. The verifier accepts only that credential; one human, one wallet.
+3. **Refusal.** Every revert carries `clauseId` and `policyHash`; a front end verifies the clause table against the on-chain hash before rendering the sentence.
+4. **Deploy and custody.** The hash on chain covers source, AST and config. Change one word, or the constraint, and the deployed contracts keep enforcing the document as signed; the new reading is a new deployment. The key that attests, mints and deploys can live in an HSM; the gateway then holds no secret worth stealing.
 
 ## 10. Target UI (workbench)
 
-IDE-style workbench, built after the Agreements API. No vendor branding in labels.
+Deferred; the CLI is the current front end. IDE-style, one flow, no vendor branding in labels.
 
-- **Left sidebar "Contracts"**: agreements from `GET /v1/agreements`, each with a status pill: Uploaded · Generating · Verified · Compiled · Deploying · Deployed · Failed. "Upload" opens a name + file/paste dialog → `POST /v1/agreements` (`{ name, text, filename }`, or several `documents`).
-- **Main pane**: breadcrumb `<agreement> › <view>`; a **Verified** badge with the confidence (`verification.confidence.overall`; counts on hover); toolbar buttons **Re-generate** (`POST /regenerate`, disabled while a job runs) and **Deploy** (`POST /deploy`, enabled only in Compiled; the pill turns Deploying until the record says `deployed`).
-- **View switcher**:
-  - **Human Language** — the document as clause cards: `§n` badge, the verbatim quote, the rule it compiles to (action · effect · condition), a verification glyph per claim (verified ✓ · contested ⚠ · unverified ○ · wrong ✕), a contested marker with the evaluator's position; unresolved items listed with their anchor.
-  - **Contract-AST** — graph from `GET /:id/ast`: agreement → actions → rules → facts, plus terms and unresolved items; node status follows the verdicts (verified / contested / unverified); selecting a node highlights its clause card.
-  - **Deploy** — chain, addresses (oracle, token, hook, pool id), txs with explorer links; refusal demo: pick a wallet, run mint / add liquidity / swap, see the clause on refusal.
-- **Footer status strip** from `GET /v1/status`: three lights — **Model** (`model.mode` mock / live, url), **Compiler** (`compiler.solidity` versions), **Chain** (`chain.chainId`, pool manager; grey when `null`).
-- States: Generating shows a progress row (job id, rounds); Failed shows the record's `error` and a Re-generate call to action; Deployed puts Re-generate behind a confirm (new hash → new deployment).
-- Existing screens (Lenders, Queue, Exit, Audit) remain as views of the credit agreement.
+- **Left sidebar "Contracts"**: agreements from `GET /v1/agreements`, each with a status pill: Uploaded · Generating · Verified · Compiled · Deployed · Failed (Deploying while `POST /deploy` runs). "Upload" opens a name + file/paste dialog → `POST /v1/agreements`. Generating shows a progress row; Failed shows `error` and Re-generate; Deployed puts Re-generate and the constraint behind a confirm (new hash → new deployment).
+- **Main pane**: breadcrumb `<agreement> › <view>`; a **Verified** badge with the confidence; toolbar **Add World ID constraint** (`PUT /constraints`: credential, actions, the sentence picked from the document), **Re-generate** (`POST /regenerate`, disabled while a job runs), **Deploy** (`POST /deploy`, enabled only in Compiled).
+- **Views**: **Human Language** — clause cards: `§n`, the verbatim quote, the rule (action · effect · condition), a verification glyph per claim, contested marker, unresolved items. **Contract-AST** — graph from `GET /:id/ast`; node status follows the verdicts; the constraint's rules highlighted. **Deploy** — chain, addresses, txs with explorer links; refusal demo: pick a wallet, run mint / liquidity / swap, see the sentence.
+- **Footer status strip** from `GET /v1/status`: **Model** (`model.mode`), **Compiler** (`compiler.solidity`), **Chain** (`chain.chainId`; grey when `null`).
 
 ## 11. Non-functional and security
 
-- **Fail closed**: unknown fact, RPC uncertainty, expired attestation → no approval, payout or fill.
-- **No model-written logic**: extraction is schema-validated data; generated Solidity holds constants and constructor arguments only.
-- **Proven equivalence** before emit; repeated on a real EVM.
+- **Fail closed**: unknown fact, RPC uncertainty, expired attestation → no approval, mint or fill. **No model-written logic**: extraction is schema-validated data; generated Solidity holds constants and constructor arguments only; equivalence proven before emit, repeated on a real EVM.
 - **Privacy**: facts, never reasons or identity, on chain; no reason strings in events; fact bitmaps readable per wallet (stated; roadmap hashed facts / ZK). World ID leaves a fact bit and an off-chain nullifier binding.
-- **Verification is backend-only**: an IDKit result is never authorization until `/v4/verify` accepts it and the signal matches the wallet.
-- **Override**: none for officers; only the MLA's §13(c)(y) borrower path, separate role, window-bound, logged.
-- **Bounded staleness**: the attestation window (Lender Check Policy, 30 days).
-- **Secrets** in `.env`; the public dashboard carries `VIEWER_KEY` only. Separate wallets: deployer/admin, attestor, watcher, borrower-treasury. Testnet keys only.
-- **Disclaimers**: prototype, testnet, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock. Aqua/SwapVM are source-available (Degensoft license).
+- **Verification is backend-only**: an IDKit result is never authorization until `/v4/verify` accepts it, the credential matches the agreement and the signal matches the wallet. **Webhook**: the signature is the credential; a policy refusal is 2xx, so the rail never retries a decision.
+- **Secrets** in `.env`; the public dashboard carries `VIEWER_KEY` only. Operator key in a file or a Cloud Wallet (§8.5). Separate wallets: deployer/admin, attestor, watcher. Testnet keys only.
+- **Disclaimers**: prototype, testnet, not legal advice, no affiliation with Uniswap, World, Curvegrid, Stripe, Securitize or BlackRock.
 
 ## 12. Prize alignment
 
 | Partner | What we built | Evidence | Status |
 | --- | --- | --- | --- |
-| World (IDKit) | Document credential → `identityVerified`, gating mint and the pool; server-side `rp_context`, `/v4/verify`, nullifier bound to one wallet; success and refusal paths; debrief | `src/worldid.js`, `dashboard/app/_components/HumanCheck.tsx`, `test/worldid.test.js`, [WORLD_ID.md](WORLD_ID.md) | P0 submit |
-| Uniswap v4 | Hook as the token's only door: mined address, transient handshake, `NoPolicyDoor`; permissionless pools under a permissioned agreement | `contracts/MirrorPolicyHook.sol`, `src/policy/hookAddress.js`, `test/chain/hook.test.js`, `FEEDBACK.md` | P1; feedback form pending |
-| 1inch (Aqua + SwapVM) | `PolicyGuard` + `FixedRateBalances` opcodes in a `LimitOpcodes` router; buyback and tender-offer strategies shipped to the canonical Aqua; refusal at `quote()` | `contracts/swapvm/`, `test/chain/swapvm.test.js`, README "How we used 1inch" | P0 submit |
-| Curvegrid (MultiBaas) | contracts registered under policy-hash versions; events behind the Audit view | `src/multibaas.js`, `test/multibaas.test.js` | P0 submit (RWA Tokenization ⚠️ or Dashboard) |
-| Securitize / BlackRock | the public transfer-agent agreement is Act 1's source; Exhibit A compiles to issuance, the hook and the identity fact | `test/human_contracts/`, `src/policy/fixture.js` | source document, not a track |
-| Wildcat | real `IRoleProvider`; MLA §1/§12/§13 compiled; mock market calls the real interface | `contracts/MirrortechRoleProvider.sol`, [MLA_CLAUSE_MAP.md](MLA_CLAUSE_MAP.md) | source document + interface, not a track |
+| World (IDKit) | Document credential as the KYC fact, chosen per agreement by the issuer and locked in the hash; server-side `rp_context`, `/v4/verify`, credential check, nullifier bound to one wallet; success and refusal paths; debrief | `src/worldid.js`, `src/agreements.js` (`constrain`), `test/worldid.test.js`, `test/chain/flow.test.js`, [WORLD_ID.md](WORLD_ID.md) | P0 submit |
+| Uniswap v4 | Hook as the token's only door: mined address, transient handshake, `NoPolicyDoor`; a pool per agreement on the canonical `PoolManager`; permissionless pools under a permissioned agreement | `contracts/MirrorPolicyHook.sol`, `src/policy/hookAddress.js`, `src/deploy.js`, `test/chain/hook.test.js`, `FEEDBACK.md` | P0 submit; feedback form pending |
+| Curvegrid (MultiBaas) | Sepolia deployment indexed under policy-hash versions, events behind the audit; operator key custody in a MultiBaas Cloud Wallet (HSM) as a platform setting | `src/multibaas.js`, `src/multibaas-signer.js`, `src/signing.js`, `test/multibaas*.test.js`, `test/signing.test.js`, `test/chain/signing.test.js` | P0 submit (⚠️ RWA Tokenization or Dashboard) |
 | Noolog | generation by deliberation; per-claim verdicts and confidence in every export; docs MCP wired in `.mcp.json` | `src/noolog/`, `test/noolog.test.js`, README "How we used Noolog" | built |
+| Securitize / BlackRock | the public transfer-agent agreement is the source document; Exhibit A compiles to issuance, the hook and the identity fact | `test/human_contracts/`, `src/policy/fixture.js` | source document, not a track |
+| Stripe-style payments | signed webhook settles a USD payment into shares under the policy, or holds it with the sentence | `src/payments.js`, `test/payments.test.js`, `test/chain/payments.test.js` | built, not a track |
 
-ETHGlobal general: commits across the weekend, video, description, screenshots, live URL. Intercepta dropped (x402 agent payments are a different product).
+ETHGlobal general: commits across the weekend, video, description, screenshots, live URL.
 
-## 13. Plan
+## 13. What is demonstrated on Sepolia
+
+`deployments/sepolia.json` is the record; policy hashes are the same bytes as the local build. Addresses and tx links in the README.
+
+- `PolicyAttestor`, `MockSanctionsOracle`, `mUSDC`; `PolicyOracle` (fund), `CompiledMirrorToken`, `MirrorPolicyHook`, `MirrorLiquidityRouter` on the canonical `PoolManager`. Recorded: identity verified with a World ID document · shares released to the verified investor · hooked pool created · liquidity through the hook · swap.
+- MultiBaas: 13 contracts registered, 10 linked and indexed under the dev plan; `GET /v1/stack/events` serves them.
+- Recorded on anvil, not yet on Sepolia: a per-agreement `POST /deploy` (`test/chain/flow.test.js`); an HSM-signed transaction (no Cloud Wallet on the dev deployment).
+
+## 14. Plan and cut order
 
 | When (JST) | Milestone | Exit check |
 | --- | --- | --- |
-| done | Both acts on anvil and Sepolia; stack API; dashboard public; MultiBaas sync; World ID fact; deliberation generation + verification | `npm run check` green; README Sepolia table |
-| Sat | Agreements API on `feat/agreements-api`: store, lifecycle, `/v1/status`, `/ast`, `regenerate`, `deploy` with runtime solc | `test/agreements*.test.js`, `test/chain/agreements-deploy.test.js` green; the walkthrough in [AGREEMENTS_API.md](AGREEMENTS_API.md) runs |
-| Sat night | Workbench UI (§10) over the Agreements API; footer lights; refusal demo | Lam runs §5 from the UI twice |
-| Sun 03:00 | Code freeze; bug fixes only | tag `v0.3-freeze` |
-| Sun 03:00–07:00 | Video, README team section, sponsor forms, screenshots | video uploaded |
-| Sun 08:00 | Submit (1h buffer) | confirmed |
+| done | Agreements API with constraints, per-agreement venue, runtime solc deploy; CLI; payments webhook; signing setting; OpenAPI; MultiBaas sync; base stack on Sepolia | `npm run check` green; `test/chain/flow.test.js` green |
+| Sat | §5 on Sepolia through the CLI against a public gateway; README team section | flow run recorded with tx links |
+| Sun 03:00 | Code freeze; bug fixes only | tag `v0.4-freeze` |
+| Sun 03:00–08:00 | Video, sponsor forms, screenshots; submit with 1h buffer | confirmed |
 
-Small PRs to `main`; commit every couple of hours (the 1inch rules disqualify a single final-day commit); any P0 slipping > 2h → tell Lam and cut per §14.
+Small PRs to `main`; commit every couple of hours; any P0 slipping > 2h → tell Lam and cut in this order:
 
-## 14. Scope cut order
-
-1. Contract-AST view (fall back to the clause cards) · footer lights
-2. Runtime `deploy` from the workbench (fall back to `npm run deploy:stack` and a read-only Deploy view)
-3. P1 SwapVM items, merkleized clause table, counsel signature
-4. **Never cut**: source-quoted rules, verification report, equivalence proof, real `IRoleProvider`, Aqua `ship` + `PolicyGuard` quote-time refusal, World ID document credential path, Sepolia deploy, Curvegrid README items
+1. Workbench UI (already deferred) · HSM wallet on the dev MultiBaas deployment · `POST /deploy` on Sepolia from the API (fall back to the base stack deployment and the CLI against it)
+2. P1 items: counsel signature, merkleized clause table
+3. **Never cut**: source-quoted rules, verification report, equivalence proof, the constraint in the hash, World ID document path, the hooked pool refusal with the sentence, Sepolia deploy, Curvegrid README items
 
 ## 15. Risks
 
 | Risk | Likelihood | Mitigation |
 | --- | --- | --- |
-| Live deliberation slow or unavailable at demo time | Med | the mock serves the same routes; the fixture reading is the draft; the status strip shows the mode honestly |
-| Runtime solc in the API too slow or too large for the container | Med | bundles already built by `scripts/build-contracts.js`; cache artifacts per policy hash; fall back to prebuilt artifacts |
-| Judges read "official Aqua contracts" as canonical only | Low | canonical registry reused on Sepolia; the router is a modified SwapVM redeploy, allowed verbatim |
+| Live deliberation slow or unavailable at demo time | Med | the mock serves the same routes; the fixture reading is the draft; `GET /v1/status` shows the mode honestly |
+| Runtime solc in the API too slow on the public gateway | Med | bundles prebuilt by `scripts/build-contracts.js`; deploy ahead of the demo; the anvil run as backup |
 | World app not migrated to v4 or no `rp_id` at demo time | Med | mock proofs run every path; `APP_NOT_MIGRATED` surfaced as its own code |
-| Privacy: fact bitmaps readable per wallet | Certain | no reasons or identity on chain; stated; roadmap ZK |
-| Scope for 3 people | High | §14; loop first, polish last |
+| No HSM wallet on the dev MultiBaas deployment | High | the setting is proven on anvil with a stand-in vault; the README says so |
 
 ## 16. Decisions log
 
 | Topic | Decision | Why |
 | --- | --- | --- |
-| Extraction | generated by a deliberation, verified per claim; the fixture is the draft, not the output | a policy should arrive with who checked it and how sure they were; a single model call cannot say |
-| World ID credential | Document (9303) as the KYC fact, not proof of human | Exhibit A asks for KYC; a proof of human proves a person, not who; a document is the minimum that does |
-| World ID surface | a fact of the policy (`identityVerified`), attested by the gateway | nothing vendor-specific in contracts; every venue reads it like any other fact |
-| Product core | Agreements API loop, one record per agreement | the two acts become two runs of one loop; any agreement can be uploaded |
-| UI | IDE-style workbench, three views, footer health lights | the loop and its trust moments visible on one screen; no vendor labels |
-| Primary credit venue | real `IRoleProvider` + SwapVM buyback | Wildcat exposes the exact socket; SwapVM makes the policy an instruction |
-| Uniswap v4 | hook as the token's only door, fund token only | a token gate cannot see pools; the hook can |
-| Sanctions authority | oracle per MLA §13 (mock on Sepolia) | observable, not attested |
-| Override | MLA §13(c)(y) borrower override only, separate role, window-bound | the MLA already defines the appeal path |
-| Chain | Sepolia, one chain; canonical Aqua and PoolManager | the rules allow the modified SwapVM redeploy; everything else canonical |
-| Privacy | no reason strings in events | revocation reasons on chain are a defamation risk |
-| Intercepta | dropped | x402 agent payments are a separate product |
+| Product story | one flow, one agreement, one token; the credit venue kept but out of the pitch | a judge follows one loop end to end; two acts diluted it |
+| Extraction | generated by a deliberation, verified per claim; the fixture is the draft, not the output | a policy should arrive with who checked it and how sure they were |
+| World ID credential | the issuer's choice per agreement; default Document (9303); the choice inside the hash; the fact `identityVerified` attested by the gateway, nothing vendor-specific in contracts | Exhibit A asks for KYC; a document is the minimum that says who; the deployed token must carry the decision |
+| Uniswap v4 | hook as the token's only door; one pool per agreement | a token gate cannot see pools; the hook can |
+| Key custody | a platform setting: file key by default, MultiBaas Cloud Wallet on request | the issuer, not the deployer, decides where the key lives |
+| Payments | a signed webhook attests `depositConfirmed`; the policy decides the mint | money in is a fact like any other; a hold is a decision, not an error |
 
 ## 17. Open questions
 
 1. ⚠️ Curvegrid: RWA Tokenization or Digital Asset Dashboard? (Lam)
 2. ⚠️ Uniswap feedback form submission. (Lam)
 3. ⚠️ Team names and handles in the README. (all)
-4. Public live gateway (Coolify creds) vs. static site with Sepolia links. (Eng A)
-5. Demo video length limit. (Lam)
+4. Public live gateway (Coolify) vs. static site with Sepolia links. (Eng A)
 
 ## 18. References
 
-- Wildcat: [Template MLA](https://docs.wildcat.finance/legal/master-loan-agreement) · [Hooks](https://docs.wildcat.finance/technical-overview/security-developer-dives/hooks) · [`IRoleProvider.sol`](https://github.com/wildcat-finance/v2-protocol/blob/main/src/access/IRoleProvider.sol)
-- 1inch: [Aqua](https://github.com/1inch/aqua) · [SwapVM](https://github.com/1inch/swap-vm) · [OpenZeppelin audit](https://www.openzeppelin.com/news/1inch-aqua-and-swapvm-mvp-v1.0-audit)
 - World: [IDKit](https://docs.world.org/world-id/idkit/integrate) · [credentials](https://docs.world.org/world-id/idkit/credentials) · [Passport/NFC](https://docs.world.org/world-id/credentials/9303)
-- Noolog: [what it is](https://noolog.io/docs/noolog/latest/explanation/what-is-noolog.html) · docs MCP `https://noolog.io/mcp` · [gateway API](https://api.peeramid.xyz/swagger-ui/)
 - Curvegrid: [MultiBaas docs](https://docs.curvegrid.com/multibaas/) · ETHGlobal Tokyo 2026 [prizes](https://ethglobal.com/events/tokyo2026/prizes)
+- Noolog: [what it is](https://noolog.io/docs/noolog/latest/explanation/what-is-noolog.html) · docs MCP `https://noolog.io/mcp` · [gateway API](https://api.peeramid.xyz/swagger-ui/)

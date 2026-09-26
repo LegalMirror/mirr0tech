@@ -6,7 +6,7 @@ A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed
 
 ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
 
-**Live:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) — the story, the agreements with every enforced sentence, who may lend and why, the Aqua exit, the Sepolia timeline (static build; the live gateway is a local or Coolify run).
+**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend prefills the API URL; issuer writes still require an operator session.
 
 [![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
 
@@ -14,14 +14,64 @@ ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with
 
 ## Run it
 
-Node 18+ and [Foundry](https://getfoundry.sh) (`anvil`). Everything runs locally.
+Use **Node.js 22**, npm and [Foundry](https://getfoundry.sh) (`anvil`). Node 22 matches CI and the Docker images. Run these from the repository root:
 
 ```sh
-npm ci && npm run vendor                                           # vendor/ ← 1inch SwapVM + Aqua sources
-npm run build && npm run build:secondary && npm run build:credit   # artifacts/<profile>/
-npm run demo:golden                                                # both acts end to end on a fresh anvil
-npm run check                                                      # unit + chain tests, all three profiles
+npm ci
+npm run build
+npm run build:secondary
+npm run build:credit               # also installs the pinned vendor sources
+npm --prefix dashboard ci
 ```
+
+### Local demo — two terminals
+
+For the local mock flow, do not export external `RPC_URL`, `DEPLOYMENT_PATH`, signing settings or `WORLD_*` credentials in your shell. `DOTENV_CONFIG_PATH=/dev/null` below prevents an existing remote `.env` from being loaded:
+
+```sh
+# Terminal 1: Anvil + complete workbench API at http://127.0.0.1:3000
+NODE_ENV=development DOTENV_CONFIG_PATH=/dev/null EXPECTED_CHAIN_ID=31337 DATA_DIR=.data/local-demo npm run dev:stack
+```
+
+```sh
+# Terminal 2: dashboard at http://localhost:3100
+NEXT_PUBLIC_GATEWAY_URL=http://127.0.0.1:3000 npm --prefix dashboard run dev
+```
+
+Open **Connection** and use `local-dev-stack-operator-key-only` for this local issuer demo. Local World proofs and Noolog reports are synthetic; this is not the official World simulator. Anvil is ephemeral: after a chain reset, old local deployment records are not evidence of contracts still being deployed.
+
+**Use `npm run dev:stack` for the workbench API.** Root `npm start` runs the older custodial ledger service, not the complete agreements/venue gateway. `npm run deploy:stack` and `npm run deploy:sepolia` explicitly deploy contracts; they are not web-server launch commands.
+
+### Existing Sepolia stack + World Sandbox
+
+Set `RPC_URL`, an authorized `DEPLOYER_PRIVATE_KEY`, a private `API_KEY`, and the registered `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_ACTION`, `WORLD_ENVIRONMENT=sandbox`, `WORLD_CREDENTIAL=document` in the server's runtime environment or local `.env`. Keep secrets out of source control and frontend build variables. Then:
+
+```sh
+EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json DATA_DIR=.data/sepolia SEED=false npm run dev:stack
+```
+
+This reuses existing contracts; startup does not deploy a new public-chain stack. The signer needs the applicable on-chain roles and Sepolia ETH for later writes. Sandbox requires the authorized World Sandbox app and a supported credential; Passport/NFC proof success has not yet been demonstrated by these setup commands.
+
+To run only a local frontend against the hosted API:
+
+```sh
+NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run dev
+```
+
+For Coolify's **Dockerfile-only** API deployment, use [deploy/README.md](deploy/README.md): `/deploy/Dockerfile.api`, port **3200**, volume **`/app/.data`**, `SEED=false`, and runtime-only secrets.
+
+### Validate
+
+```sh
+npm test
+npm run check                     # all existing policy, venue, stack and cashier chain suites
+npm --prefix dashboard test
+npm --prefix dashboard run typecheck
+npm --prefix dashboard run lint
+NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run build
+```
+
+The static build is written to `dashboard/out/`; serve it with `npm --prefix dashboard start` on port 3100. The browser URL is public configuration, never a place for `API_KEY` or signing keys.
 
 ## Workbench and NAV cashier
 
@@ -98,25 +148,31 @@ Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right g
 
 ## Deploy
 
-`deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`): [docs/deploy.md](docs/deploy.md). `.github/workflows/pages.yml` publishes the static dashboard to GitHub Pages on every push.
+For a standalone Coolify API resource, use [deploy/Dockerfile.api](deploy/Dockerfile.api) and the exact settings in [deploy/README.md](deploy/README.md). Alternatively, `deploy/docker-compose.remote.yml` runs API + dashboard against external Sepolia RPC, with no Anvil service. The local Compose pair is development-only. [Detailed deployment and World configuration](docs/deploy.md). `.github/workflows/pages.yml` publishes GitHub Pages on every push to `main`.
 
 ### The flow from a terminal
 
 ```sh
-npm run dev:stack &                      # anvil + the stack + the gateway on :3000
-npx mirr0 login http://127.0.0.1:3000 local-dev-stack-operator-key-only
-npx mirr0 upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL && npx mirr0 show <id> --wait compiled
-npx mirr0 constrain <id> --credential document --actions mint,transfer   # the World ID trust decision, in the hash
-npx mirr0 deploy <id> --wait                                             # oracle, token, hook, pool
-npx mirr0 verify <id> Investor && npx mirr0 fund <id> Investor 10000 && npx mirr0 mint <id> 10000 && npx mirr0 release <id> Investor 5000 && npx mirr0 pool <id> liquidity Investor
-npx mirr0 pool <id> swap Stranger                                        # refused, with the sentence
+# Keep Terminal 1's local dev:stack process above running; use Terminal 3 for these calls.
+node scripts/mirr0.js login http://127.0.0.1:3000 local-dev-stack-operator-key-only
+node scripts/mirr0.js upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL
+# Replace <id> below with the returned agreement id; do not enter the angle brackets literally.
+node scripts/mirr0.js show <id> --wait compiled
+node scripts/mirr0.js constrain <id> --credential document --actions mint,transfer
+node scripts/mirr0.js deploy <id> --wait
+node scripts/mirr0.js verify <id> Investor
+node scripts/mirr0.js fund <id> Investor 10000
+node scripts/mirr0.js mint <id> 10000
+node scripts/mirr0.js release <id> Investor 5000
+node scripts/mirr0.js pool <id> liquidity Investor
+node scripts/mirr0.js pool <id> swap Stranger  # refused with the sentence
 ```
 
 Every command is one call of the [agreements API](docs/AGREEMENTS_API.md); `GET /docs` is the Swagger UI over all of it.
 
 ### Sepolia
 
-Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json` is the record (`DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack` serves it without redeploying). Policy hashes are the same bytes as the local build.
+Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json` is the record. Use the **Existing Sepolia stack + World Sandbox** launch command above to serve it without redeploying. Policy hashes are the same bytes as the local build.
 
 | Contract | Address |
 | --- | --- |

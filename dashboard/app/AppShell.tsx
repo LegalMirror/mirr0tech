@@ -132,7 +132,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {!compact && <ThemeToggle />}
           <p className="sh-note muted">
             {buildStamp(build.sha, build.builtAt)} ·{" "}
-            {source.kind === "static" ? "static export · snapshot or mock parties" : "live gateway"}
+            {source.kind === "static" ? "static export · Sepolia snapshot" : "live gateway"}
           </p>
         </div>
       </aside>

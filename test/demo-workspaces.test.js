@@ -88,7 +88,9 @@ test('HTTP: keyless sessions run the real scoped lifecycle without exposing oper
   const config = await call('/demo/config');
   assert.equal(config.status, 200);
   assert.deepEqual(Object.keys(config.data), ['enabled', 'chainId', 'limits']);
-  assert.equal(config.data.limits.deploysPerInterval, 5);
+  assert.equal(config.data.limits.deploysPerInterval, 20);
+  assert.equal(config.data.limits.deploysPerWorkspace, 10);
+  assert.equal(config.data.limits.uploadsPerWorkspace, 25);
   assert.equal(config.headers.get('cache-control'), 'no-store');
   const issued = await call('/demo/session', { method: 'POST' });
   const token = issued.data.accessToken;

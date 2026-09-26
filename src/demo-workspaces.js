@@ -13,9 +13,10 @@ const DEFAULT_LIMITS = Object.freeze({
   sessionTtlSeconds: 3 * 3600, intervalSeconds: 3600,
   maxSessions: 200, sessionsPerIp: 10, sessionsPerInterval: 100,
   requestsPerIp: 1800, requestsPerInterval: 6000, maxPendingRequests: 128,
-  uploadsPerWorkspace: 3, uploadsPerInterval: 20,
-  jobsPerWorkspace: 12, jobsPerInterval: 40,
-  deploysPerWorkspace: 2, deploysPerInterval: 5,
+  // A deploy costs the operator about 0.01 Sepolia ETH; the hourly deploy cap bounds that spend.
+  uploadsPerWorkspace: 25, uploadsPerInterval: 200,
+  jobsPerWorkspace: 100, jobsPerInterval: 400,
+  deploysPerWorkspace: 10, deploysPerInterval: 20,
   maxRequestBytes: 4 * 1024 * 1024, maxParts: 4,
 });
 const PUBLIC_PROFILES = ['rwa-secondary', 'custodial-rwa'];
@@ -23,7 +24,7 @@ const digest = (value) => createHash('sha256').update(value).digest('hex');
 const object = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 const integer = (value) => Number.isSafeInteger(value) && value >= 0;
 const invalid = (condition, message) => ensure(condition, 400, 'INVALID_BODY', message);
-const quota = (condition) => ensure(condition, 429, 'DEMO_LIMIT', 'Public demo quota exhausted; try again after the interval or use the operator API');
+const quota = (condition, what = 'requests') => ensure(condition, 429, 'DEMO_LIMIT', `Public demo ${what} quota exhausted; try again after the interval or use the operator API`);
 const unavailable = (condition, message) => ensure(condition, 503, 'UNAVAILABLE', message);
 const fields = (value, allowed) => object(value) && Object.keys(value).every((key) => allowed.includes(key));
 /// A public job failure says why; URLs (RPC keys ride in them), bearer tokens and API keys are redacted and the reason is capped.
@@ -254,7 +255,10 @@ export class DemoWorkspaces {
   }
 
   async reserve(session, kinds) {
-    for (const kind of kinds) quota(session[kind] < this.limits[`${kind}PerWorkspace`] && this.state[kind].length < this.limits[`${kind}PerInterval`]);
+    for (const kind of kinds) {
+      quota(session[kind] < this.limits[`${kind}PerWorkspace`], `${kind} per workspace (${this.limits[`${kind}PerWorkspace`]})`);
+      quota(this.state[kind].length < this.limits[`${kind}PerInterval`], `${kind} per hour (${this.limits[`${kind}PerInterval`]})`);
+    }
     for (const kind of kinds) { session[kind]++; this.state[kind].push({ at: this.now() }); }
     // Never refund: a timeout, error or crash cannot prove that no work/transaction happened.
     await this.persist();

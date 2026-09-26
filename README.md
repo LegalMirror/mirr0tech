@@ -80,9 +80,9 @@ A World ID credential proves one onboarding condition. It is not a full KYC, AML
 
 Developer feedback: [FEEDBACK.md](FEEDBACK.md).
 
-## How we used Noolog
+## How we ensure HITL & No Slop
 
-Choose **Noolog** as the generation for an upload (`generation: "noolog"`, or `EXTRACTOR=noolog` as the default). `src/noolog/extract.js` submits the document to the orchestrator under the `legal_rwa_pro` policy (RwaCounsel, RwaScrivener and RwaCompliance), shows its progress line on the record while the seats deliberate (up to three rounds, about ten minutes each on the full agreement), then reads `/details` and `/references` for the verdicts and a confidence score. What the deployment cannot enforce is moved to `unresolved` before validation, so a live answer always compiles. Demo and OpenAI generations are unchanged. More: [docs/NOOLOG.md](docs/NOOLOG.md).
+We use **Noolog** orchestration because it been benchmarked (https://arxiv.org/abs/2601.16863) to provide hallucination and syncophancy reduction. We fused **LEGAL_RWA_PRO** model on it using astra, fable and gpt safeguarded model. As the generation for an upload (`generation: "noolog"`, or `EXTRACTOR=noolog` as the default). `src/noolog/extract.js` submits the document to the orchestrator under the `legal_rwa_pro` policy (RwaCounsel, RwaScrivener and RwaCompliance), shows its progress line on the record while the seats deliberate (up to three rounds, about ten minutes each on the full agreement), then reads `/details` and `/references` for the verdicts and a confidence score. What the deployment cannot enforce is moved to `unresolved` before validation, so a live answer always compiles. Demo and OpenAI generations are unchanged. Our customers not simply use it, they can embedd their agent rules, and responsible stakeholder HITL; More: [docs/NOOLOG.md](docs/NOOLOG.md).
 
 ## How we used Curvegrid MultiBaas
 

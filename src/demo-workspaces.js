@@ -26,7 +26,13 @@ const invalid = (condition, message) => ensure(condition, 400, 'INVALID_BODY', m
 const quota = (condition) => ensure(condition, 429, 'DEMO_LIMIT', 'Public demo quota exhausted; try again after the interval or use the operator API');
 const unavailable = (condition, message) => ensure(condition, 503, 'UNAVAILABLE', message);
 const fields = (value, allowed) => object(value) && Object.keys(value).every((key) => allowed.includes(key));
-const safeRecord = (record) => record.error ? { ...record, error: 'Agreement job failed; contact the demo operator before retrying.' } : record;
+/// A public job failure says why; URLs (RPC keys ride in them), bearer tokens and API keys are redacted and the reason is capped.
+export const publicError = (message) => String(message)
+  .replace(/[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url]')
+  .replace(/(Bearer\s+)\S+/gi, '$1[redacted]')
+  .replace(/\b(?:op|sk|api|rp)[-_][A-Za-z0-9_-]{6,}/g, '[redacted]')
+  .slice(0, 300);
+const safeRecord = (record) => record.error ? { ...record, error: publicError(record.error) } : record;
 
 export class DemoWorkspaces {
   // clock returns epoch milliseconds, like Date.now. One instance/process owns each durable file.

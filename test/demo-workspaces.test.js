@@ -465,3 +465,13 @@ test('the short template is a public upload for a Noolog reading only; other new
     if (saved === undefined) delete process.env.NOOLOG_API_KEY; else process.env.NOOLOG_API_KEY = saved;
   }
 });
+
+test('a failed public job says why, with credentials redacted and the reason capped', async () => {
+  const { publicError } = await import('../src/demo-workspaces.js');
+  assert.equal(publicError('The secondary profile needs a transfer permit quoting the agreement'), 'The secondary profile needs a transfer permit quoting the agreement');
+  const leaked = publicError('POST /deliberation: 401 Authorization: Bearer op-e2f9bc0f-1234 rejected for sk-abcdef1234567890');
+  assert.doesNotMatch(leaked, /op-e2f9|sk-abcdef/);
+  assert.match(leaked, /Bearer \[redacted\]/);
+  assert.equal(publicError('RPC down: https://eth.drpc.org/key-abc'), 'RPC down: [url]');
+  assert.ok(publicError('x'.repeat(1000)).length <= 300);
+});

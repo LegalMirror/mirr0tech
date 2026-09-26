@@ -9,9 +9,9 @@ import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
-import { auditEvents } from '../src/audit-events.js';
-import { extractWithNoolog } from '../src/noolog/extract.js';
-import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
+import { auditEvents } from '../src/onchain/audit-events.js';
+import { extractDemo } from '../src/openai-extract.js';
+import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/onchain/programs.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const at = (path) => `${root}${path}`;
@@ -139,7 +139,7 @@ export function annotateProgram(programHex, clauses) {
 // does. Token and maker addresses are fixed placeholders until a deployment exists, so the strategy
 // hash here is illustrative; the policy hash inside the program is the real one.
 function buybackOf(policy) {
-  if (!existsSync(OPCODES)) return { available: false, reason: 'vendor/swap-vm is missing; run `npm run vendor` to decode the program.' };
+  if (!existsSync(OPCODES)) return { available: false, reason: 'vendor/swap-vm is missing; run `pnpm run vendor` to decode the program.' };
   const opcodes = loadOpcodes(OPCODES);
   const policyGuardOpcode = opcodes.count;
   const fixedRateBalancesOpcode = opcodes.count + 1;
@@ -401,8 +401,8 @@ export function coverageOf({ parts, rules, terms, unresolved, enforcedBy }) {
 
 export async function exportProfile(spec) {
   const document = await readDocuments(spec.documents.map(at));
-  // The extraction is a Noolog deliberation over the document (the hand-authored reading is the draft it starts from).
-  const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast });
+  // Offline compiler examples use explicit deterministic fixtures.
+  const { envelope, verification } = await extractDemo({ profile: spec.profile, document, draft: spec.fixture(document).ast });
   const config = JSON.parse(await readFile(at(spec.config), 'utf8'));
   const raws = await Promise.all(spec.documents.map(async (path) => ({ name: path.split('/').pop(), raw: await readFile(at(path), 'utf8') })));
   return exportCompiled({ profile: spec.profile, act: spec.act, label: spec.label, venue: spec.venue, document, raws, envelope, verification, config });
@@ -467,6 +467,11 @@ export function exportCompiled({ profile, act = null, label = null, venue = null
     title: ast.title, parties: ast.parties,
     source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, parts: document.parts ?? null },
     policyHash: compiled.policy.hash,
+    contractSources: Object.fromEntries([
+      ['generated/CompiledPolicy.sol', compiled.compiledPolicy],
+      ['generated/CompiledMirrorToken.sol', compiled.solidity],
+      ['generated/CompiledCashierTerms.sol', compiled.compiledCashierTerms],
+    ].filter(([, source]) => typeof source === 'string' && source.length)),
     clauseTableHash: onchain.clauseTableHash,
     equivalenceChecks: compiled.equivalenceChecks,
     demo: compiled.policy.demo,

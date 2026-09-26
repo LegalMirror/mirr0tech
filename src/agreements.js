@@ -1,22 +1,23 @@
 // The product's core loop, one record per uploaded agreement:
-//   uploaded → extracting → verified → compiled → deploying → deployed, or failed at any step.
-// `verified` means the deliberation returned an AST whose quotes are in the document; `compiled`
+//   uploaded → extracting → verified → analyzed (legal AST), or compiled → deploying → deployed (explicit compiler mappings).
+// `verified` means the extraction returned an AST whose quotes are in the document; `compiled`
 // means the policy hash, clause table and Solidity exist; `deployed` means the token, its oracle,
 // its hook and a policy-managed pool are on chain. Records persist as one JSON file; the heavy
 // export (located quotes, coverage, programs) is recomputed from the record when needed.
 import { randomBytes } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { dirname, join, basename } from 'node:path';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
-import { cashierFixture } from './policy/cashier.js';
+import { cashierFixture } from './onchain/cashier.js';
 import { ACTIONS, validateAst } from './policy/schema.js';
 import { CREDENTIALS, DEFAULT_ACTION } from './worldid.js';
-import { extractAgreement, extractorMode } from './noolog/extract.js';
+import { extractWorkspace, GENERATIONS } from './openai-extract.js';
+import { isLegalAst, legalAstGraph } from './legal/ast.js';
 import { PROFILES, exportCompiled } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
 
-export const STATES = ['uploaded', 'extracting', 'verified', 'compiled', 'deploying', 'deployed', 'failed'];
+export const STATES = ['uploaded', 'extracting', 'verified', 'analyzed', 'compiled', 'deploying', 'deployed', 'failed'];
 // Why this credential is the minimum sufficient assurance, in the rule's own words.
 const IDENTITY_RATIONALE = {
   document: 'KYC is an identity check, so the proportionate credential is a government document: a World ID Passport/NFC credential, verified by the gateway and bound to the wallet, satisfies it; its nullifier keeps one person from onboarding twice.',
@@ -24,7 +25,7 @@ const IDENTITY_RATIONALE = {
   selfie: 'The agreement asks for a live person behind the wallet: a World ID selfie check, verified by the gateway and bound to the wallet, satisfies it; its nullifier keeps one person from onboarding twice.',
 };
 const isIdentityRule = (rule) => rule.id.endsWith('-identity-verified');
-const REGENERATE_FROM = ['verified', 'compiled', 'deployed', 'failed'];
+const REGENERATE_FROM = ['verified', 'analyzed', 'compiled', 'deployed', 'failed'];
 const now = () => new Date().toISOString();
 
 const summary = ({ documents, envelope, verification, config, ...record }) => ({
@@ -32,8 +33,7 @@ const summary = ({ documents, envelope, verification, config, ...record }) => ({
   verification: verification ? { confidence: { overall: verification.confidence.overall, verified: verification.confidence.verified, total: verification.confidence.total, counts: verification.confidence.counts }, contested: verification.contested.length } : null,
 });
 
-/// The hand-authored reading of a demo agreement, when its quotes hold in this document. It is the
-/// draft a deliberation starts from; the mock cannot read a document without one.
+/// The explicit offline compiler fixture, only valid when its quotations match the document.
 export function draftFor(spec, document, config = {}) {
   try { return validateAst((config.cashier?.enabled ? cashierFixture(document) : spec.fixture(document)).ast, document.text); } catch { return null; }
 }
@@ -41,7 +41,7 @@ export function draftFor(spec, document, config = {}) {
 const factsOf = (node) => (node.type === 'fact' ? [node.name] : node.children ? node.children.flatMap(factsOf) : factsOf(node.child));
 
 /// The Contract-AST view: agreement → actions → rules → facts, terms and open items, each rule
-/// carrying what the deliberation established about it.
+/// carrying what the extraction established about it.
 export function astGraph({ title, rules, terms, unresolved, verification }) {
   const contested = new Set((verification?.contested ?? []).map((item) => item.ref));
   const byRef = verification?.confidence.byRef ?? {};
@@ -64,12 +64,13 @@ export function astGraph({ title, rules, terms, unresolved, verification }) {
 }
 
 export class Agreements {
-  /// `extract` and `deployer` are injectable: the deliberation client and the chain deploy.
+  /// `extract` and `deployer` are injectable: the extraction client and the chain deploy.
   /// `venueFactory` builds the operator service over one deployed agreement's token, oracle and hook.
-  constructor({ path = null, extract = extractAgreement, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
+  constructor({ path = null, uploadsPath = null, extract = extractWorkspace, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
     ensure(typeof worldIdAction === 'string' && worldIdAction.trim(), 500, 'CONFIG', 'WORLD_ACTION must not be empty');
-    Object.assign(this, { path, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
+    Object.assign(this, { path, uploadsPath, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
     this.deployQueue = Promise.resolve();
+    this.persistQueue = Promise.resolve();
   }
 
   async init() {
@@ -77,14 +78,20 @@ export class Agreements {
       try { for (const record of JSON.parse(await readFile(this.path, 'utf8'))) this.records.set(record.id, record); } catch (error) { if (error.code !== 'ENOENT') throw error; }
     }
     // A restart mid-job leaves no one to finish it.
-    for (const record of this.records.values()) if (['extracting', 'deploying'].includes(record.status)) this.transition(record, 'failed', { error: `Interrupted while ${record.status}` });
+    for (const record of this.records.values()) if (['uploaded', 'extracting', 'deploying'].includes(record.status)) this.transition(record, 'failed', { error: `Interrupted while ${record.status}` });
     return this;
   }
 
   async persist() {
     if (!this.path) return;
-    await mkdir(dirname(this.path), { recursive: true });
-    await writeFile(this.path, JSON.stringify([...this.records.values()]));
+    const snapshot = JSON.stringify([...this.records.values()]);
+    const write = this.persistQueue.then(async () => {
+      await mkdir(dirname(this.path), { recursive: true, mode: 0o700 });
+      await writeFile(`${this.path}.tmp`, snapshot, { mode: 0o600 });
+      await rename(`${this.path}.tmp`, this.path);
+    });
+    this.persistQueue = write.catch(() => {});
+    await write;
   }
 
   /// Every job in flight; tests and shutdown wait on it.
@@ -100,13 +107,14 @@ export class Agreements {
 
   get(id) {
     const record = this.record(id);
-    return { ...summary(record), export: this.exports.has(id) || record.policyHash ? this.export(id) : null };
+    return { ...summary(record), ast: record.envelope?.ast ?? null, documentAst: record.envelope?.documentAst ?? null, export: this.exports.has(id) || record.policyHash ? this.export(id) : null };
   }
 
   ast(id) {
     const record = this.record(id);
-    ensure(record.policyHash, 409, 'INVALID_STATE', `Agreement is ${record.status}; the tree exists once it compiled`);
-    return astGraph(this.export(id));
+    ensure(record.envelope, 409, 'INVALID_STATE', `Agreement is ${record.status}; the tree exists after AST generation`);
+    if (isLegalAst(record.envelope.ast)) return legalAstGraph(record.envelope.ast);
+    return astGraph(record.policyHash ? this.export(id) : record.envelope.ast);
   }
 
   transition(record, status, patch = {}) {
@@ -116,9 +124,10 @@ export class Agreements {
   }
 
   /// `documents` are the uploaded files ([{ name, text }]); their bytes are kept so the reader sees them as written.
-  async create({ name, documents, profile = 'rwa-secondary', config = null }) {
+  async create({ name, documents, profile = 'rwa-secondary', config = null, generation = undefined }) {
     const spec = PROFILES.find((entry) => entry.profile === profile);
     ensure(spec, 400, 'UNKNOWN_PROFILE', `Unknown profile ${profile}`);
+    ensure(generation === undefined || GENERATIONS.includes(generation), 400, 'INVALID_BODY', `generation must be ${GENERATIONS.join(', ')}`);
     let document;
     try { document = bundleDocuments(documents.map((part) => documentFrom(part.name, part.text))); } catch (error) { throw new AppError(400, 'INVALID_DOCUMENT', error.message); }
     let deploymentConfig = config ?? JSON.parse(await readFile(spec.config, 'utf8'));
@@ -130,16 +139,25 @@ export class Agreements {
     const record = {
       id: `agr_${randomBytes(6).toString('hex')}`, name, profile, status: 'uploaded', createdAt: now(), updatedAt: now(),
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
-      documents, config: deploymentConfig,
+      documents, config: deploymentConfig, ...(generation ? { generation } : {}),
       extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, progress: null, history: [],
     };
+    if (this.uploadsPath) {
+      const directory = join(this.uploadsPath, record.id);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      for (const [index, part] of documents.entries()) {
+        const filename = `${index + 1}-${basename(part.name).replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+        await writeFile(join(directory, filename), part.text, { mode: 0o600, flag: 'wx' });
+      }
+    }
     this.records.set(record.id, record);
     this.transition(record, 'uploaded');
+    await this.persist();
     this.generate(record.id);
     return summary(record);
   }
 
-  /// Runs the deliberation and the compiler in the background; the record tells where it is.
+  /// Runs the extraction and the compiler in the background; the record tells where it is.
   generate(id) {
     const record = this.record(id);
     ensure(!this.jobs.has(id), 409, 'INVALID_STATE', 'Agreement has a job in flight');
@@ -149,22 +167,25 @@ export class Agreements {
     this.transition(record, 'extracting', { error: null, extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null });
     const job = (async () => {
       try {
+        await this.persist();
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
-        if (!draft && extractorMode() === 'mock') throw new Error('Reading a new document needs a model: EXTRACTOR=noolog with NOOLOG_API_KEY, or EXTRACTOR=openai with OPENAI_API_KEY. The mock only generates the demo agreements.');
         // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
         const onProgress = (state) => { record.progress = { job: state.job_id, status: state.status, at: now() }; };
-        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft, onProgress, config: record.config });
+        const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation, onProgress, config: record.config });
         record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
+        if (isLegalAst(envelope.ast)) {
+          this.transition(record, 'analyzed');
+          return;
+        }
         const exported = this.export(id);
         this.transition(record, 'compiled', { policyHash: exported.policyHash, clauseTableHash: exported.clauseTableHash, coverage: { total: exported.coverage.total, counts: exported.coverage.counts, rules: exported.coverage.rules, terms: exported.coverage.terms } });
       } catch (error) {
         this.transition(record, 'failed', { error: error.message, progress: null });
       } finally {
-        this.jobs.delete(id);
+        try { await this.persist(); } finally { this.jobs.delete(id); }
       }
-      await this.persist();
     })();
     this.jobs.set(id, job);
     return summary(record);
@@ -191,6 +212,7 @@ export class Agreements {
   constraints(id) {
     const record = this.record(id);
     ensure(record.envelope, 409, 'INVALID_STATE', `Agreement is ${record.status}; nothing compiled yet`);
+    if (isLegalAst(record.envelope.ast)) return { identity: null };
     const rules = record.envelope.ast.rules.filter(isIdentityRule);
     return { identity: rules.length ? { credential: record.config.worldId?.credential ?? 'document', actions: rules.map((rule) => rule.action), clause: rules[0].source.clause, quote: rules[0].source.quote } : null };
   }
@@ -201,6 +223,7 @@ export class Agreements {
   async constrain(id, { identity } = {}) {
     const record = this.record(id);
     ensure(record.envelope && !this.jobs.has(id), 409, 'INVALID_STATE', `Agreement is ${record.status}`);
+    ensure(!isLegalAst(record.envelope.ast), 409, 'UNSUPPORTED_AST', 'Legal document ASTs require an explicit compiler mapping before deployment constraints can be added');
     ensure(identity === null || (identity && typeof identity === 'object' && !Array.isArray(identity)), 400, 'INVALID_BODY', 'identity: { credential, actions, quote?, clause? } or null');
     const document = this.document(record);
     const ast = { ...record.envelope.ast, rules: record.envelope.ast.rules.filter((rule) => !isIdentityRule(rule)) };
@@ -248,20 +271,19 @@ export class Agreements {
     ensure(record.status === 'compiled', 409, 'INVALID_STATE', `Agreement is ${record.status}; deploy needs compiled`);
     const document = this.document(record);
     const compiled = compilePolicy(record.envelope, record.config, document, { demo: true });
-    ensure(compiled.solidity, 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no token of its own to deploy; it is served by the stack's credit venue`);
+    ensure(compiled.solidity || record.profile === 'wildcat-credit', 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no deployment adapter`);
     this.venues.delete(id);
     this.transition(record, 'deploying');
     // All agreements share the signer, including operator and anonymous demo requests.
     const job = this.deployQueue.then(async () => {
       try {
-        const deployment = await this.deployer({ policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
+        const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
         this.transition(record, 'deployed', { deployment });
       } catch (error) {
         this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });
       } finally {
-        this.jobs.delete(id);
+        try { await this.persist(); } finally { this.jobs.delete(id); }
       }
-      await this.persist();
     });
     this.deployQueue = job.catch(() => {});
     this.jobs.set(id, job);

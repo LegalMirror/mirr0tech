@@ -1,0 +1,169 @@
+.world-loading {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  color: #aebdd5;
+  background: #080f1e;
+}
+.world-landing {
+  min-height: 100dvh;
+  background: radial-gradient(ellipse at 80% 35%, #162c49 0, transparent 50%), #080f1e;
+  color: #edf2fa;
+  padding: 36px max(24px, calc((100vw - 1200px) / 2));
+}
+.world-landing-header,
+.world-brand,
+.world-account-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.world-landing-header {
+  justify-content: space-between;
+}
+.world-brand {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.06em;
+}
+.world-sandbox {
+  padding: 6px 12px;
+  border: 1px solid #405369;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #becde0;
+}
+.world-hero {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 70px;
+  align-items: center;
+  min-height: 75dvh;
+  padding: 64px 0;
+}
+.world-eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  color: #81c9bc;
+}
+.world-hero h1 {
+  font-size: clamp(40px, 4.5vw, 66px);
+  line-height: 1.08;
+  letter-spacing: -0.055em;
+  font-weight: 500;
+  margin: 24px 0;
+}
+.world-intro {
+  max-width: 480px;
+  font-size: 17px;
+  line-height: 1.8;
+  color: #a7b8d0;
+}
+.world-steps {
+  display: grid;
+  gap: 16px;
+  margin-top: 40px;
+  font-size: 13px;
+  color: #b8c8db;
+}
+.world-login-card {
+  padding: 36px;
+  border: 1px solid #34445b;
+  border-radius: 20px;
+  background: #111d30;
+  box-shadow: 0 30px 80px #0003;
+}
+.world-orbit {
+  display: block;
+  font-size: 55px;
+  color: #a2e7d7;
+  margin-bottom: 26px;
+}
+.world-login-card h2 {
+  font-size: 25px;
+  line-height: 1.3;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+.world-login-card p {
+  color: #afc0d6;
+  line-height: 1.7;
+  font-size: 14px;
+}
+.world-login-button {
+  width: 100%;
+  background: #ecf6f2;
+  color: #102822;
+  border: 0;
+  border-radius: 9px;
+  padding: 16px;
+  font-size: 15px;
+  font-weight: 650;
+  margin: 22px 0 8px;
+  cursor: pointer;
+}
+.world-login-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.world-login-card .world-login-note {
+  font-size: 12px;
+  color: #8da2bc;
+}
+.world-login-card a {
+  display: inline-block;
+  color: #a2e7d7;
+  font-size: 13px;
+  margin-top: 12px;
+}
+.world-login-card .world-login-error {
+  color: #ffb7ad;
+}
+.world-reset {
+  display: block;
+  background: none;
+  border: 0;
+  padding: 16px 0 0;
+  color: #afc0d6;
+  cursor: pointer;
+  font-size: 12px;
+}
+.world-landing-footer {
+  border-top: 1px solid #25354b;
+  padding: 24px 0;
+  color: #8094b0;
+  font-size: 12px;
+}
+.world-account-bar {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  padding: 6px 20px;
+  background: #112638;
+  color: #d7e7f2;
+  font-size: 11px;
+}
+.world-account-bar button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid #4e6577;
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.world-account-id {
+  opacity: 0.65;
+  margin-left: 6px;
+}
+@media (max-width: 760px) {
+  .world-hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 40px 0;
+  }
+  .world-login-card {
+    padding: 28px;
+  }
+  .world-steps {
+    display: none;
+  }
+}

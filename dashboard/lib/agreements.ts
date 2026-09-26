@@ -1,16 +1,21 @@
+import type { LegalAst, LegalNode, LegalSource } from "./legal-ast";
 import type { Coverage, PolicyData, ProfileId, Verification, WorldIdContext } from "./types";
 import { gatewayRequest, type GatewaySession } from "./session";
 
 export type AgreementStatus =
-  "uploaded" | "extracting" | "verified" | "compiled" | "deploying" | "deployed" | "failed";
+  "uploaded" | "extracting" | "verified" | "analyzed" | "compiled" | "deploying" | "deployed" | "failed";
 export type AgreementDeployment = {
   chainId: number;
   policyHash: string;
   oracle: string;
   token: string;
-  hook: string;
-  poolManager: string;
-  poolId: string;
+  hook?: string;
+  poolManager?: string;
+  poolId?: string;
+  roleProvider?: string;
+  market?: string;
+  router?: string;
+  mockMarket?: boolean;
   deployedAt: string;
   txs: Record<string, string>;
 };
@@ -22,7 +27,15 @@ export type Agreement = {
   createdAt: string;
   updatedAt: string;
   source: { name: string; sha256: string; textSha256: string };
-  extraction: { provider: string; model: string | null; responseId?: string; agents?: string[] } | null;
+  extraction: {
+    provider: string;
+    model: string | null;
+    responseId?: string;
+    reasoningEffort?: string;
+    analysisMode?: "light";
+    compilerMapping?: { provider: string; id: string; scope: string };
+    agents?: string[];
+  } | null;
   verification: { confidence: Omit<Verification["confidence"], "byRef">; contested: number } | null;
   policyHash: string | null;
   clauseTableHash: string | null;
@@ -31,7 +44,18 @@ export type Agreement = {
   error: string | null;
   history: { status: AgreementStatus; at: string; policyHash?: string }[];
 };
-export type AgreementDetail = Agreement & { export: PolicyData | null };
+export type AgreementDetail = Agreement & {
+  export: PolicyData | null;
+  documentAst?: LegalAst | null;
+  ast?:
+    | LegalAst
+    | {
+        title: string;
+        rules: { id: string; action: string; source: { clause: string; quote: string }; rationale: string }[];
+        unresolved: { clause: string; description: string }[];
+      }
+    | null;
+};
 export type StackStatus = {
   model: { provider: string; mode: "mock" | "live" | "unavailable"; url?: string; model?: string };
   compiler: { solidity: Record<string, string> };
@@ -39,7 +63,7 @@ export type StackStatus = {
 };
 export type AstNode = {
   id: string;
-  kind: "agreement" | "action" | "rule" | "fact" | "term" | "unresolved";
+  kind: "agreement" | "action" | "rule" | "fact" | "term" | "unresolved" | "document" | LegalNode["kind"];
   label: string;
   effect?: string;
   clauseId?: number;
@@ -48,8 +72,12 @@ export type AstNode = {
   status?: string;
   confidence?: number | null;
   description?: string;
+  source?: LegalSource;
 };
-export type AstGraph = { nodes: AstNode[]; edges: { from: string; to: string }[] };
+export type AstGraph = {
+  nodes: AstNode[];
+  edges: { from: string; to: string; kind?: string; source?: LegalSource }[];
+};
 export type IdentityConstraint = {
   credential: "document" | "proof_of_human" | "selfie";
   actions: string[];
@@ -58,6 +86,7 @@ export type IdentityConstraint = {
 };
 export type Constraints = { identity: IdentityConstraint | null };
 export type Upload = {
+  generation?: "demo" | "openai";
   name: string;
   profile: ProfileId;
   documents: { name: string; text: string }[];
@@ -125,7 +154,7 @@ export type AgreementsClient = ReturnType<typeof agreementsClient>;
 export const inFlight = (status?: AgreementStatus) =>
   !!status && ["uploaded", "extracting", "verified", "deploying"].includes(status);
 export const canRegenerate = (status?: AgreementStatus) =>
-  !!status && ["verified", "compiled", "deployed", "failed"].includes(status);
+  !!status && ["verified", "analyzed", "compiled", "deployed", "failed"].includes(status);
 export function deployBlocked(
   record: Agreement | null,
   status: StackStatus | null,
@@ -133,8 +162,6 @@ export function deployBlocked(
 ): string | null {
   if (!writable) return "Start an active demo workspace to deploy your own contract.";
   if (!record || record.status !== "compiled") return "Deployment requires a compiled contract.";
-  if (record.profile === "wildcat-credit")
-    return "This credit profile uses the existing stack venue; per-contract deployment is not supported.";
   if (!status?.chain) return "No chain signer is reported by this gateway.";
   return null;
 }

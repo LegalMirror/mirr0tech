@@ -1,6 +1,6 @@
 import { AbiCoder, keccak256 } from 'ethers';
-import { canonical, sha256 } from './document.js';
-import { sampleFixture } from './fixture.js';
+import { canonical, sha256 } from '../policy/document.js';
+import { sampleFixture } from '../policy/fixture.js';
 
 // Only this separately authored DEMO grammar is supported, never arbitrary legal prose.
 const EXECUTION_QUOTE = 'The DEMO cashier may issue or redeem only for a wallet admitted by the transfer policy and the applicable issuance or redemption policy. Only full exact-input orders are supported. A trusted router may try the real AMM execution and revert that attempt if its output is below the cashier quote, then execute the cashier through Uniswap v4 custom accounting. Subscriptions must actually pay mockUSD into the cashier reserve; redemptions burn shares and pay only from prefunded available mockUSD reserves. A caller minimum output and deadline apply to both routes. Zero-output orders are refused. No reserve withdrawal is authorized in this demo.';

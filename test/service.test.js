@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { setup, funded, compliant } from './helpers.js';
 import { amountUnits, MirrorService } from '../src/service.js';
 import { Store } from '../src/store.js';
-import { MockChain } from '../src/chain.js';
+import { MockChain } from '../src/onchain/chain.js';
 import { AppError } from '../src/errors.js';
 
 test('amounts use exact integers, rejecting floats, negatives, zero and overflow', () => {

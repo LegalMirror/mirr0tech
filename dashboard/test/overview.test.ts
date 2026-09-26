@@ -33,7 +33,7 @@ describe("proofLinks", () => {
 describe("plainSummary", () => {
   it("swaps identifiers for words and drops hashes", () => {
     expect(plainSummary("attested mlaCountersigned, notInsolvent")).toBe(
-      "attested signed the loan agreement, not insolvent"
+      "attested signed the loan contract, not insolvent"
     );
     expect(plainSummary("shipped buyback 0x8582dad8…")).toBe("posted the buyback");
     expect(plainSummary("NoDepositCredential")).toBe("No deposit credential");

@@ -5,7 +5,7 @@ import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
 import { ContractFactory, JsonRpcProvider, Wallet, id, ZeroAddress } from 'ethers';
-import { EvmChain } from '../../src/chain.js';
+import { EvmChain } from '../../src/onchain/chain.js';
 import { compiled, setup, funded } from '../helpers.js';
 
 // Public Anvil development key, never use for assets or a public chain.

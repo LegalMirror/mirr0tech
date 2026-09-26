@@ -78,6 +78,9 @@ export function sampleSummary(profile: ProfileSummary): AgreementDetail {
 }
 export function verificationLabel(policy: PolicyData | null, sample: boolean): string {
   if (sample) return "Sample · exported policy";
+  if (policy?.extraction?.provider === "openai")
+    return "OpenAI AST · quotes validated, no independent review";
+  if (policy?.extraction?.provider === "demo") return "Demo AST · deterministic fixture";
   const report = policy?.verification;
   if (report?.mock) return "Mock extraction report";
   if (

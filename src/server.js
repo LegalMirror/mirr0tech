@@ -1,10 +1,10 @@
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import { Store } from './store.js';
-import { MockChain, EvmChain } from './chain.js';
+import { MockChain, EvmChain } from './onchain/chain.js';
 import { MirrorService } from './service.js';
 import { verifyPolicy } from './policy/compile.js';
-import { createApp } from './app.js';
+import { createApp } from './routes.js';
 
 const policy = verifyPolicy(JSON.parse(await readFile(process.env.POLICY_PATH ?? 'generated/policy.json', 'utf8')));
 const store = new Store(process.env.DATA_DIR ?? '.data');

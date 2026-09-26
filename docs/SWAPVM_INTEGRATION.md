@@ -1,6 +1,6 @@
 # 1inch SwapVM integration — specification
 
-Appendix to [PRD.md](PRD.md) §7.4. Status: **built and tested on anvil** (`test/chain/swapvm.test.js`). Sources: `contracts/swapvm/`, `src/policy/programs.js`.
+Appendix to [PRD.md](PRD.md) §7.4. Status: **built and tested on anvil** (`test/chain/swapvm.test.js`). Sources: `contracts/swapvm/`, `src/onchain/programs.js`.
 
 ## 1. What we are building
 
@@ -137,7 +137,7 @@ The router may wrap instruction reverts. Decode order: try `LegalClauseViolation
 
 ## 8. Spike checklist — done
 
-Vendored `release/1.1` (`npm run vendor`), pinned solc 0.8.30 via IR, opcodes parsed from `LimitOpcodes.sol`, `query.taker` is `msg.sender` (custom receivers only affect the asset leg), Aqua deployed from source locally and reused canonically on Sepolia.
+Vendored `release/1.1` (`pnpm run vendor`), pinned solc 0.8.30 via IR, opcodes parsed from `LimitOpcodes.sol`, `query.taker` is `msg.sender` (custom receivers only affect the asset leg), Aqua deployed from source locally and reused canonically on Sepolia.
 
 ## 9. Open questions
 

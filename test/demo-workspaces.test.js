@@ -1,3 +1,4 @@
+import { extractDemo } from '../src/openai-extract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -6,11 +7,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import express from 'express';
 import { Agreements } from '../src/agreements.js';
-import { agreementRoutes } from '../src/agreements-api.js';
-import { DemoWorkspaces, demoWorkspaceRoutes } from '../src/demo-workspaces.js';
+import { agreementRoutes, demoWorkspaceRoutes } from '../src/routes.js';
+import { DemoWorkspaces } from '../src/demo-workspaces.js';
 
 // node:test isolates test files; these tests must never contact a paid model.
-delete process.env.NOOLOG_API_KEY;
+delete process.env.OPENAI_API_KEY;
 const html = await readFile('test/human_contracts/ea026411904ex10-9.htm', 'utf8');
 const addendum = await readFile('test/human_contracts/nav-cashier-addendum.md', 'utf8');
 const cashier = JSON.parse(await readFile('examples/rwa-cashier-config.json', 'utf8'));
@@ -24,7 +25,7 @@ async function temporary(t) {
   return directory;
 }
 async function service(options = {}) {
-  const agreements = options.agreements ?? new Agreements({ deployer: async () => ({ chainId: 31337, token: '0xtest' }) });
+  const agreements = options.agreements ?? new Agreements({ extract: extractDemo, deployer: async () => ({ chainId: 31337, token: '0xtest' }) });
   const workspaces = await new DemoWorkspaces({ agreements, chainId: 31337, ...options }).init();
   return { agreements, workspaces };
 }
@@ -70,12 +71,12 @@ async function http(t, options = {}, trustProxy = false) {
 }
 
 test('constructor restricts chain, durable Sepolia state and safety ceilings', async (t) => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   for (const chainId of [1, 10, 8453, '11155111', undefined]) assert.throws(() => new DemoWorkspaces({ agreements, chainId }), rejected(500, 'CONFIG'));
   assert.throws(() => new DemoWorkspaces({ agreements, chainId: 11155111 }), /durable/);
   for (const options of [{ sessionsPerIp: 0 }, { sessionTtlSeconds: 86400 }, { maxParts: 9 }, { maxRequestBytes: 5_000_000 }, { unknown: 1 }]) assert.throws(() => new DemoWorkspaces({ agreements, chainId: 31337, ...options }), rejected(500, 'CONFIG'));
   const path = join(await temporary(t), 'workspaces.json');
-  assert.throws(() => new DemoWorkspaces({ agreements: new Agreements({ path }), chainId: 31337, path }), /different paths/);
+  assert.throws(() => new DemoWorkspaces({ agreements: new Agreements({ extract: extractDemo, path }), chainId: 31337, path }), /different paths/);
   const demo = await new DemoWorkspaces({ agreements, chainId: 11155111, path }).init();
   assert.equal(demo.config().chainId, 11155111);
 });
@@ -107,7 +108,8 @@ test('HTTP: keyless sessions run the real scoped lifecycle without exposing oper
   assert.equal(record.data.status, 'compiled');
   assert.equal(record.data.export.documents.length, 1);
   assert.ok(record.data.export.equivalenceChecks > 0);
-  assert.equal(record.data.export.verification.mock, true);
+  assert.equal(record.data.export.verification, null);
+  assert.equal(record.data.extraction.provider, 'demo');
   assert.deepEqual((await call('/agreements', { token })).data.map((record) => record.id), [id]);
   assert.equal((await call('/agreements', { token })).data[0].export, undefined);
   assert.deepEqual((await call('/agreements', { token: other })).data, []);
@@ -127,7 +129,7 @@ test('HTTP: keyless sessions run the real scoped lifecycle without exposing oper
     }
   }
   const sanitized = await call('/status', { token });
-  assert.deepEqual(sanitized.data, { model: { provider: 'noolog', mode: 'mock' }, compiler: { solidity: { core: '0.8.37+commit.123', 'uniswap-v4': '0.8.26' } }, chain: { chainId: 31337 } });
+  assert.deepEqual(sanitized.data, { model: { provider: 'demo', mode: 'mock' }, compiler: { solidity: { core: '0.8.37+commit.123', 'uniswap-v4': '0.8.26' } }, chain: { chainId: 31337 } });
   assert.equal(passed.length, 0, 'all demo agreement requests terminate in the router');
   assert.equal((await call('/demo/logout', { token, method: 'POST' })).data.revoked, true);
   assert.equal((await call('/agreements', { token })).status, 401);
@@ -239,17 +241,7 @@ test('unsupported/new documents are UNAVAILABLE, consume attempted work quota an
   await assert.rejects(workspaces.create(two.accessToken, upload), rejected(429));
 });
 
-test('live Noolog disables public create and regenerate without a paid call', async () => {
-  const { agreements, workspaces } = await service();
-  const { accessToken: token } = await workspaces.session('ip');
-  const id = await created(workspaces, agreements, token);
-  process.env.NOOLOG_API_KEY = 'test-only-never-send';
-  try {
-    await assert.rejects(workspaces.create(token, upload), rejected(503, 'UNAVAILABLE'));
-    await assert.rejects(workspaces.mutate(token, id, 'regenerate'), rejected(503, 'UNAVAILABLE'));
-    assert.equal(workspaces.state.jobs.length, 1);
-    assert.equal(agreements.get(id).status, 'compiled');
-  } finally { delete process.env.NOOLOG_API_KEY; }
+test('custom extractors cannot make paid calls through public demo routes', async () => {
   const custom = await service({ agreements: new Agreements({ extract: async () => { throw new Error('must not run'); } }) });
   const other = await custom.workspaces.session('ip');
   await assert.rejects(custom.workspaces.create(other.accessToken, upload), rejected(503, 'UNAVAILABLE'));
@@ -281,7 +273,7 @@ test('durable hashed tokens/ownership and global gas reservations survive restar
     assert.equal(persisted.deploys.length, 1, 'gas reservation is on disk before invoking the deployer');
     throw new Error('RPC disconnected after broadcast: https://secret.invalid/private-key');
   };
-  const agreements = new Agreements({ path: agreementPath, deployer });
+  const agreements = new Agreements({ extract: extractDemo, path: agreementPath, deployer });
   const options = { path, chainId: 11155111, clock: () => now, deploysPerInterval: 1 };
   const first = (await service({ ...options, agreements })).workspaces;
   const { accessToken: token } = await first.session('ip1');
@@ -294,7 +286,7 @@ test('durable hashed tokens/ownership and global gas reservations survive restar
   const raw = await readFile(path, 'utf8');
   assert.ok(!raw.includes(token) && !raw.includes(html) && !raw.includes('ip1'));
   assert.equal((await stat(path)).mode & 0o777, 0o600);
-  const reloadedAgreements = await new Agreements({ path: agreementPath, deployer }).init();
+  const reloadedAgreements = await new Agreements({ extract: extractDemo, path: agreementPath, deployer }).init();
   const second = (await service({ ...options, agreements: reloadedAgreements })).workspaces;
   assert.deepEqual((await second.read(token, 'list')).map((record) => record.id), [id]);
   await assert.rejects(second.mutate(token, id, 'deploy'), rejected(429));
@@ -365,7 +357,7 @@ test('Agreements serializes operator and demo deployer calls and preserves jobs/
   let calls = 0;
   let active = 0;
   let maximum = 0;
-  const agreements = new Agreements({ deployer: async () => {
+  const agreements = new Agreements({ extract: extractDemo, deployer: async () => {
     const call = ++calls;
     active++;
     maximum = Math.max(maximum, active);

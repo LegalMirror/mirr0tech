@@ -1,5 +1,5 @@
 import { Contract, JsonRpcProvider, Wallet } from 'ethers';
-import { ensure, AppError } from './errors.js';
+import { ensure, AppError } from '../errors.js';
 
 export const TOKEN_ABI = [
   'function policyHash() view returns (bytes32)', 'function custodian() view returns (address)',

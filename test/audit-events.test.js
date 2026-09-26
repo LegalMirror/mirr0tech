@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { auditEvents } from '../src/audit-events.js';
+import { auditEvents } from '../src/onchain/audit-events.js';
 
 const entries = [
   { id: '1', at: '2026-09-25T19:47:00Z', type: 'attest', policy: 'credit', wallet: 'Lender A', status: 'ok', facts: { mlaCountersigned: true }, txHash: '0xaa' },

@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { deployStack } from '../../src/deploy.js';
-import { VenueService } from '../../src/venues.js';
-import { createApp } from '../../src/app.js';
+import { deployStack } from '../../src/onchain/deploy.js';
+import { VenueService } from '../../src/onchain/venues.js';
+import { createApp } from '../../src/routes.js';
 import { mockProof } from '../../src/worldid.js';
 
 test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t) => {

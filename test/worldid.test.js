@@ -101,3 +101,16 @@ test('installed IDKit v4 presets accept the wallet as signal, without legacy rem
   assert.deepEqual(proofOfHuman({ signal: A }), { type: 'ProofOfHuman', signal: A });
   assert.deepEqual(selfieCheck({ signal: A }), { type: 'SelfieCheck', signal: A });
 });
+
+test('a 0x-hex signal is hashed as bytes and anything else as text; our wallet and login signals follow that rule', async () => {
+  const { hashSignal } = await import('@worldcoin/idkit-core/hashing');
+  const { keccak256, getBytes, toUtf8Bytes } = await import('ethers');
+  const field = (bytes) => BigInt(keccak256(bytes)) >> 8n;
+  const wallet = '0xEE48a1bA5C5A2C1dC2b8e2A06b0ea1e5E1bC5B47';
+  assert.equal(BigInt(hashSignal(wallet)), field(getBytes(wallet)), 'a wallet is its 20 bytes');
+  assert.notEqual(BigInt(hashSignal(wallet)), field(toUtf8Bytes(wallet)), 'not its 42 characters, as a server following the docs would hash it');
+  assert.equal(hashSignal(wallet), hashSignal(wallet.toLowerCase()), 'case does not change the bytes');
+  const login = 'ab'.repeat(32);
+  assert.equal(BigInt(hashSignal(login)), field(toUtf8Bytes(login)), 'hex without 0x is text');
+  assert.equal(BigInt(hashSignal('0xzz')), field(toUtf8Bytes('0xzz')), '0x followed by non-hex is text');
+});

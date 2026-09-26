@@ -114,6 +114,8 @@ export function DeployView({
 }) {
   const deployment = !sample && record.status === "deployed" ? record.deployment : null;
   const mismatch = !!deployment && deployment.policyHash !== record.policyHash;
+  const explorer = deployment?.chainId === 11155111 ? "https://sepolia.etherscan.io" : null;
+  const sources = Object.entries(policy?.contractSources ?? {});
   return (
     <div className="wb-scroll-page">
       <div className="wb-section-heading">
@@ -175,26 +177,50 @@ export function DeployView({
                   Token: deployment.token,
                   Oracle: deployment.oracle,
                   Hook: deployment.hook,
+                  "Role provider": deployment.roleProvider,
+                  "Mock credit market": deployment.market,
+                  "Buyback router": deployment.roleProvider ? deployment.router : undefined,
                   "Pool manager": deployment.poolManager,
                   "Pool ID": deployment.poolId,
                   "Deployed policy": deployment.policyHash,
-                }).map(([label, value]) => (
-                  <div key={label}>
-                    <dt>{label}</dt>
-                    <dd>
-                      <code>{value}</code>
-                    </dd>
-                  </div>
-                ))}
+                })
+                  .filter(([, value]) => value !== undefined)
+                  .map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>
+                        <code>{value}</code>
+                        {explorer && /^0x[0-9a-fA-F]{40}$/.test(String(value)) && (
+                          <>
+                            {" "}
+                            <a href={`${explorer}/address/${value}`} target="_blank" rel="noreferrer">
+                              Etherscan ↗
+                            </a>
+                          </>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
               </dl>
-              <details>
-                <summary>Deployment transactions</summary>
-                {Object.entries(deployment.txs).map(([label, hash]) => (
+              <section aria-label="Deployment transactions">
+                <h4>Deployment transaction hashes</h4>
+                {Object.entries(deployment.txs ?? {}).map(([label, hash]) => (
                   <p key={label}>
                     {label}: <code>{hash}</code>
+                    {explorer && (
+                      <>
+                        {" "}
+                        <a href={`${explorer}/tx/${hash}`} target="_blank" rel="noreferrer">
+                          Etherscan ↗
+                        </a>
+                      </>
+                    )}
                   </p>
                 ))}
-              </details>
+                {!Object.keys(deployment.txs ?? {}).length && (
+                  <p className="wb-muted">No transaction hashes reported by the gateway.</p>
+                )}
+              </section>
             </>
           ) : (
             <p className="wb-muted">
@@ -209,6 +235,32 @@ export function DeployView({
           </Notice>
         </section>
       </div>
+      <section className="wb-surface">
+        <h3>Contract code</h3>
+        <p className="wb-muted">
+          Generated Solidity for the current policy. These files use shared contract dependencies.
+        </p>
+        {mismatch && (
+          <Notice>
+            These sources describe the current policy, which differs from the recorded deployment.
+          </Notice>
+        )}
+        {sources.length ? (
+          sources.map(([filename, source]) => (
+            <details key={filename}>
+              <summary>{filename}</summary>
+              <pre className="wb-json">
+                <code>{source}</code>
+              </pre>
+            </details>
+          ))
+        ) : (
+          <p className="wb-muted">
+            Contract source is not available in this export. Compile the agreement or refresh from a gateway
+            that provides contract sources.
+          </p>
+        )}
+      </section>
       {policy && (
         <section className="wb-surface">
           {constraintError && <Notice error>{constraintError}</Notice>}

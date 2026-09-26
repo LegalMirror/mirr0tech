@@ -91,13 +91,13 @@ node --test test/worldid*.test.js
 
 Verify these with the venues/frontend owners before claiming the whole application is fail-closed:
 
-- `src/venues.js`: bind **before** attesting, keep unrelated facts, and preserve verifier `mock`, `environment`, `credential` and action provenance in successful responses/audits. Generic `attest`/`attestMerged` paths must not grant `identityVerified: true` without the verified-credential path; any privileged recovery route needs explicit authorization and auditing. Explicit false/revocation can remain supported.
+- `src/onchain/venues.js`: bind **before** attesting, keep unrelated facts, and preserve verifier `mock`, `environment`, `credential` and action provenance in successful responses/audits. Generic `attest`/`attestMerged` paths must not grant `identityVerified: true` without the verified-credential path; any privileged recovery route needs explicit authorization and auditing. Explicit false/revocation can remain supported.
 - Require durable registry storage for live venues rather than the constructor's in-memory fallback. `scripts/dev-stack.js` currently supplies a chain-based registry shared with agreement venues; decide the intended RP/action/policy scope and separate mock/staging/production storage before a live deployment.
 - Bound attestation lifetimes on the server; do not let client-controlled `days` turn a one-time credential result into an arbitrary-lived fact or refresh unrelated expired compliance facts. The credential gate does not decide those facts' validity periods.
 - `verifyHuman` must use the correct deployed policy/attestor and ensure the intended issuance, pool and cashier policies require the credential fact. Do not claim cashier enforcement merely because the World ID backend is present.
 - The dashboard should use `passport`, `proofOfHuman`, or `selfieCheck` for the selected credential, `allow_legacy_proofs: false`, the context environment, and the actual wallet address as signal. Keep the whole IDKit result, including Selfie integrity material. Its mock helper must use the selected schema. Render cancellation/denial honestly, and only mark success after backend verification and chain attestation—not merely IDKit's completion callback.
 
-Related routes: `GET /v1/stack/worldid/context`, `POST /v1/stack/wallets/:wallet/worldid`; related integration: `src/venues.js` `verifyHuman`, `dashboard/app/_components/HumanCheck.tsx`. No signing secret belongs in those client components.
+Related routes: `GET /v1/stack/worldid/context`, `POST /v1/stack/wallets/:wallet/worldid`; related integration: `src/onchain/venues.js` `verifyHuman`, `dashboard/app/_components/HumanCheck.tsx`. No signing secret belongs in those client components.
 
 ## Official sources and integration notes
 
@@ -111,5 +111,7 @@ Audit sources were the installed `@worldcoin/idkit-core@4.3.0` types, presets, h
 - [Selfie Check credential 11](https://docs.world.org/world-id/credentials/11)
 - [v4 on-chain proof encoding (`uint256[5]`)](https://docs.world.org/world-id/idkit/onchain-verification)
 - [v4 migration and legacy nullifier tracking](https://docs.world.org/world-id/4-0-migration)
+
+**The signal is hashed as bytes, and nothing says so.** A signal that looks like hex (`0xEE48…`, a wallet) is hashed by IDKit as its 20 bytes, and as its 42 characters by a server that follows the docs; every proof is then refused, indistinguishable from a forgery. We use `hashSignal` from `@worldcoin/idkit-core/hashing` on the server, so both sides apply one rule (`0x` + valid hex → bytes, anything else → UTF-8), and `test/worldid.test.js` locks it for the wallet signal and the login signal. Ask: document the rule beside `signal`, and publish `hashSignal` for other languages.
 
 Actual integration friction: IDKit needs a preset/constraint and explicit legacy policy; RP context must be signed on the server; a v4 endpoint HTTP 200 can include failed proof items. The SDK makes signal optional for general integrations, but it is mandatory for this wallet-bound gate. A useful documentation improvement would be a complete application-level server example validating the selected per-credential result, wallet signal, cancellation/retry semantics and durable nullifier binding—not just forwarding an HTTP status.

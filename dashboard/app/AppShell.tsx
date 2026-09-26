@@ -17,7 +17,8 @@ import { useModalEscape } from "./useModalEscape";
 function nav(profile: ProfileId) {
   return [
     { href: "/", label: "Workbench", hint: "contracts & deployment" },
-    { href: "/investor", label: "Investor dashboard", hint: "World ID & wallet swaps" },
+    // Temporarily disabled with the investor dashboard.
+    // { href: "/investor", label: "Investor dashboard", hint: "World ID & wallet swaps" },
     { href: "/overview", label: "Overview", hint: "the story" },
     { href: "/agreement", label: "Contract", hint: "what runs on-chain" },
     {

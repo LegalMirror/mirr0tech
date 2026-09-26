@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { AbiCoder, ContractFactory, Contract, Interface, Wallet, concat, id, MaxUint256 } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER } from '../../src/policy/hookAddress.js';
+import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER } from '../../src/onchain/hookAddress.js';
 
 // Act 1: the fund's transfer-agent agreement compiles into the token's issuance rules and into the
 // Uniswap v4 hook that is the token's only door into a pool.
@@ -39,7 +39,7 @@ const decode = (error) => {
 };
 
 test('the fund agreement compiles into the token and into the only door a pool can use', { timeout: 300_000 }, async (t) => {
-  assert.equal(policy.profile, 'rwa-secondary', 'run npm run build:secondary first');
+  assert.equal(policy.profile, 'rwa-secondary', 'run pnpm run build:secondary first');
   const { provider } = await startAnvil(t);
   const admin = new Wallet(DEV_KEY, provider);
   const investor = await provider.getSigner(1);

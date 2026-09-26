@@ -36,7 +36,6 @@ function summaryOf(entry) {
   switch (entry.type) {
     case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
     case 'worldid.verify': return `identity verified with a World ID document (nullifier ${entry.nullifier})`;
-    case 'signing.handover': return `operator roles handed to ${entry.to}`;
     case 'payment.settle': return entry.status === 'held' ? `payment ${entry.paymentId} of ${entry.amount} USD held: ${entry.refusal?.clause?.ruleId ?? 'policy'}`
       : entry.status === 'failed' ? `payment ${entry.paymentId} of ${entry.amount} USD failed: ${entry.message}` : `payment ${entry.paymentId} of ${entry.amount} USD settled into ${entry.amount} shares`;
     case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;

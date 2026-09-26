@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/onchain/runtime-config.js';
 
 const remote = { NODE_ENV: 'production', API_KEY: 'test-operator-key-at-least-24-chars', RPC_URL: 'https://rpc.example.invalid', EXPECTED_CHAIN_ID: '11155111' };
 
@@ -58,7 +58,7 @@ test('the data directory is checked for writes at boot, with the reason and the 
   const { mkdtemp, rm, writeFile } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
   const { join } = await import('node:path');
-  const { assertWritableDataDir } = await import('../src/runtime-config.js');
+  const { assertWritableDataDir } = await import('../src/onchain/runtime-config.js');
   const directory = await mkdtemp(join(tmpdir(), 'data-dir-'));
   try {
     await assertWritableDataDir(join(directory, 'nested', 'data'));

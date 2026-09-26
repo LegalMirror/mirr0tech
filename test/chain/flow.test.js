@@ -7,13 +7,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { deployStack, deployFund } from '../../src/deploy.js';
-import { VenueService } from '../../src/venues.js';
+import { deployStack, deployFund } from '../../src/onchain/deploy.js';
+import { VenueService } from '../../src/onchain/venues.js';
 import { Agreements } from '../../src/agreements.js';
-import { createApp } from '../../src/app.js';
+import { createApp } from '../../src/routes.js';
 import { HumanRegistry, WorldIdVerifier } from '../../src/worldid.js';
 
-delete process.env.NOOLOG_API_KEY;
+import { extractDemo } from '../../src/openai-extract.js';
 const run = promisify(execFile);
 
 test('the flow from the terminal: upload, constrain, deploy, verify, and use the policy-hooked pool', { timeout: 420_000 }, async (t) => {
@@ -22,7 +22,7 @@ test('the flow from the terminal: upload, constrain, deploy, verify, and use the
   const { record } = await deployStack(signer);
   const registry = new HumanRegistry(null);
   const base = await new VenueService({ provider, signer, record, worldId: { verifier: new WorldIdVerifier(), registry } }).init();
-  const agreements = new Agreements({
+  const agreements = new Agreements({ extract: extractDemo,
     deployer: ({ sources }) => deployFund(signer, { record, sources }),
     venueFactory: ({ deployment, policy, clauseTable, credential, action }) => new VenueService({
       provider, signer, policies: { rwa: { policy, clauseTable }, credit: base.policies.credit },

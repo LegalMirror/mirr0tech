@@ -1653,3 +1653,18 @@
   height: 36px;
   padding: 8px;
 }
+
+.wb-legal-split .wb-source-intro input { width: 100%; margin-top: 12px; }
+.wb-legal-split .wb-graph-tools { flex-wrap: wrap; }
+.wb-legal-split .wb-graph-tools label { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.wb-legal-split .wb-graph-tools input { width: auto; }
+.wb-legal-split .wb-clause-bottom { flex-wrap: wrap; overflow-wrap: anywhere; }
+.wb-legal-inspector { max-height: 280px; overflow-y: auto; }
+.wb-legal-inspector blockquote { margin: 12px 0; padding-left: 12px; border-left: 2px solid var(--wb-cyan, #44b6b0); line-height: 1.7; }
+.wb-legal-links { padding-left: 18px; }
+.wb-legal-links button { text-align: left; }
+.wb-legal-issue { color: var(--wb-amber, #b6873c); }
+.wb-legal-document { flex: 1; min-height: 320px; overflow: auto; padding: 28px; }
+.wb-legal-document p { line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
+.wb-legal-document mark { background: #e2ce6b; color: #182024; }
+.wb-state-analyzed { background: var(--wb-cyan, #44b6b0); }

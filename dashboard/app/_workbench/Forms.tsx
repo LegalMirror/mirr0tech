@@ -3,7 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { demoUrl, loadDemoBundle } from "@/lib/demo";
 import { CREDENTIAL_COPY } from "@/lib/identity";
-import { gatewayUrl, hasDemoSession, setSession, type GatewaySession } from "@/lib/session";
+import { gatewayUrl, hasGatewaySession, setSession, type GatewaySession } from "@/lib/session";
 import { startDemoWorkspace } from "@/lib/demo-session";
 import {
   validateUpload,
@@ -28,13 +28,13 @@ export function SettingsDialog({
   statusError: string;
   onClose: () => void;
 }) {
-  const [url, setUrl] = useState(session.url || "https://mir-api.peeramid.xyz");
+  const [url, setUrl] = useState(session.url || "http://localhost:3000");
   const [error, setError] = useState("");
   function connect(event: FormEvent) {
     event.preventDefault();
     try {
       const next = gatewayUrl(url);
-      if (!(hasDemoSession(session) && next === session.url)) void startDemoWorkspace(next, true);
+      if (!(hasGatewaySession(session) && next === session.url)) void startDemoWorkspace(next, true);
       onClose();
     } catch (error) {
       setError((error as Error).message);
@@ -107,21 +107,19 @@ export function SettingsDialog({
         </section>
         <span className="wb-eyebrow">CONNECTION</span>
         <p>
-          Anyone can create demo contracts—no API key or World login is needed. The gateway issues an
-          anonymous, isolated workspace for your own uploads.
+          {session.demoToken
+            ? "Anyone can create demo contracts in a hosted demo workspace. No operator key is needed."
+            : "Connect to the local workspace started with pnpm start. OpenAI credentials stay on the server."}
         </p>
         <label>
           Gateway URL
           <input type="url" required value={url} onChange={(event) => setUrl(event.target.value)} autoFocus />
         </label>
-        <Notice>
-          {session.demoNotice ??
-            "Connect to create your demo workspace. Exported samples remain available if the public demo API is not deployed yet."}
-        </Notice>
+        <Notice>{session.demoNotice ?? "Connect to upload contracts or try the demo."}</Notice>
         <p className="wb-muted">
-          The opaque demo token stays only in memory. Reloading, disconnecting, changing gateways or starting
-          a new workspace loses access to this workspace in the browser. No private existing contracts, admin
-          methods or wallet funds are exposed. Investor login is separate.
+          {session.workspaceToken
+            ? "Source files and contracts persist on this machine. Reloading reconnects to the same workspace."
+            : "Connection tokens stay in memory. Hosted demo workspaces are temporary and separate from the local workspace."}
         </p>
         {session.demoExpiresAt && (
           <p>Workspace expires {new Date(session.demoExpiresAt * 1000).toLocaleString()}.</p>
@@ -141,12 +139,10 @@ export function SettingsDialog({
               onClose();
             }}
           >
-            Disconnect · use samples
+            Disconnect
           </button>
           <button className="wb-primary" type="submit" disabled={session.demoState === "starting"}>
-            {hasDemoSession(session) && url === session.url
-              ? "Keep this workspace"
-              : "Start new demo workspace"}
+            {hasGatewaySession(session) && url === session.url ? "Keep this workspace" : "Connect workspace"}
             <Icon name="arrow" />
           </button>
         </footer>
@@ -161,16 +157,18 @@ export function UploadDialog({
   writable,
   status,
   demoWorkspace = false,
+  localWorkspace = false,
 }: {
   onClose: () => void;
   onUpload: (upload: Upload) => Promise<void>;
   writable: boolean;
   status: StackStatus | null;
   demoWorkspace?: boolean;
+  localWorkspace?: boolean;
 }) {
   const [name, setName] = useState("BUIDL demo");
   const [profile, setProfile] = useState<ProfileId>("rwa-secondary");
-  const [mode, setMode] = useState<"demo" | "paste" | "files">("demo");
+  const [mode, setMode] = useState<"demo" | "files">("demo");
   const [bundle, setBundle] = useState<Upload | null>(null);
   const [cashierDemo, setCashierDemo] = useState(false);
   const [demoError, setDemoError] = useState("");
@@ -189,8 +187,6 @@ export function UploadDialog({
     return () => controller.abort();
   }, [mode, demoRetry]);
   const demoDocuments = bundle?.documents.filter((_, index) => cashierDemo || index === 0) ?? [];
-  const [text, setText] = useState("");
-  const [extension, setExtension] = useState("txt");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -205,11 +201,10 @@ export function UploadDialog({
       const documents =
         mode === "demo"
           ? demoDocuments
-          : mode === "paste"
-            ? [{ name: `contract.${extension}`, text }]
-            : await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
+          : await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
       const upload: Upload = {
         name: name.trim(),
+        ...(localWorkspace ? { generation: mode === "demo" ? ("demo" as const) : ("openai" as const) } : {}),
         profile: mode === "demo" ? "rwa-secondary" : profile,
         documents,
         ...(mode === "demo" && cashierDemo ? { config: bundle?.config } : {}),
@@ -227,32 +222,23 @@ export function UploadDialog({
     <Modal title="Upload contracts" onClose={onClose} busy={busy}>
       <form className="wb-form" onSubmit={submit}>
         <p>
-          Start with the demo contract, or bring your own documents. This submits a real upload to the
-          gateway; extraction, analysis and compilation happen there.
+          Try the bundled demo, or upload your own contract to generate its AST with OpenAI. Source files and
+          contract records are saved on the server.
         </p>
         {!writable && (
-          <Notice>
-            The demo workspace is not ready. Use Connection to retry or start a new workspace. No API key is
-            needed; exported samples cannot be mutated.
-          </Notice>
+          <Notice>Connect to the workspace first. Run pnpm start, then open Settings to reconnect.</Notice>
         )}
         {demoWorkspace && (
           <Notice>
             Public workspaces accept only the bundled BUIDL document, optionally followed by its separately
-            authored NAV demo addendum with the provided config. Paste/file mode can submit those same
-            sources; arbitrary documents and credit profiles are not supported by the public mock reader.
+            authored NAV demo addendum with the provided config. File mode can submit those same sources;
+            arbitrary documents and credit profiles are not supported by the public mock reader.
           </Notice>
         )}
-        {status?.model.mode === "unavailable" && (
+        {localWorkspace && mode === "files" && status?.model.mode !== "live" && (
           <Notice>
-            Public demo generation is currently unavailable. This workspace does not fall back to paid live
-            Noolog calls. Retry after the gateway's demo configuration is restored.
-          </Notice>
-        )}
-        {status?.model.mode === "mock" && !demoWorkspace && (
-          <Notice>
-            The gateway reports a mock model. Only recognized demo documents can generate; new documents need
-            a live model configured on the server.
+            Set OPENAI_API_KEY in the server’s .env and restart pnpm start to enable generation. You can still
+            save your files now, or use Demo without an API key.
           </Notice>
         )}
         <label>
@@ -276,27 +262,29 @@ export function UploadDialog({
             <option value="rwa-secondary">RWA · token + secondary trading</option>
             <option value="custodial-rwa">RWA · custodial mint / burn</option>
             <option value="wildcat-credit" disabled={demoWorkspace}>
-              Credit · existing stack venue (no per-contract deploy)
+              Credit · role provider + mock market + buyback
             </option>
           </select>
         </label>
+        {mode !== "demo" && profile === "wildcat-credit" && (
+          <p className="wb-muted">
+            For the executable credit demo, upload the Wildcat MLA, lender-check policy and buyback addendum together.
+          </p>
+        )}
         <div className="wb-segmented" aria-label="Document input">
           <button type="button" aria-pressed={mode === "demo"} onClick={() => setMode("demo")}>
-            Demo documents
-          </button>
-          <button type="button" aria-pressed={mode === "paste"} onClick={() => setMode("paste")}>
-            Paste text
+            Demo
           </button>
           <button type="button" aria-pressed={mode === "files"} onClick={() => setMode("files")}>
-            Choose files
+            Upload files
           </button>
         </div>
         {mode === "demo" ? (
           <div className="wb-demo-bundle">
             <h3>BUIDL contract → executable policy</h3>
             <p>
-              Use the recognized source to exercise the existing deterministic Noolog adapter when the gateway
-              model is mock. This does not emulate live model reasoning in the browser.
+              Generate a sample AST from the bundled contract using a deterministic fixture. No API key is
+              needed.
             </p>
             <label className="wb-check">
               <input
@@ -342,31 +330,9 @@ export function UploadDialog({
               </details>
             )}
             <p className="wb-muted">
-              After upload, Analysis shows the actual report, claim verdicts, source quotes, open items and
-              equivalence checks. Mock provenance stays with the report.
+              After upload, review the contract’s source, AST, open questions and compiler checks.
             </p>
           </div>
-        ) : mode === "paste" ? (
-          <>
-            <label>
-              Document format
-              <select value={extension} onChange={(e) => setExtension(e.target.value)}>
-                <option value="txt">Plain text</option>
-                <option value="md">Markdown</option>
-                <option value="html">HTML source</option>
-              </select>
-            </label>
-            <label>
-              Contract text
-              <textarea
-                rows={8}
-                required
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                placeholder="Paste the full contract, including the clauses to compile…"
-              />
-            </label>
-          </>
         ) : (
           <label className="wb-file-input">
             <Icon name="file" size={28} />
@@ -375,7 +341,12 @@ export function UploadDialog({
               type="file"
               multiple
               accept=".txt,.md,.htm,.html"
-              onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
+              onChange={(e) => {
+                const selected = Array.from(e.target.files ?? []);
+                setFiles(selected);
+                if (selected.length && name === "BUIDL demo")
+                  setName(selected[0].name.replace(/\.[^.]+$/, "").slice(0, 200));
+              }}
             />
             <span>
               {files.map((file) => file.name).join(", ") || "Choose a contract and optional addenda"}
@@ -384,8 +355,9 @@ export function UploadDialog({
         )}
         <p className="wb-muted">
           No PDF support · 2 MB per file · 4 MB encoded request limit. Documents are sent to your gateway and,
-          in live mode, its configured extraction provider.
+          for file generation, to OpenAI. Demo generation runs locally.
         </p>
+        {mode === "files" && !files.length && <p role="status">Choose at least one file to continue.</p>}
         {error && <Notice error>{error}</Notice>}
         <footer>
           <button type="button" disabled={busy} onClick={onClose}>
@@ -394,7 +366,7 @@ export function UploadDialog({
           <button
             type="submit"
             className="wb-primary"
-            disabled={!writable || busy || (mode === "demo" && (!bundle || !!demoError))}
+            disabled={!writable || busy || (mode === "demo" ? !bundle || !!demoError : !files.length)}
           >
             {busy ? "Uploading…" : "Upload & generate"}
             <Icon name="arrow" />

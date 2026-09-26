@@ -1,5 +1,12 @@
 {
   "mcpServers": {
-    "noolog-docs": { "type": "http", "url": "https://noolog.io/mcp" }
+    "noolog-docs": {
+      "type": "http",
+      "url": "https://noolog.io/mcp"
+    },
+    "world-docs": {
+      "type": "http",
+      "url": "https://docs.world.org/mcp"
+    }
   }
 }

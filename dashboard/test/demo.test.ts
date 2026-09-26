@@ -38,32 +38,30 @@ describe("real demo document upload", () => {
     expect(() => validateUpload(upload)).not.toThrow();
     expect(upload.documents[1].text).toContain("not part of the base BUIDL agreement");
   });
-  it("uses the existing mock Noolog backend to produce a real compiled report, not frontend invented results", async () => {
+  it("uses the explicit deterministic fixture to produce a real compiled report", async () => {
     const upload = await mockStaticFiles();
     vi.unstubAllGlobals();
-    vi.stubEnv("NOOLOG_API_KEY", "");
+    vi.stubEnv("OPENAI_API_KEY", "");
     // The backend is untyped JS; its inferred default config:null is narrower than the REST contract.
     const store = (await new Agreements().init()) as unknown as {
       create(upload: Upload): Promise<{ id: string }>;
       settled(): Promise<unknown>;
       get(id: string): AgreementDetail;
     };
-    const created = await store.create(upload);
+    const created = await store.create({ ...upload, generation: "demo" });
     await store.settled();
     const record = store.get(created.id) as AgreementDetail;
     expect(record.status, record.error ?? "").toBe("compiled");
-    expect(record.export?.verification?.mock).toBe(true);
-    expect(record.export?.verification?.claims.length).toBeGreaterThan(0);
-    expect(record.export?.verification?.agents).toContain("critic");
+    expect(record.export?.verification).toBeNull();
+    expect(record.extraction?.provider).toBe("demo");
     expect(record.export?.equivalenceChecks).toBeGreaterThan(0);
     expect(record.export?.documents).toHaveLength(2);
     expect(record.export?.config.cashier).toMatchObject({ enabled: true });
     const html = renderToStaticMarkup(
       createElement(AnalysisView, { record, sample: false, onAst: () => {}, onIdentity: () => {} })
     );
-    expect(html).toContain("Simulated Noolog analysis");
-    expect(html).toContain("Deterministic mock adapter output");
-    expect(html).toContain("Verbatim");
+    expect(html).toContain("Demo AST");
+    expect(html).toContain("deterministic fixture");
     const regenerating = {
       ...record,
       export: null,

@@ -6,7 +6,7 @@
 // and no verdicts). Unset, it follows the keys present: noolog, then openai, then mock.
 import { once } from 'node:events';
 import { ACTIONS, astSchema, validateAst } from '../policy/schema.js';
-import { enforceableActions, profileComponents } from '../policy/components.js';
+import { enforceableActions, profileComponents } from '../onchain/components.js';
 import { NoologClient } from './client.js';
 import { createMockNoolog } from './mock.js';
 import { verificationFrom } from './verify.js';

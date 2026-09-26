@@ -1,4 +1,4 @@
-// Serves the JSON written by `npm run ui:export` and keeps mock parties in memory, so the queue and
+// Serves the JSON written by `pnpm run ui:export` and keeps mock parties in memory, so the queue and
 // the lender list stay consistent for the length of a session.
 import type { AuditEvent, Deployment, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
 import { mockAudit, mockParties } from "./mock";
@@ -12,7 +12,7 @@ const listeners = new Set<() => void>();
 async function json<T>(path: string): Promise<T> {
   const response = await fetch(path);
   if (!response.ok)
-    throw new Error(`${path}: ${response.status}. Run \`npm run ui:export\` from the repository root.`);
+    throw new Error(`${path}: ${response.status}. Run \`pnpm run ui:export\` from the repository root.`);
   return (await response.json()) as T;
 }
 

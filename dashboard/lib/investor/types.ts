@@ -1,7 +1,7 @@
 import type { WorldIdContext } from "../types";
 
 export const SEPOLIA = 11155111;
-export const INVESTOR_API = (process.env.NEXT_PUBLIC_GATEWAY_URL || "https://mir-api.peeramid.xyz").replace(
+export const INVESTOR_API = (process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3000").replace(
   /\/$/,
   ""
 );
@@ -127,7 +127,7 @@ export type ActivityEvent = Scope & {
   expiresAt?: number;
 };
 export type InvestorActivity = Scope & {
-  source: "multibaas" | "rpc" | "unavailable";
+  source: "rpc" | "unavailable";
   status: string;
   indexer: { status: string };
   complete: false;

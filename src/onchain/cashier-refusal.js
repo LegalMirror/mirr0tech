@@ -1,5 +1,5 @@
 import { Interface } from 'ethers';
-import { revertData } from '../refusal.js';
+import { revertData } from './refusal.js';
 
 const WRAPPER = new Interface(['error WrappedError(address target, bytes4 selector, bytes reason, bytes details)']);
 const ERRORS = new Interface([

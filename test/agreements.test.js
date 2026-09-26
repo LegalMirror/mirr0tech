@@ -1,3 +1,4 @@
+import { extractDemo } from '../src/openai-extract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -7,7 +8,7 @@ import { Agreements, astGraph, draftFor, STATES } from '../src/agreements.js';
 import { documentFrom, readDocument } from '../src/policy/document.js';
 import { PROFILES } from '../scripts/export-ui.js';
 
-delete process.env.NOOLOG_API_KEY;
+delete process.env.OPENAI_API_KEY;
 const FUND = 'test/human_contracts/ea026411904ex10-9.htm';
 const fund = { name: 'BUIDL fund agreement', documents: [{ name: 'ea026411904ex10-9.htm', text: await readFile(FUND, 'utf8') }] };
 const upload = async (agreements, body = fund) => {
@@ -26,7 +27,7 @@ test('an uploaded document is the same document the compiler reads from disk', a
 });
 
 test('upload → extracting → verified → compiled, with the record telling the story', async () => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   const created = await agreements.create(fund);
   assert.equal(created.status, 'extracting');
   assert.equal(created.documents, undefined, 'the summary does not carry the document bytes');
@@ -36,8 +37,8 @@ test('upload → extracting → verified → compiled, with the record telling t
   assert.equal(record.status, 'compiled', record.error ?? '');
   assert.deepEqual(record.history.map((entry) => entry.status), ['uploaded', 'extracting', 'verified', 'compiled']);
   assert.match(record.policyHash, /^0x[0-9a-f]{64}$/);
-  assert.equal(record.extraction.provider, 'noolog');
-  assert.ok(record.verification.confidence.overall > 0 && record.verification.confidence.total > 0);
+  assert.equal(record.extraction.provider, 'demo');
+  assert.equal(record.verification, null);
   assert.equal(record.coverage.total, 194);
   assert.ok(record.export.rules.some((rule) => rule.id === 'transfer-identity-verified'));
   assert.equal(record.export.documents.length, 1);
@@ -47,7 +48,7 @@ test('upload → extracting → verified → compiled, with the record telling t
 });
 
 test('the tree: agreement → actions → rules → facts, each rule carrying its verdict', async () => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   const record = await upload(agreements);
   const graph = agreements.ast(record.id);
   const kinds = new Set(graph.nodes.map((node) => node.kind));
@@ -55,18 +56,18 @@ test('the tree: agreement → actions → rules → facts, each rule carrying it
   assert.ok(graph.edges.some((edge) => edge.from === 'action:transfer' && edge.to === 'rule:transfer-identity-verified'));
   assert.ok(graph.edges.some((edge) => edge.from === 'rule:transfer-identity-verified' && edge.to === 'fact:identityVerified'));
   const rule = graph.nodes.find((node) => node.id === 'rule:transfer-identity-verified');
-  assert.ok(['verified', 'contested'].includes(rule.status));
-  assert.equal(typeof rule.confidence, 'number');
+  assert.equal(rule.status, 'unverified');
+  assert.equal(rule.confidence, null);
   assert.equal(new Set(graph.nodes.map((node) => node.id)).size, graph.nodes.length, 'no duplicate nodes');
   const bare = astGraph({ title: 't', rules: [], terms: [{ name: 'capPosition', value: '1', source: { clause: '3' } }], unresolved: [] });
   assert.equal(bare.nodes.find((node) => node.kind === 'term').status, 'unverified');
 });
 
 test('a document the demo readings do not fit needs the model, and says so', async () => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   const record = await upload(agreements, { name: 'Other', documents: [{ name: 'other.md', text: 'A short agreement nobody has read before.' }] });
   assert.equal(record.status, 'failed');
-  assert.match(record.error, /NOOLOG_API_KEY/);
+  assert.match(record.error, /bundled demo documents/);
   assert.equal(draftFor(PROFILES[1], documentFrom('other.md', 'nothing quoted here')), null);
   assert.throws(() => agreements.ast(record.id), (error) => error.status === 409);
   assert.throws(() => agreements.get('agr_nope'), (error) => error.status === 404);
@@ -74,7 +75,7 @@ test('a document the demo readings do not fit needs the model, and says so', asy
 });
 
 test('regenerate runs a new deliberation and keeps the earlier policy hash in the history', async () => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   const record = await upload(agreements);
   const again = agreements.regenerate(record.id);
   assert.equal(again.status, 'extracting');
@@ -88,7 +89,7 @@ test('regenerate runs a new deliberation and keeps the earlier policy hash in th
 
 test('deploy hands the generated Solidity to the chain and records what came back', async () => {
   const calls = [];
-  const agreements = new Agreements({ deployer: async (input) => { calls.push(input); return { chainId: 31337, token: '0xtoken', policyHash: input.policyHash }; } });
+  const agreements = new Agreements({ extract: extractDemo, deployer: async (input) => { calls.push(input); return { chainId: 31337, token: '0xtoken', policyHash: input.policyHash }; } });
   const record = await upload(agreements);
   assert.throws(() => agreements.deploy('agr_nope'), (error) => error.status === 404);
   const deploying = agreements.deploy(record.id);
@@ -102,14 +103,14 @@ test('deploy hands the generated Solidity to the chain and records what came bac
   assert.match(calls[0].sources.token, new RegExp(record.policyHash));
   assert.match(calls[0].sources.compiledPolicy, /library CompiledPolicy/);
 
-  const failing = new Agreements({ deployer: async () => { throw new Error('out of gas'); } });
+  const failing = new Agreements({ extract: extractDemo, deployer: async () => { throw new Error('out of gas'); } });
   const other = await upload(failing);
   failing.deploy(other.id);
   await failing.settled();
   assert.equal(failing.get(other.id).status, 'compiled');
   assert.match(failing.get(other.id).error, /out of gas/);
-  assert.throws(() => new Agreements().deploy(other.id), (error) => error.status === 404);
-  const unsigned = new Agreements();
+  assert.throws(() => new Agreements({ extract: extractDemo }).deploy(other.id), (error) => error.status === 404);
+  const unsigned = new Agreements({ extract: extractDemo });
   const third = await upload(unsigned);
   assert.throws(() => unsigned.deploy(third.id), (error) => error.status === 503);
 });
@@ -118,14 +119,14 @@ test('records survive a restart; an interrupted job is reported, not resumed', a
   const directory = await mkdtemp(join(tmpdir(), 'agreements-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const path = join(directory, 'agreements.json');
-  const first = new Agreements({ path });
+  const first = new Agreements({ extract: extractDemo, path });
   const record = await upload(first);
   const created = await first.create(fund);
   assert.equal(created.status, 'extracting');
   await first.persist();
   await first.settled();
 
-  const second = await new Agreements({ path }).init();
+  const second = await new Agreements({ extract: extractDemo, path }).init();
   assert.equal(second.list().length, 2);
   const reloaded = second.get(record.id);
   assert.equal(reloaded.status, 'compiled');
@@ -134,12 +135,12 @@ test('records survive a restart; an interrupted job is reported, not resumed', a
 
   const stale = JSON.parse(await readFile(path, 'utf8')).map((entry) => ({ ...entry, status: 'extracting' }));
   await import('node:fs/promises').then(({ writeFile }) => writeFile(path, JSON.stringify(stale)));
-  const third = await new Agreements({ path }).init();
+  const third = await new Agreements({ extract: extractDemo, path }).init();
   assert.ok(third.list().every((entry) => entry.status === 'failed' && /Interrupted/.test(entry.error)));
 });
 
 test('the issuer puts a World ID constraint on the agreement: credential and actions, quoting the sentence; the hash moves', async () => {
-  const agreements = new Agreements();
+  const agreements = new Agreements({ extract: extractDemo });
   const record = await upload(agreements);
   const before = agreements.constraints(record.id);
   assert.deepEqual(before.identity.actions, ['mint', 'transfer']);
@@ -157,7 +158,7 @@ test('the issuer puts a World ID constraint on the agreement: credential and act
   assert.equal(agreements.get(record.id).history.filter((entry) => entry.status === 'compiled').length, 2);
   const nodes = agreements.ast(record.id).nodes;
   assert.equal(nodes.find((node) => node.id === 'rule:burn-identity-verified').status, 'unverified', 'a rule the issuer added has no verdict');
-  assert.notEqual(nodes.find((node) => node.id === 'rule:transfer-identity-verified').status, 'unverified', 'the deliberation\'s verdict on the sentence stands');
+  assert.equal(nodes.find((node) => node.id === 'rule:transfer-identity-verified').status, 'unverified');
 
   const lifted = await agreements.constrain(record.id, { identity: null });
   assert.equal(agreements.constraints(record.id).identity, null);
@@ -179,6 +180,7 @@ test('the issuer puts a World ID constraint on the agreement: credential and act
 
 test('the configured World action is hashed for new agreements and passed to their verifier', async () => {
   const agreements = new Agreements({
+    extract: extractDemo,
     worldIdAction: 'humanity',
     deployer: async () => ({ testOnly: true }),
     venueFactory: async ({ action }) => ({ action }),
@@ -194,7 +196,7 @@ test('the configured World action is hashed for new agreements and passed to the
 });
 
 test('updating an old agreement to the registered action changes its hash and requires redeployment', async () => {
-  const agreements = new Agreements({ worldIdAction: 'onboard-investor' });
+  const agreements = new Agreements({ extract: extractDemo, worldIdAction: 'onboard-investor' });
   const record = await upload(agreements);
   agreements.record(record.id).status = 'deployed';
   agreements.record(record.id).deployment = { testOnly: true };
@@ -206,13 +208,18 @@ test('updating an old agreement to the registered action changes its hash and re
   assert.equal(agreements.get(record.id).export.config.worldId.action, 'humanity');
 });
 
-test('a credit-profile agreement compiles but has no token to deploy per agreement', async () => {
-  const agreements = new Agreements({ deployer: async () => { throw new Error('must not be called'); } });
+test('a credit-profile agreement passes its bound policy to the deployment adapter', async () => {
+  let input;
+  const agreements = new Agreements({ extract: extractDemo, deployer: async (value) => { input = value; return { policyHash: value.policyHash }; } });
   const names = ['wildcat-mla.md', 'lender-check-policy.md', 'buyback-addendum.md'];
   const documents = await Promise.all(names.map(async (name) => ({ name, text: await readFile(`test/human_contracts/${name}`, 'utf8') })));
   const record = await upload(agreements, { name: 'MLA', documents, profile: 'wildcat-credit' });
   assert.equal(record.status, 'compiled', record.error ?? '');
   assert.equal(record.source.parts.length, 3);
-  assert.throws(() => agreements.deploy(record.id), (error) => error.code === 'UNSUPPORTED_PROFILE');
-  assert.equal(agreements.get(record.id).status, 'compiled');
+  agreements.deploy(record.id);
+  await agreements.settled();
+  assert.equal(agreements.get(record.id).status, 'deployed');
+  assert.equal(input.profile, 'wildcat-credit');
+  assert.equal(input.sources.policy.hash, record.policyHash);
+  assert.equal(input.sources.policy.ast.terms.find((term) => term.name === 'buybackPrice').value, '0.96');
 });

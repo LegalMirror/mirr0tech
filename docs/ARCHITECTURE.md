@@ -96,7 +96,7 @@ sequenceDiagram
   GW->>A: attest identityVerified (fund policy, expiry)
 ```
 
-`src/worldid.js`: verifier (mock proofs when `WORLD_RP_ID` is unset), `HumanRegistry` (nullifier → wallet, persisted). `src/venues.js` `verifyHuman`. Nothing about World ID lives in the contracts; the refusal path reads the sentence through `transfer-identity-verified`. Credential choice and debrief: [WORLD_ID.md](WORLD_ID.md).
+`src/worldid.js`: verifier (mock proofs when `WORLD_RP_ID` is unset), `HumanRegistry` (nullifier → wallet, persisted). `src/onchain/venues.js` `verifyHuman`. Nothing about World ID lives in the contracts; the refusal path reads the sentence through `transfer-identity-verified`. Credential choice and debrief: [WORLD_ID.md](WORLD_ID.md).
 
 ### 4.3 Privacy
 
@@ -112,15 +112,15 @@ Implements `IRoleProvider` (`contracts/wildcat/IRoleProvider.sol`, vendored verb
 
 ### 5.2 1inch — `MirrortechRouter` + `PolicyGuard` + `FixedRateBalances`
 
-[SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md). A guard instruction carrying `policyHash ‖ action` evaluates maker and taker at fill and at `quote()` through `PolicyOracle.decide`; `FixedRateBalances` pins the addendum's price over Aqua balances; a `LimitOpcodes` router dispatches both; `src/policy/programs.js` fills `BuybackFixedPrice` and `BuybackDutchAuction` from the compiled terms. Strategies ship to the canonical Aqua registry; the router is a modified SwapVM redeploy. Hash chain: `document sha256 ⊂ policyHash ⊂ program bytes ⊂ order.data ⊂ orderHash`.
+[SWAPVM_INTEGRATION.md](SWAPVM_INTEGRATION.md). A guard instruction carrying `policyHash ‖ action` evaluates maker and taker at fill and at `quote()` through `PolicyOracle.decide`; `FixedRateBalances` pins the addendum's price over Aqua balances; a `LimitOpcodes` router dispatches both; `src/onchain/programs.js` fills `BuybackFixedPrice` and `BuybackDutchAuction` from the compiled terms. Strategies ship to the canonical Aqua registry; the router is a modified SwapVM redeploy. Hash chain: `document sha256 ⊂ policyHash ⊂ program bytes ⊂ order.data ⊂ orderHash`.
 
 ### 5.3 Uniswap v4 — `MirrorPolicyHook.sol`
 
-`beforeAddLiquidity | beforeRemoveLiquidity | beforeSwap`, all evaluated as `ACTION_TRANSFER`. Subject comes from `hookData` written by the trusted `MirrorLiquidityRouter`. Address mined via `src/policy/hookAddress.js` (CREATE2 through the deterministic deployer); the constructor rejects an address whose low bits do not match.
+`beforeAddLiquidity | beforeRemoveLiquidity | beforeSwap`, all evaluated as `ACTION_TRANSFER`. Subject comes from `hookData` written by the trusted `MirrorLiquidityRouter`. Address mined via `src/onchain/hookAddress.js` (CREATE2 through the deterministic deployer); the constructor rejects an address whose low bits do not match.
 
 **The hook is the token's only door into Uniswap.** `PoolManager` is a singleton, so a token allowlist cannot see which pool a transfer belongs to; the hook can, its address is in the `PoolKey`. Handshake: on success the hook `tstore`s the subject (EIP-1153); `MirrorToken._update`, for any transfer to or from `PoolManager`, calls `hook.consumeApproval()`, which returns the subject and clears it, else reverts `NoPolicyDoor`. A hookless pool initializes; its first settlement reverts at the token. Anyone may create a pool; only hooked pools can hold the token; the issuer publishes one address and never operates a venue. Venue for the fund token (`rwa-secondary`), not for Wildcat positions. Scope claimed: admission plus the handshake; no quota, lockup, fee or LVR claims.
 
-## 6. Component model (`src/policy/components.js`)
+## 6. Component model (`src/onchain/components.js`)
 
 The compiler is a resolver over a library of audited components. Each declares `coversRule`/`coversTerm`, its contracts with their compiler bundle, an optional config check and a clause template. `resolveComponents` links every rule and term to a component or throws; the resolved `{ id, version }` list and the coverage map go inside `policyHash`; `scripts/build-contracts.js` builds exactly the declared contracts. Profiles (`custodial-rwa`, `rwa-secondary`, `wildcat-credit`) are named component sets. **Parameters, never shape**: a clause fills a slot in a versioned template.
 
@@ -136,21 +136,21 @@ The compiler is a resolver over a library of audited components. Each declares `
 
 ## 7. Gateway (Node/Express)
 
-`src/app.js` mounts three route sets under `/v1` behind one bearer (`API_KEY` writes; `VIEWER_KEY` GET and quotes); errors are `{ error: { code, message } }`.
+`src/routes.js` defines both Express app factories (`createApp` for the hosted/operator API and `createWorkspaceApp` for the local workspace), all application route groups, authentication middleware, and error handling. Operator routes use `API_KEY` for writes and `VIEWER_KEY` for GET and allowed quotes; World ID login, scoped demo workspaces, and signed payment webhooks retain their own authentication. Errors are `{ error: { code, message } }`. The Noolog provider simulator remains in `src/noolog/mock.js`.
 
-- **Stack API** `/v1/stack/*` (`src/venues.js`, `src/venues-api.js`): attest/revoke/override/sanction, World ID context and verify, Act 1 mint/release/pool actions, Act 2 deposit/withdraw and the Aqua buyback (ship, quote, fill, dock), `explain` for any wallet/action, audit with tx hash or decoded refusal (`403 POLICY_REFUSED` with the clause). With `MULTIBAAS_*` set, `src/multibaas.js` registers every contract and `GET /v1/stack/events` serves indexed events. [API.md](API.md).
-- **Dashboard adapter** (`src/dashboard-api.js`): `/v1/policy*`, `/v1/lenders*`, `/v1/audit` served live from the stack.
+- **Stack API** `/v1/stack/*` (`src/onchain/venues.js`, `src/routes.js`): attest/revoke/override/sanction, World ID context and verify, Act 1 mint/release/pool actions, Act 2 deposit/withdraw and the Aqua buyback (ship, quote, fill, dock), `explain` for any wallet/action, audit with tx hash or decoded refusal (`403 POLICY_REFUSED` with the clause). `GET /v1/stack/events` serves the local gateway audit. [API.md](API.md).
+- **Dashboard adapter** (`src/routes.js`): `/v1/policy*`, `/v1/lenders*`, `/v1/audit` served live from the stack.
 - **Payment webhook** (`src/payments.js`): `POST /webhooks/payments`, Stripe-signed; a settled USD payment attests `depositConfirmed` for the named wallet and the policy decides the mint (settled into shares, or held with the sentence). Idempotent by event id. Spec: [API.md](API.md#payment-webhook).
-- **Signing setting** (`src/signing.js`): `GET/PUT /v1/settings/signing`, the operator key as a platform setting: the file key by default, a MultiBaas Cloud Wallet (HSM) on request, roles and gas handed over, the choice persisted. Spec: [PRD.md](PRD.md#85-platform-capabilities-around-the-flow--built).
-- **Agreements API** (`src/agreements.js`, `src/agreements-api.js`): the core loop upload → generate → verify → compile → deploy. One record per agreement, lifecycle `uploaded → extracting → verified → compiled → deploying → deployed`, `failed` at any step, in memory and at `${DATA_DIR:-generated}/agreements-<chainId>.json`. `POST /v1/agreements` starts a deliberation and returns `extracting`; the background run validates the AST, compiles (hash, clause table, DNF, Solidity, equivalence) and stops at `compiled`; `POST /deploy` (202) compiles the generated Solidity in memory through `src/solc.js`, deploys `PolicyOracle` + `CompiledMirrorToken` + `MirrorPolicyHook` (salt mined) and initializes the pool on the stack's `PoolManager` (`deployFund`). `GET /v1/status` reports model mode (mock | live), compiler versions and chain. Spec: [AGREEMENTS_API.md](AGREEMENTS_API.md).
+- **Deployment signer** (`src/onchain/signer.js`): uses `DEPLOYER_PRIVATE_KEY` or `PRIVATE_KEY`; no wallet settings.
+- **Agreements API** (`src/agreements.js`, `src/routes.js`): the core loop upload → generate → verify → compile → deploy. One record per agreement, lifecycle `uploaded → extracting → verified → compiled → deploying → deployed`, `failed` at any step, in memory and at `${DATA_DIR:-generated}/agreements-<chainId>.json`. `POST /v1/agreements` starts a deliberation and returns `extracting`; the background run validates the AST, compiles (hash, clause table, DNF, Solidity, equivalence) and stops at `compiled`; `POST /deploy` (202) compiles the generated Solidity in memory through `src/onchain/solc.js`, deploys `PolicyOracle` + `CompiledMirrorToken` + `MirrorPolicyHook` (salt mined) and initializes the pool on the stack's `PoolManager` (`deployFund`). `GET /v1/status` reports model mode (mock | live), compiler versions and chain. Spec: [AGREEMENTS_API.md](AGREEMENTS_API.md).
 
 `scripts/dev-stack.js` runs anvil + deployment + API in one process; `test/chain/gateway.test.js` drives both acts over HTTP. Wallet separation: deployer/admin · attestor · watcher · borrower-treasury. No wallet holds two roles.
 
 ## 8. Deployment
 
-- **Sepolia**: `deployments/sepolia.json` is the record (addresses in the README). Canonical `PoolManager` and canonical Aqua (`0x1111113ccf…`) reused; `MirrortechRouter` is our modified SwapVM redeploy. `npm run deploy:sepolia` = `scripts/deploy-stack.js` + `scripts/multibaas-sync.js`.
-- **Local**: anvil via `test/chain/anvil.js`; `npm run check` runs unit + chain tests for all three profiles; `npm run demo:golden` runs both acts.
-- **Compilers**: bundles `core` (solc 0.8.37), `uniswap-v4` (0.8.26, `PoolManager` pins it), `swapvm` (0.8.30 via IR) in `src/solc.js`; `scripts/build-contracts.js` writes `artifacts/<profile>/`, self-contained with `policy.json` and `clause-table.json`; `deployFund` compiles the same bundles at runtime for an uploaded agreement.
+- **Sepolia**: `deployments/sepolia.json` is the record (addresses in the README). Canonical `PoolManager` and canonical Aqua (`0x1111113ccf…`) reused; `MirrortechRouter` is our modified SwapVM redeploy. `pnpm run deploy:sepolia` runs `scripts/deploy-stack.js`.
+- **Local**: anvil via `test/chain/anvil.js`; `pnpm run check` runs unit + chain tests for all three profiles; `pnpm run demo:golden` runs both acts.
+- **Compilers**: bundles `core` (solc 0.8.37), `uniswap-v4` (0.8.26, `PoolManager` pins it), `swapvm` (0.8.30 via IR) in `src/onchain/solc.js`; `scripts/build-contracts.js` writes `artifacts/<profile>/`, self-contained with `policy.json` and `clause-table.json`; `deployFund` compiles the same bundles at runtime for an uploaded agreement.
 - **Hosting**: Coolify compose (`deploy/`, [deploy.md](deploy.md)); static dashboard on GitHub Pages.
 
 ## 9. File map
@@ -160,24 +160,22 @@ The compiler is a resolver over a library of audited components. Each declares `
 | `src/policy/document.js` | normalization, sha256, canonical JSON, multi-document bundles |
 | `src/policy/schema.js` | `FACTS` (bit order), `ACTIONS`, AST schema, `validateAst` |
 | `src/policy/dnf.js`, `evaluate.js` | NNF/DNF, mask evaluation, tree interpreter |
-| `src/policy/onchain.js` | ABI-encoded programs, `CompiledPolicy.sol`, clause table hash |
+| `src/onchain/policy.js` | ABI-encoded programs, `CompiledPolicy.sol`, clause table hash |
 | `src/policy/compile.js` | profiles, config checks, equivalence proof, `policyHash`, artifact emission |
-| `src/policy/components.js` | component registry, profiles, resolver |
-| `src/policy/programs.js` | SwapVM opcode table, instruction encoders, buyback templates, order packing |
-| `src/policy/hookAddress.js` | CREATE2 salt mining for v4 |
+| `src/onchain/components.js` | component registry, profiles, resolver |
+| `src/onchain/programs.js` | SwapVM opcode table, instruction encoders, buyback templates, order packing |
+| `src/onchain/hookAddress.js` | CREATE2 salt mining for v4 |
 | `src/policy/fixture.js`, `mla-fixture.js` | hand-authored draft ASTs (fund agreement; MLA + Lender Check Policy + addendum) |
 | `src/noolog/client.js`, `extract.js`, `verify.js`, `mock.js` | deliberation client, generation, verification report, in-process mock |
 | `src/worldid.js` | World ID verifier, mock proofs, `HumanRegistry` |
-| `src/agreements.js`, `src/agreements-api.js` | agreement store + lifecycle + AST graph; `/v1/agreements*`, `/v1/status` |
+| `src/agreements.js`, `src/routes.js` | agreement store + lifecycle + AST graph; `/v1/agreements*`, `/v1/status` |
 | `src/payments.js` | payment rail webhook: signature check, `depositConfirmed`, mint under policy or hold |
-| `src/multibaas.js`, `src/multibaas-signer.js` | MultiBaas registration + event index; the operator key as a Cloud Wallet (HSM) signer, `SIGNER=multibaas` |
-| `src/signing.js` | key custody setting: registers the vault account and key, hands roles and gas over, swaps the signer; persists |
-| `src/solc.js` | compiler bundles, one compile path for the build script and the runtime deploy |
-| `src/venues.js`, `src/venues-api.js`, `src/dashboard-api.js` | stack service, `/v1/stack/*`, dashboard adapter |
-| `src/app.js`, `src/server.js` | Express app, auth, error envelope |
-| `src/deploy.js`, `scripts/deploy-stack.js` | one-call deployment of both acts against any RPC; `deployFund` for an uploaded agreement |
-| `src/refusal.js` | revert → clause decoder (unwraps Uniswap's `WrappedError`) |
-| `src/multibaas.js`, `scripts/multibaas-sync.js` | MultiBaas registration |
+| `src/onchain/signer.js` | Server-side deployment key selection: `DEPLOYER_PRIVATE_KEY` or `PRIVATE_KEY` |
+| `src/onchain/solc.js` | compiler bundles, one compile path for the build script and the runtime deploy |
+| `src/onchain/venues.js`, `src/routes.js` | stack service, `/v1/stack/*`, dashboard adapter |
+| `src/routes.js`, `src/server.js` | Express app, auth, error envelope |
+| `src/onchain/deploy.js`, `scripts/deploy-stack.js` | one-call deployment of both acts against any RPC; `deployFund` for an uploaded agreement |
+| `src/onchain/refusal.js` | revert → clause decoder (unwraps Uniswap's `WrappedError`) |
 | `contracts/PolicyEval.sol`, `PolicyAttestor.sol`, `PolicyOracle.sol` | evaluator, facts, fact assembly + decision |
 | `contracts/MirrorToken.sol`, generated `CompiledMirrorToken.sol` | fund token with the venue-hook door |
 | `contracts/MirrorPolicyHook.sol`, `contracts/test/MirrorLiquidityRouter.sol` | Uniswap v4 hook and trusted router |

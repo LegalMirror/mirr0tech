@@ -4,14 +4,13 @@
 // on a public chain they are derived from the operator key and topped up with gas when funded.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { Contract, MaxUint256, Wallet, ZeroHash, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
+import { Contract, MaxUint256, Wallet, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
-import { decodeCashierRefusal } from './policy/cashier-refusal.js';
-import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
-import { AppError, ensure } from './errors.js';
-import { indexedEvents } from './multibaas.js';
-import { HumanRegistry, WorldIdError, WorldIdVerifier } from './worldid.js';
+import { decodeCashierRefusal } from './cashier-refusal.js';
+import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './programs.js';
+import { AppError, ensure } from '../errors.js';
+import { HumanRegistry, WorldIdError, WorldIdVerifier } from '../worldid.js';
 
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 const TICK_SPACING = 60;
@@ -22,16 +21,13 @@ export class VenueService {
   /// `auditPath` keeps the audit across restarts; without it the audit lives in memory only.
   /// `policies` ({ rwa: { policy, clauseTable }, credit }) may be given for a venue over another
   /// compiled agreement; otherwise the built artifacts' policies apply.
-  constructor({ provider, signer, record, multibaas = null, auditPath = null, worldId = null, policies = null, log = () => {} }) {
-    Object.assign(this, { provider, signer, record, multibaas, auditPath, log, policies, audit: [], orders: [] });
+  constructor({ provider, signer, record, auditPath = null, worldId = null, policies = null, log = () => {} }) {
+    Object.assign(this, { provider, signer, record, auditPath, log, policies, audit: [], orders: [] });
     this.worldId = worldId ?? { verifier: new WorldIdVerifier(), registry: new HumanRegistry(null) };
   }
 
-  /// Indexed events from MultiBaas when a deployment is registered there; the local audit otherwise.
-  async events(contractLabel, eventSignature) {
-    if (!this.multibaas) return { source: 'local', events: this.audit };
-    return { source: 'multibaas', events: await indexedEvents(this.multibaas, { contractLabel, eventSignature }) };
-  }
+  /// The durable audit records operations observed by this gateway, not a complete chain index.
+  async events() { return { source: 'local', events: this.audit }; }
 
   async init() {
     const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'PoolManager']);
@@ -65,32 +61,6 @@ export class VenueService {
       roleProvider: at(r.credit.roleProvider, credit.MirrortechRoleProvider), market: at(r.credit.market, credit.MockWildcatMarket),
       aqua: at(r.credit.aqua, credit.Aqua), swapRouter: at(r.credit.router, credit.MirrortechRouter),
     };
-  }
-  /// Signs from `signer` from now on: every handle rebinds and the operator wallet is its address.
-  async useSigner(signer) {
-    this.signer = signer;
-    this.bind(signer);
-    this.wallets.Operator = await signer.getAddress();
-  }
-  /// Hands the operator's roles to `address` (attest, watch, override; mint and admin on the fund
-  /// token and on `tokens`), plus `gas` in ETH, so a vault key can take over. The current signer must
-  /// hold the admin roles; grants already in place are skipped.
-  async handover(address, { gas = null, tokens = [] } = {}) {
-    const txs = {};
-    const grant = async (contract, label, role) => {
-      const hash = role === 'DEFAULT_ADMIN_ROLE' ? ZeroHash : id(role);
-      if (await contract.hasRole(hash, address)) return;
-      txs[`${label}.${role}`] = (await (await contract.grantRole(hash, address)).wait()).hash;
-    };
-    for (const role of ['ATTESTOR_ROLE', 'WATCHER_ROLE', 'BORROWER_ROLE']) await grant(this.c.attestor, 'attestor', role);
-    for (const [index, token] of [this.c.token, ...tokens.map((at) => new Contract(at, this.artifacts.rwa.CompiledMirrorToken.abi, this.signer))].entries()) {
-      for (const role of ['MINTER_ROLE', 'DEFAULT_ADMIN_ROLE']) await grant(token, index ? `token:${await token.getAddress()}` : 'token', role);
-    }
-    if (gas) txs.gas = (await (await this.signer.sendTransaction({ to: address, value: parseEther(gas) })).wait()).hash;
-    const entry = { id: id(`handover:${address}:${Date.now()}`).slice(0, 18), at: new Date().toISOString(), type: 'signing.handover', from: this.wallets.Operator, to: address, status: 'ok', txs };
-    this.audit.push(entry);
-    await this.persist();
-    return txs;
   }
   /// A load-balanced RPC can serve a receipt from one node and the next call from a node still a
   /// block behind; a quote right after a ship would then see no strategy. Wait until the RPC reads

@@ -108,6 +108,7 @@ export class WorldIdVerifier {
     }
     if (response.identifier !== IDENTIFIERS[this.credential]) throw new WorldIdError(400, 'WRONG_CREDENTIAL', 'Proof identifier does not match the requested credential');
     if (!address(wallet)) throw invalid('A target wallet address is required for verification');
+    // A wallet is `0x`+hex, so IDKit hashes it as its 20 bytes, not its 42 characters; only the SDK's own hashSignal matches.
     if (canonical(response.signal_hash) !== canonical(hashSignal(wallet.toLowerCase()))) throw invalid('The proof is bound to another wallet');
     if (payload.environment !== this.environment) throw invalid('Proof environment does not match this deployment');
     if (this.credential === 'selfie') {

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { deployStack } from '../../src/deploy.js';
+import { deployStack } from '../../src/onchain/deploy.js';
 
 test('the two-act stack deploys on a local chain with both policies bound', { timeout: 300_000 }, async (t) => {
   const { provider } = await startAnvil(t);
@@ -21,7 +21,7 @@ test('the two-act stack deploys on a local chain with both policies bound', { ti
 });
 
 test('on a public chain the demo wallets are derived from the operator key and funded with gas', { timeout: 300_000 }, async (t) => {
-  const { VenueService } = await import('../../src/venues.js');
+  const { VenueService } = await import('../../src/onchain/venues.js');
   const { provider } = await startAnvil(t);
   const signer = new Wallet(DEV_KEY, provider);
   const { record } = await deployStack(signer);

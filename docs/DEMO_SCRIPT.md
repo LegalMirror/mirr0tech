@@ -1,9 +1,9 @@
 # Demo script — 3 minutes, two acts, one asset
 
 Fallback with no stack at all: https://legalmirror.github.io/mirr0tech/ (static build, mock parties, Sepolia links).
-Run: `npm run dev:stack` (API on :3200) and the dashboard in gateway mode (or the hosted stack; for Sepolia:
-`RPC_URL=… DEPLOYER_PRIVATE_KEY=… DEPLOYMENT_PATH=deployments/sepolia.json AUDIT_PATH=deployments/sepolia-audit.json npm run dev:stack`, no seed needed). The seed
-(`npm run seed:stack`) leaves the state below in place; the presenter only has to click. Every line in
+Run: `pnpm run dev:stack` (API on :3200) and the dashboard in gateway mode (or the hosted stack; for Sepolia:
+`RPC_URL=… DEPLOYER_PRIVATE_KEY=… DEPLOYMENT_PATH=deployments/sepolia.json AUDIT_PATH=deployments/sepolia-audit.json pnpm run dev:stack`, no seed needed). The seed
+(`pnpm run seed:stack`) leaves the state below in place; the presenter only has to click. Every line in
 *italics* is narration. Numbers match PRD §4.
 
 ## Open (15 s)
@@ -55,5 +55,5 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Fallbacks
 
-- Terminal instead of UI: `npm run demo:golden` prints the same story, refusals with quotes included.
-- If the chain restarted: `npm run seed:stack` rebuilds the state in ~40 s.
+- Terminal instead of UI: `pnpm run demo:golden` prints the same story, refusals with quotes included.
+- If the chain restarted: `pnpm run seed:stack` rebuilds the state in ~40 s.

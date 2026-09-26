@@ -1,5 +1,5 @@
 // The gateway's OpenAPI 3.1 document, served at /openapi.json and rendered by Swagger UI at /docs.
-// Hand-written next to the routes it describes: every path here is one src/app.js mounts.
+// Hand-written next to the routes it describes: every path here is one src/routes.js mounts.
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const obj = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required });
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
@@ -23,33 +23,33 @@ export const schemas = {
   Error: obj({ error: obj({ code: str('Machine-readable code, e.g. POLICY_REFUSED'), message: str('Plain-words reason'), details: { description: 'The audit entry, for a refusal', type: 'object' } }, ['code', 'message']) }),
   Health: obj({ status: str('ok | reconciliation_required'), mode: str('stack | mock | live'), policyHash: { type: ['string', 'null'] }, stack: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, rwa: str('Fund policy hash'), credit: str('Credit policy hash') } } }),
   Status: obj({
-    model: obj({ provider: str('noolog | openai'), mode: str('mock | live | openai (EXTRACTOR)'), url: str('Deliberation API, or the OpenAI-compatible base URL'), model: str('Model id, e.g. nsed:legal_rwa_pro'), listed: { type: ['boolean', 'null'], description: 'The live gateway lists this model on /v1/models (null: could not ask)' }, models: { type: 'array', items: { type: 'string' }, description: 'Every model the token may name (live only)' } }, ['provider', 'mode', 'url', 'model']),
+    model: obj({ provider: str('openai | demo'), mode: str('mock | live | unavailable'), model: str('Model id') }),
     compiler: obj({ solidity: obj({ core: str('solc version'), swapvm: str('solc version'), 'uniswap-v4': str('solc version') }) }),
     chain: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, deployer: str('Operator address'), attestor: str('PolicyAttestor'), poolManager: str('Uniswap v4 PoolManager') } },
   }),
   DocumentPart: obj({ name: str('File name; the extension picks the reader (.txt, .md, .htm, .html)'), text: str('The document as uploaded') }),
   AgreementUpload: {
     type: 'object', required: ['name'],
-    properties: { name: str('Display name'), documents: { type: 'array', items: ref('DocumentPart'), description: 'One or more parts, hashed as one bundle' }, text: str('Short form: one document'), filename: str('Short form: its file name (default <name>.txt)'), profile: str('rwa-secondary (default) | custodial-rwa | wildcat-credit'), config: { type: 'object', description: 'Deployment config; the profile default when absent' } },
+    properties: { generation: { type: 'string', enum: ['openai', 'demo'], description: 'OpenAI legal AST (default), or an explicit offline compiler fixture' }, name: str('Display name'), documents: { type: 'array', items: ref('DocumentPart'), description: 'One or more parts, hashed as one bundle' }, text: str('Short form: one document'), filename: str('Short form: its file name (default <name>.txt)'), profile: str('rwa-secondary (default) | custodial-rwa | wildcat-credit'), config: { type: 'object', description: 'Deployment config; the profile default when absent' } },
   },
   Agreement: obj({
     id: str('agr_<12 hex>'), name: str('Display name'), profile: str('Deployment profile'),
-    status: str('uploaded | extracting | verified | compiled | deploying | deployed | failed'),
+    status: str('uploaded | extracting | verified | analyzed | compiled | deploying | deployed | failed'),
     progress: { type: ['object', 'null'], description: 'While extracting on the live orchestrator: the job and its status line', properties: { job: str('Deliberation job id'), status: str('e.g. running: round 2 — Starting'), at: str('ISO time') } },
     createdAt: str('ISO time'), updatedAt: str('ISO time'),
     source: obj({ name: str('Document name'), sha256: str('Bytes hash'), textSha256: str('Normalized text hash') }),
-    extraction: { type: ['object', 'null'], properties: { provider: str('noolog'), model: str('Model id'), responseId: str('Deliberation job id') } },
+    extraction: { type: ['object', 'null'], properties: { provider: str('openai | demo'), model: str('Model id'), responseId: str('OpenAI response id'), analysisMode: str('light'), compilerMapping: { type: 'object', description: 'Explicit MVP mapping identifier, source hashes and scope; absent for analysis-only uploads' } } },
     verification: { type: ['object', 'null'], properties: { confidence: obj({ overall: { type: 'number' }, verified: { type: 'integer' }, total: { type: 'integer' }, counts: { type: 'object' } }), contested: { type: 'integer' } } },
     policyHash: { type: ['string', 'null'] }, clauseTableHash: { type: ['string', 'null'] },
     coverage: { type: ['object', 'null'], properties: { total: { type: 'integer' }, counts: { type: 'object' }, rules: { type: 'integer' }, terms: { type: 'integer' } } },
-    deployment: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, policyHash: str('On-chain hash'), oracle: str('PolicyOracle'), token: str('CompiledMirrorToken'), hook: str('MirrorPolicyHook'), poolManager: str('PoolManager'), poolId: str('Pool id'), txs: { type: 'object' } } },
+    deployment: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, policyHash: str('On-chain hash'), oracle: str('PolicyOracle'), token: str('CompiledMirrorToken or mock credit market'), roleProvider: str('Credit role provider'), market: str('Mock credit market'), router: str('Policy-bound venue router'), hook: str('MirrorPolicyHook'), poolManager: str('PoolManager'), poolId: str('Pool id'), txs: { type: 'object' } } },
     error: { type: ['string', 'null'] },
     history: { type: 'array', items: obj({ status: str('State entered'), at: str('ISO time'), policyHash: str('Hash in force') }, ['status', 'at']) },
   }, ['id', 'name', 'profile', 'status']),
-  AgreementDetail: { allOf: [ref('Agreement'), obj({ export: { type: ['object', 'null'], description: 'The compiled reading: rules with clauseId, dnf and located quotes; terms; unresolved; clauseTable; programs; coverage; verification; documents with display text' } })] },
+  AgreementDetail: { allOf: [ref('Agreement'), obj({ ast: { type: ['object', 'null'], description: 'Version 2.0 legal AST: title, documents with hashes and normalized text, nodes with parentId and located source quotes, typed relations, issues. Version 1.0 is the executable subset for explicitly mapped MVP sources and historical compiler records.' }, documentAst: { type: ['object', 'null'], description: 'Original model-generated version 2.0 overview when ast is an executable compiler mapping' }, export: { type: ['object', 'null'], description: 'The compiled reading: rules with clauseId, dnf and located quotes; terms; unresolved; clauseTable; programs; coverage; verification; documents with display text' } })] },
   AstGraph: obj({
-    nodes: { type: 'array', items: obj({ id: str('agreement | action:<a> | rule:<id> | fact:<name> | term:<name> | unresolved:<n>'), kind: str('agreement | action | rule | fact | term | unresolved'), label: str('Display label'), status: str('verified | contested | unverified | unresolved'), confidence: { type: ['number', 'null'] } }, ['id', 'kind', 'label']) },
-    edges: { type: 'array', items: obj({ from: str('Node id'), to: str('Node id') }) },
+    nodes: { type: 'array', items: obj({ id: str('agreement | action:<a> | rule:<id> | fact:<name> | term:<name> | unresolved:<n>'), kind: str('agreement | document | section | clause | definition | obligation | permission | prohibition | condition | exception | party | remedy | date | amount; legacy compiler nodes are also supported'), label: str('Display label'), status: str('verified | contested | unverified | unresolved'), confidence: { type: ['number', 'null'] } }, ['id', 'kind', 'label']) },
+    edges: { type: 'array', items: obj({ from: str('Node id'), to: str('Node id'), kind: str('contains | references | defines | applies_to | requires | excepts | overrides | amends | party_to') }) },
   }),
   PaymentEvent: {
     type: 'object', required: ['id', 'type', 'data'],
@@ -75,23 +75,6 @@ export const schemas = {
   }, ['id', 'type', 'paymentId', 'wallet', 'amount', 'status']),
   PaymentReceived: obj({ received: { type: 'boolean' }, ignored: str('Event type, when not a settling payment'), payment: { type: 'object' }, settlement: ref('Settlement') }, ['received']),
   Constraints: obj({ identity: { type: ['object', 'null'], description: 'null lifts the constraint', properties: { credential: str('document | proof_of_human | selfie', { example: 'document' }), actions: { type: 'array', items: { type: 'string', enum: ['mint', 'burn', 'transfer'] }, example: ['mint', 'transfer'] }, quote: str('The sentence of the agreement this enforces, verbatim; defaults to the current constraint\'s'), clause: str('Where it is in the agreement') } } }),
-  Signing: obj({
-    provider: str('key | multibaas'), address: str('The signing address now'), balance: str('Its ETH balance'), fileKey: str('The file key the gateway started with'),
-    multibaas: { type: 'boolean', description: 'A MultiBaas client is configured' },
-    wallet: { type: ['object', 'null'], properties: { address: str('Cloud Wallet address'), keyName: str('Key name in the vault'), vaultName: { type: ['string', 'null'] } } },
-    hsm: { type: ['object', 'null'], description: 'What MultiBaas holds: Azure accounts and Cloud Wallets', properties: { configs: { type: 'array', items: { type: 'object' } }, wallets: { type: 'array', items: obj({ address: str('Address'), keyName: str('Key'), vaultName: { type: ['string', 'null'] } }) } } },
-    steps: { type: 'object', description: 'On a switch: config, key, handover (role grants and gas, by tx hash)' },
-  }, ['provider', 'address']),
-  SigningRequest: {
-    type: 'object', required: ['provider'],
-    properties: {
-      provider: str('key | multibaas', { example: 'multibaas' }),
-      azure: obj({ label: str('A name for this account'), clientID: str('Azure application id'), clientSecret: str('Its secret; goes to MultiBaas, never stored here'), tenantID: str('Directory id'), subscriptionID: str('Subscription'), baseGroupName: str('Resource group') }),
-      key: obj({ clientID: str('The Azure application id above'), keyName: str('Key name'), vaultName: str('Key Vault name'), keyVersion: str('Existing key version (omit with create)'), create: { type: 'boolean', description: 'Create the key in the vault' }, useHardwareModule: { type: 'boolean', description: 'HSM-backed key (default true)' } }, ['clientID', 'keyName', 'vaultName']),
-      wallet: str('The Cloud Wallet address to sign from; the only one when omitted'),
-      gas: str('ETH to send the wallet for gas', { example: '0.05' }),
-    },
-  },
   Facts: { type: 'object', additionalProperties: { type: 'boolean' }, description: 'Fact name → value; names come from the policy factOrder', example: { kycApproved: true, amlApproved: true, sanctionsClear: true } },
   Decision: obj({ wallet: str('Name'), address: str('Address'), action: str('Policy action'), allowed: { type: 'boolean' }, clauseId: { type: 'integer' }, clause: { type: ['object', 'null'], description: 'The deciding clause: ruleId, clause, quote' }, facts: { type: 'object' }, sanctioned: { type: 'boolean' }, screeningCurrent: { type: 'boolean' } }),
   AuditEntry: obj({ id: str('Entry id'), at: str('ISO time'), type: str('attest | worldid.verify | rwa.* | credit.* | payment.settle | sanction | override'), status: str('ok | refused | held'), txHash: { type: ['string', 'null'] }, refusal: { type: ['object', 'null'] } }, ['id', 'at', 'type', 'status']),
@@ -126,7 +109,6 @@ function openapiBase(serverUrl, agreementId) {
       { name: 'Agreements', description: 'The core loop: upload → generate → verify → compile → deploy' },
       { name: 'Webhooks', description: 'Endpoints other systems call. Signed, never bearer-authenticated, always 2xx once verified so the caller does not retry a policy decision.' },
       { name: 'Stack', description: 'The deployed two-act stack: facts, identity, the fund token and its pool, the credit market and its buyback' },
-      { name: 'Settings', description: 'Platform settings the issuer configures: key custody' },
       { name: 'Dashboard', description: 'Read models and lender operations the dashboard uses' },
     ],
     paths: {
@@ -190,16 +172,8 @@ function openapiBase(serverUrl, agreementId) {
       '/v1/stack/credit/buyback/fill': { post: op('Stack', 'Fill through SwapVM with the policy guard', { body: walletAmount, responses: { ...ok(ref('AuditEntry')), 403: error('POLICY_REFUSED') } }) },
       '/v1/stack/credit/buyback/dock': { post: op('Stack', 'Dock the buyback', { responses: ok(ref('AuditEntry')) }) },
       '/v1/stack/audit': { get: op('Stack', 'The local audit, oldest first', { responses: ok({ type: 'array', items: ref('AuditEntry') }) }) },
-      '/v1/stack/events': { get: op('Stack', 'Indexed events (MultiBaas when registered, else the local audit)', { params: [{ name: 'contract', in: 'query', schema: { type: 'string' }, description: 'MultiBaas contract label, e.g. mirr0tech_policy_attestor' }, { name: 'event', in: 'query', schema: { type: 'string' }, description: 'Event signature, e.g. Attested(address,bytes32,uint256,uint256,uint32)' }], responses: ok(obj({ source: str('local | multibaas'), events: { type: 'array', items: { type: 'object' } } })) }) },
+      '/v1/stack/events': { get: op('Stack', 'Gateway audit events (not a complete chain history)', { responses: ok(obj({ source: str('local', { enum: ['local'] }), events: { type: 'array', items: { type: 'object' } } })) }) },
 
-      '/v1/settings/signing': {
-        get: op('Settings', 'Who signs for the operator, and what the vault offers', { responses: ok(ref('Signing')) }),
-        put: op('Settings', 'Move signing into a MultiBaas Cloud Wallet (HSM), or back to the file key', {
-          description: 'With `provider: multibaas`: registers the Azure Key Vault account (`azure`) and the key (`key`, `create: true` to make one) with MultiBaas when given, picks the Cloud Wallet (`wallet`, or the only one), hands the operator roles on the attestor and every fund token to it plus `gas` ETH, and signs from the vault from then on. The choice persists across restarts. `provider: key` returns to the file key.',
-          body: ref('SigningRequest'),
-          responses: { ...ok(ref('Signing'), 'Switched; `steps` lists what was done'), 400: error('INVALID_BODY or NO_HSM_WALLET'), 502: error('MULTIBAAS: the vault refused'), 503: error('NO_MULTIBAAS: no MultiBaas configured') },
-        }),
-      },
       '/v1/policy/profiles': { get: op('Dashboard', 'The compiled profiles with coverage', { responses: ok({ type: 'array', items: { type: 'object' } }) }) },
       '/v1/policy': { get: op('Dashboard', 'One profile\'s compiled reading', { params: [{ name: 'profile', in: 'query', schema: { type: 'string' } }], responses: ok({ type: 'object' }) }) },
       '/v1/lenders': { get: op('Dashboard', 'Parties under a profile with their standing', { params: [{ name: 'profile', in: 'query', schema: { type: 'string' } }], responses: ok({ type: 'array', items: { type: 'object' } }) }) },

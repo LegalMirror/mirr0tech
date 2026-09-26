@@ -40,7 +40,7 @@ The remote Compose configuration sets:
 - `DATA_DIR=/app/.data`, `AUDIT_PATH=/app/.data/audit-11155111.json`.
 - No automatic golden-path seeding. Its synthetic World proofs are not valid in provider-backed staging.
 
-Optional: a distinct `VIEWER_KEY` for read-only access; `WORLD_ACTION` (default `onboard-investor`, must match the registered action); `MULTIBAAS_URL`/`MULTIBAAS_API_KEY` for indexing; `SOURCE_COMMIT` for build attribution.
+Optional: a distinct `VIEWER_KEY` for read-only access; `WORLD_ACTION` (default `onboard-investor`, must match the registered action); `SOURCE_COMMIT` for build attribution.
 
 Leaving `NOOLOG_API_KEY` empty uses the existing deterministic mock analysis adapter. Set it only to opt into live model calls and sending uploaded document text to that provider. This setting does **not** mock World verification.
 
@@ -72,7 +72,7 @@ World App's MiniKit `sendTransaction` is documented for **World Chain mainnet (4
 
 ## Persistence and security
 
-Keep one API replica with a durable `api-data` volume. It contains agreements, audits, signing settings and scoped World nullifier bindings. Back it up; do not delete it to reset a failed proof. Changing the action/credential/environment changes the binding namespace. Multiple API replicas need a transactional shared store instead of the prototype's files.
+Keep one API replica with a durable `api-data` volume. It contains agreements, audits and scoped World nullifier bindings. Back it up; do not delete it to reset a failed proof. Changing the action/credential/environment changes the binding namespace. Multiple API replicas need a transactional shared store instead of the prototype's files.
 
 `.dockerignore` excludes `.env*`, local ledger/cache directories and common key files from image builds. No operator or RP signing secret is a dashboard build argument. CORS supports the workbench's PUT constraints route; bearer authorization remains the API gate. This is a privileged operator prototype, not public investor authentication. Restrict access as appropriate and use test funds only.
 
@@ -81,12 +81,11 @@ Keep one API replica with a durable `api-data` volume. It contains agreements, a
 Without Docker:
 
 ```sh
-npm ci
-npm run build && npm run build:secondary && npm run build:credit
-npm run dev:stack
+pnpm install --frozen-lockfile
+pnpm run build && pnpm run build:secondary && pnpm run build:credit
+pnpm run dev:stack
 # In another terminal:
-npm --prefix dashboard ci
-npm --prefix dashboard run dev
+pnpm --dir dashboard run dev
 ```
 
 The API defaults to `127.0.0.1:3000`, dashboard to port 3100. With no World registration configured, this local path uses **our synthetic mock**, not the official simulator.

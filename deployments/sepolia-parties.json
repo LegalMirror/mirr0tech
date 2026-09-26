@@ -9,11 +9,11 @@
         "kycApproved": true,
         "amlApproved": true,
         "sanctionsClear": true,
-        "subscriptionAccepted": true,
-        "issuerAuthorized": true,
-        "offeringCompliant": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
         "redemptionAuthorized": null,
-        "depositConfirmed": true,
+        "depositConfirmed": null,
         "depositAvailable": null,
         "sufficientBalance": null,
         "mlaCountersigned": null,
@@ -22,9 +22,10 @@
         "notInsolvent": null,
         "screeningCurrent": true,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": true
       },
-      "screenedAt": 1790385936,
+      "screenedAt": 1790396472,
       "sanctions": "clear",
       "decision": {
         "allowed": true,
@@ -53,19 +54,20 @@
         "notInsolvent": null,
         "screeningCurrent": null,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
       "screenedAt": null,
       "sanctions": "clear",
       "decision": {
         "allowed": false,
         "clause": {
-          "clauseId": 5,
-          "ruleId": "transfer-onboarded-holder",
+          "clauseId": 6,
+          "ruleId": "transfer-identity-verified",
           "action": "transfer",
-          "effect": "permit",
+          "effect": "require",
           "clause": "Exhibit A — Investor Onboarding",
-          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+          "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
         }
       }
     },
@@ -91,19 +93,20 @@
         "notInsolvent": null,
         "screeningCurrent": null,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
       "screenedAt": null,
       "sanctions": "clear",
       "decision": {
         "allowed": false,
         "clause": {
-          "clauseId": 5,
-          "ruleId": "transfer-onboarded-holder",
+          "clauseId": 6,
+          "ruleId": "transfer-identity-verified",
           "action": "transfer",
-          "effect": "permit",
+          "effect": "require",
           "clause": "Exhibit A — Investor Onboarding",
-          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+          "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
         }
       }
     }
@@ -118,11 +121,11 @@
         "kycApproved": true,
         "amlApproved": true,
         "sanctionsClear": true,
-        "subscriptionAccepted": true,
-        "issuerAuthorized": true,
-        "offeringCompliant": true,
+        "subscriptionAccepted": null,
+        "issuerAuthorized": null,
+        "offeringCompliant": null,
         "redemptionAuthorized": null,
-        "depositConfirmed": true,
+        "depositConfirmed": null,
         "depositAvailable": null,
         "sufficientBalance": null,
         "mlaCountersigned": null,
@@ -131,9 +134,10 @@
         "notInsolvent": null,
         "screeningCurrent": true,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": true
       },
-      "screenedAt": 1790385936,
+      "screenedAt": 1790396472,
       "sanctions": "clear",
       "decision": {
         "allowed": true,
@@ -162,19 +166,20 @@
         "notInsolvent": null,
         "screeningCurrent": null,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
       "screenedAt": null,
       "sanctions": "clear",
       "decision": {
         "allowed": false,
         "clause": {
-          "clauseId": 5,
-          "ruleId": "transfer-onboarded-holder",
+          "clauseId": 6,
+          "ruleId": "transfer-identity-verified",
           "action": "transfer",
-          "effect": "permit",
+          "effect": "require",
           "clause": "Exhibit A — Investor Onboarding",
-          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+          "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
         }
       }
     },
@@ -200,19 +205,20 @@
         "notInsolvent": null,
         "screeningCurrent": null,
         "openTermState": null,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
       "screenedAt": null,
       "sanctions": "clear",
       "decision": {
         "allowed": false,
         "clause": {
-          "clauseId": 5,
-          "ruleId": "transfer-onboarded-holder",
+          "clauseId": 6,
+          "ruleId": "transfer-identity-verified",
           "action": "transfer",
-          "effect": "permit",
+          "effect": "require",
           "clause": "Exhibit A — Investor Onboarding",
-          "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+          "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
         }
       }
     }
@@ -240,9 +246,10 @@
         "notInsolvent": true,
         "screeningCurrent": true,
         "openTermState": true,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
-      "screenedAt": 1790365656,
+      "screenedAt": 1790397120,
       "sanctions": "clear",
       "decision": {
         "allowed": true,
@@ -271,9 +278,10 @@
         "notInsolvent": true,
         "screeningCurrent": true,
         "openTermState": true,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
-      "screenedAt": 1790365692,
+      "screenedAt": 1790397132,
       "sanctions": "clear",
       "decision": {
         "allowed": false,
@@ -309,9 +317,10 @@
         "notInsolvent": true,
         "screeningCurrent": true,
         "openTermState": true,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
-      "screenedAt": 1790365704,
+      "screenedAt": 1790397156,
       "sanctions": "flagged",
       "decision": {
         "allowed": false,
@@ -347,7 +356,8 @@
         "notInsolvent": null,
         "screeningCurrent": null,
         "openTermState": true,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
       "screenedAt": null,
       "sanctions": "clear",
@@ -385,9 +395,10 @@
         "notInsolvent": true,
         "screeningCurrent": true,
         "openTermState": true,
-        "borrowerOverride": null
+        "borrowerOverride": null,
+        "identityVerified": null
       },
-      "screenedAt": 1790365740,
+      "screenedAt": 1790397204,
       "sanctions": "clear",
       "decision": {
         "allowed": true,

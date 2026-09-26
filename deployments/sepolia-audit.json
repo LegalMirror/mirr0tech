@@ -1,16 +1,16 @@
 [
   {
-    "id": "0x0e7620407d436c59",
-    "at": "2026-09-25T19:35:21.395Z",
+    "id": "0xccb76785f1b01a80",
+    "at": "2026-09-26T04:20:40.495Z",
     "type": "rwa.mint",
     "policy": "rwa",
     "amount": "1000000",
     "status": "ok",
-    "txHash": "0xa63c8ad7ce3022850c4e86a39f3cb2f46ca590a82a7b090f2c4c9ea5cb0fe517"
+    "txHash": "0x864b67127705ccb1484d3ad4e608260daae18b16ddd09add14ce3b2ed8939036"
   },
   {
-    "id": "0x0deaba38d95895ea",
-    "at": "2026-09-25T19:35:25.362Z",
+    "id": "0x6b69486c0fdb7ce6",
+    "at": "2026-09-26T04:21:00.841Z",
     "type": "rwa.release",
     "policy": "rwa",
     "wallet": "Stranger",
@@ -18,14 +18,14 @@
     "status": "refused",
     "refusal": {
       "name": "TransferRefused",
-      "clauseId": 5,
+      "clauseId": 6,
       "clause": {
-        "clauseId": 5,
-        "ruleId": "transfer-onboarded-holder",
+        "clauseId": 6,
+        "ruleId": "transfer-identity-verified",
         "action": "transfer",
-        "effect": "permit",
+        "effect": "require",
         "clause": "Exhibit A — Investor Onboarding",
-        "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
       },
       "subject": "Stranger",
       "policyHash": null
@@ -33,8 +33,8 @@
     "message": "execution reverted (unknown custom error)"
   },
   {
-    "id": "0xa038a1f714d23df9",
-    "at": "2026-09-25T19:35:25.564Z",
+    "id": "0x3477abe253386c72",
+    "at": "2026-09-26T04:21:01.050Z",
     "type": "attest",
     "policy": "rwa",
     "wallet": "Investor",
@@ -43,41 +43,54 @@
       "amlApproved": true
     },
     "status": "ok",
-    "txHash": "0x50f0246a572ebeb4cf2bcdd395f830fd3530db76abced36f3c3785cf2877f5e6"
+    "txHash": "0xbcf34fdfbb9c5430affcd3243ed54535dd636928173e9e183ba0fbb5a2040044"
   },
   {
-    "id": "0x71adb2f9a9959234",
-    "at": "2026-09-25T19:35:36.474Z",
+    "id": "0xee762af8cdcb00ca",
+    "at": "2026-09-26T04:21:14.634Z",
+    "type": "worldid.verify",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "nullifier": "0xf527da0f…",
+    "facts": {
+      "identityVerified": true
+    },
+    "status": "ok",
+    "txHash": "0xbfa9779df88b5aeb5b7587a5a2ad6368226ebd045757dcd80f0889b57861b748"
+  },
+  {
+    "id": "0xa54ab59b4d8391ca",
+    "at": "2026-09-26T04:21:25.253Z",
     "type": "rwa.release",
     "policy": "rwa",
     "wallet": "Investor",
     "amount": "500000",
     "status": "ok",
-    "txHash": "0x475c96a1aa02844c6c84800e5b546da04af3d26fc6fafcef972ed418164f9a1f"
+    "txHash": "0x3baa0a49d05a385f88584ddfd6eb80d12def27226a683811d773171d7704f1cf"
   },
   {
-    "id": "0x8e80d0f1ea374b33",
-    "at": "2026-09-25T19:39:24.402Z",
+    "id": "0x3f9d14dcb933cbf5",
+    "at": "2026-09-26T04:24:48.414Z",
     "type": "rwa.pool.create",
     "policy": "rwa",
     "wallet": "Stranger",
     "hooked": true,
     "status": "ok",
-    "txHash": "0xa22610f0ae976bf538ce0ba0396084910ccdcc9fb6bd417d8ba69e0ed3ab850a"
+    "txHash": "0x168ee3e5a5f60e2c1f4eae9abadcc4a50517af35cf6deec20120a8bdcc3622f3"
   },
   {
-    "id": "0x7fd416629d919056",
-    "at": "2026-09-25T19:39:37.184Z",
+    "id": "0xa030f3c8909979dc",
+    "at": "2026-09-26T04:25:00.516Z",
     "type": "rwa.pool.create",
     "policy": "rwa",
     "wallet": "Stranger",
     "hooked": false,
     "status": "ok",
-    "txHash": "0xe8ea315dc8fa243e67d805aca65007d7cce6f41657f4c6418ebe359ad95df7ed"
+    "txHash": "0x82dd03cff5bbc3047d0ca50a0fe4fd554d186335280297164ddc900a4af955e3"
   },
   {
-    "id": "0x6406c45a27e3e4b7",
-    "at": "2026-09-25T19:39:48.552Z",
+    "id": "0xad93469ef973b20d",
+    "at": "2026-09-26T04:25:25.556Z",
     "type": "rwa.pool.addLiquidity",
     "policy": "rwa",
     "wallet": "Investor",
@@ -93,28 +106,28 @@
     "message": "execution reverted (unknown custom error)"
   },
   {
-    "id": "0x0e46eb9715739dd3",
-    "at": "2026-09-25T19:39:48.680Z",
+    "id": "0x83fdb6a3cbf52383",
+    "at": "2026-09-26T04:25:25.866Z",
     "type": "rwa.pool.addLiquidity",
     "policy": "rwa",
     "wallet": "Investor",
     "hooked": true,
     "status": "ok",
-    "txHash": "0xf87a0b8f25294007698a160a6553661637557cb3b29c3fdd5baa4a108f03c15b"
+    "txHash": "0x5c29af26ac59903924890347f0902ee4773d9e8a6f1bc2cb0b304d51a077ad88"
   },
   {
-    "id": "0x4e883a3e8c931ada",
-    "at": "2026-09-25T19:40:00.460Z",
+    "id": "0x217a8b517090ee5c",
+    "at": "2026-09-26T04:25:36.711Z",
     "type": "rwa.pool.swap",
     "policy": "rwa",
     "wallet": "Investor",
     "hooked": true,
     "status": "ok",
-    "txHash": "0x9a2cbc65c98d65e2a12a2f19e3e09ed3e3e09a41f158401167bfa6b1fc524210"
+    "txHash": "0xc315cb93ce6eb203e612a7caf0e55d7d8acbfaef90da73b3fb1870f22d777ad6"
   },
   {
-    "id": "0x0223fcde7eedeb92",
-    "at": "2026-09-25T19:40:12.466Z",
+    "id": "0xb6057419d23dce27",
+    "at": "2026-09-26T04:25:48.422Z",
     "type": "rwa.pool.addLiquidity",
     "policy": "rwa",
     "wallet": "Stranger",
@@ -122,23 +135,23 @@
     "status": "refused",
     "refusal": {
       "name": "LegalClauseViolation",
-      "clauseId": 5,
+      "clauseId": 6,
       "clause": {
-        "clauseId": 5,
-        "ruleId": "transfer-onboarded-holder",
+        "clauseId": 6,
+        "ruleId": "transfer-identity-verified",
         "action": "transfer",
-        "effect": "permit",
+        "effect": "require",
         "clause": "Exhibit A — Investor Onboarding",
-        "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+        "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
       },
       "subject": null,
-      "policyHash": "0x957fb3966967f64002dfec4c160dba7cb5c3145cc1057a3f7e556730b5a469b3"
+      "policyHash": "0xe989ab52d1a152333ef8fd18ecf52f6a8b7e760cbe7c6e2359205cf5665bd052"
     },
     "message": "execution reverted (unknown custom error)"
   },
   {
-    "id": "0xbc18abff6feac1f1",
-    "at": "2026-09-25T19:47:37.383Z",
+    "id": "0xffb3b535ad11ec1b",
+    "at": "2026-09-26T04:32:00.721Z",
     "type": "attest",
     "policy": "credit",
     "wallet": "Lender A",
@@ -149,11 +162,11 @@
       "notInsolvent": true
     },
     "status": "ok",
-    "txHash": "0xce4baaf348b60d1962535942549361ca58c1114ca52b19530c697c841e7a28d3"
+    "txHash": "0x01592dd1d530b5dab2523564ef37204e2ad5fbb457e9bf29c3cc45e6ec781d20"
   },
   {
-    "id": "0x1ed3cbc2eab35396",
-    "at": "2026-09-25T19:48:13.206Z",
+    "id": "0xbc9640333fe41bd3",
+    "at": "2026-09-26T04:32:12.640Z",
     "type": "attest",
     "policy": "credit",
     "wallet": "Lender B",
@@ -163,11 +176,11 @@
       "notInsolvent": true
     },
     "status": "ok",
-    "txHash": "0x58517eb21421cedeb20e8b0d2cbccdeccca99e1fc3bf5eb6e35230a2f09c6c52"
+    "txHash": "0x3d88ac122275065dccad885f454e3863957e90912bec02bd3a3887a903dac788"
   },
   {
-    "id": "0xc05e02a9ed13d1b5",
-    "at": "2026-09-25T19:48:25.733Z",
+    "id": "0x211a954ba608cea6",
+    "at": "2026-09-26T04:32:36.547Z",
     "type": "attest",
     "policy": "credit",
     "wallet": "Lender C",
@@ -178,20 +191,20 @@
       "notInsolvent": true
     },
     "status": "ok",
-    "txHash": "0x437eba8a2347d6443093b5b2cf9d4aa8571102b0ba59075c4fb80f77b1197ad8"
+    "txHash": "0xc68f997831f11c108253f2d70ec01a671c4fe9b4f910e3d5cee685b2b078ff14"
   },
   {
-    "id": "0x476a877a8dc20d13",
-    "at": "2026-09-25T19:49:01.821Z",
+    "id": "0xb0c6a80e82f90fb8",
+    "at": "2026-09-26T04:32:48.411Z",
     "type": "sanction",
     "wallet": "Lender C",
     "sanctioned": true,
     "status": "ok",
-    "txHash": "0xe80147c04e4d2a5734e887a8279ebab893b9772c0814399453e81de36465ab8d"
+    "txHash": "0x510b657dfb50b5f73f9374023c71cbaf646fc22fdbd63eb0c6a343c9e9464e39"
   },
   {
-    "id": "0xd987da3cc749c00d",
-    "at": "2026-09-25T19:49:12.404Z",
+    "id": "0xf413733d72d46897",
+    "at": "2026-09-26T04:33:24.719Z",
     "type": "attest",
     "policy": "credit",
     "wallet": "Operator",
@@ -202,21 +215,21 @@
       "notInsolvent": true
     },
     "status": "ok",
-    "txHash": "0x8957a28c4728c6098321ed52d2d535d36e8c349a4087b9a5be6e379cc92a905c"
+    "txHash": "0x9e55a582474e1c2ab2f7a4b1cbc8fd3f8743b166c339db8ec6560d2fcbafa3f2"
   },
   {
-    "id": "0x46bbe85caac160df",
-    "at": "2026-09-25T19:49:24.216Z",
+    "id": "0xd18704fb953937f4",
+    "at": "2026-09-26T04:33:36.409Z",
     "type": "credit.deposit",
     "policy": "credit",
     "wallet": "Lender A",
     "amount": "1000000",
     "status": "ok",
-    "txHash": "0x3a3074b0f8634c65d5be398965fdfb5cb6c44b55540488687e24d0de47dbf2b7"
+    "txHash": "0x35f150eb239754991595604735eebdf34cd8bd47ba7597415580b19e12c40c89"
   },
   {
-    "id": "0x01bfef9eb1eb17eb",
-    "at": "2026-09-25T19:49:48.529Z",
+    "id": "0x631d8064ff7ae554",
+    "at": "2026-09-26T04:33:49.468Z",
     "type": "credit.deposit",
     "policy": "credit",
     "wallet": "Lender C",
@@ -232,18 +245,18 @@
     "message": "execution reverted (unknown custom error)"
   },
   {
-    "id": "0x2c63faafb9187ea6",
-    "at": "2026-09-25T19:49:48.767Z",
+    "id": "0x0a60eafc4c4684b3",
+    "at": "2026-09-26T04:33:49.661Z",
     "type": "credit.buyback.ship",
     "policy": "credit",
-    "strategyHash": "0x8582dad8b5c7a481851bf956f1a9655a159dcb976c6b1c09803c0db3feac002e",
+    "strategyHash": "0x3d7b36ebb3079097588d5523a72727f68832ace826e13a92969405012d7dbe51",
     "kind": "fixed-price",
     "status": "ok",
-    "txHash": "0x604a19d5dacbb37ded2937eece8d0fbc7d39a8806b22c3fc27ac1dab0c746cb8"
+    "txHash": "0xf732931467f914badca599ffc884bef8379ccd5e8903ed68b1b24a8ada615c6f"
   },
   {
-    "id": "0x190229ec573818af",
-    "at": "2026-09-25T19:50:01.929Z",
+    "id": "0x2ec39a3c6c89e0be",
+    "at": "2026-09-26T04:34:00.586Z",
     "type": "credit.buyback.quote",
     "policy": "credit",
     "wallet": "Lender A",
@@ -257,18 +270,18 @@
     }
   },
   {
-    "id": "0xe23d7b611e2287e5",
-    "at": "2026-09-25T19:50:02.065Z",
+    "id": "0xa0142fd32d53252d",
+    "at": "2026-09-26T04:34:00.724Z",
     "type": "credit.buyback.fill",
     "policy": "credit",
     "wallet": "Lender A",
     "amount": "100000",
     "status": "ok",
-    "txHash": "0xd42e703d2f20eaccbd0387c1257786340720172054c70dfc759f6d4fd37de82d"
+    "txHash": "0x5564bf23bfa078e91e1b9178bf78e3e3507db7361abb963e99e7c5444c2f0467"
   },
   {
-    "id": "0xc615c0527b999b96",
-    "at": "2026-09-25T19:50:13.423Z",
+    "id": "0x16bfe227037eba28",
+    "at": "2026-09-26T04:34:26.362Z",
     "type": "credit.buyback.quote",
     "policy": "credit",
     "wallet": "Stranger",
@@ -286,50 +299,8 @@
         "quote": "Market Tokens may be transferred only to a Wallet Address that holds a valid Deposit Credential"
       },
       "subject": "Stranger",
-      "policyHash": "0x259211145ade8e08840aaea5efe60e7ec45694e1d03cdc2e70a98c4bff1378db"
+      "policyHash": "0x580dd10756ba0162388e5b72e489e51035152e4e80e49fb1963f5159ae5908e3"
     },
     "message": "execution reverted (unknown custom error)"
-  },
-  {
-    "id": "0x48212fafc7aab18f",
-    "at": "2026-09-26T00:25:50.763Z",
-    "type": "credit.buyback.ship",
-    "policy": "credit",
-    "strategyHash": "0xb775886a540e73020f8cf1f1aef68410fea1884eaa4eeaf94c5c309d7e8aed5d",
-    "kind": "dutch-auction",
-    "status": "ok",
-    "txHash": "0x2a2dba2abd9a1b30afe95c48a6805b09487d6ec00e98b16daadef1d2a4c75602"
-  },
-  {
-    "id": "0x280c9144d375cbcc",
-    "at": "2026-09-26T00:27:11.231Z",
-    "type": "credit.buyback.quote",
-    "policy": "credit",
-    "wallet": "Lender A",
-    "amount": "100000",
-    "status": "ok",
-    "txHash": null,
-    "result": {
-      "amountIn": "100000.0",
-      "amountOut": "96015.241421",
-      "price": 0.96015241421
-    }
-  },
-  {
-    "id": "0x477741b251b033f5",
-    "at": "2026-09-26T01:25:45.027Z",
-    "type": "attest",
-    "policy": "rwa",
-    "wallet": "Investor",
-    "facts": {
-      "kycApproved": true,
-      "amlApproved": true,
-      "subscriptionAccepted": true,
-      "issuerAuthorized": true,
-      "offeringCompliant": true,
-      "depositConfirmed": true
-    },
-    "status": "ok",
-    "txHash": "0x7af83b46736f7de99adb9f1dbfae88e6a64a67b041b3ae6be75984a4fcae7f66"
   }
 ]

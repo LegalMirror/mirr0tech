@@ -236,6 +236,7 @@ export class Agreements {
     ensure(record.status === 'compiled', 409, 'INVALID_STATE', `Agreement is ${record.status}; deploy needs compiled`);
     const document = this.document(record);
     const compiled = compilePolicy(record.envelope, record.config, document, { demo: true });
+    ensure(compiled.solidity, 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no token of its own to deploy; it is served by the stack's credit venue`);
     this.venues.delete(id);
     this.transition(record, 'deploying');
     const job = (async () => {

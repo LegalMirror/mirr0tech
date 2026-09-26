@@ -64,7 +64,7 @@ For Coolify's **Dockerfile-only** API deployment, use [deploy/README.md](deploy/
 
 ```sh
 npm test
-npm run check                     # all existing policy, venue, stack and cashier chain suites
+npm run check                     # unit + policy, venue, stack, cashier and investor chain suites
 npm --prefix dashboard test
 npm --prefix dashboard run typecheck
 npm --prefix dashboard run lint
@@ -72,6 +72,28 @@ NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run 
 ```
 
 The static build is written to `dashboard/out/`; serve it with `npm --prefix dashboard start` on port 3100. The browser URL is public configuration, never a place for `API_KEY` or signing keys.
+
+## World ID login and investor swaps
+
+Open [the investor dashboard](https://legalmirror.github.io/mirr0tech/investor) (local route `/investor`). No operator/viewer key is requested. Connect a Sepolia EOA wallet, sign the server's wallet/fund-bound challenge, and complete the configured World Passport credential request. The backend validates both before issuing a short-lived investor session. Login alone does not grant on-chain eligibility, KYC or administrator rights.
+
+The investor dashboard shows own-wallet balances, remaining policy requirements, reserves, exact approval amounts, minimum output/deadline, wallet-signed transactions, RPC-confirmed receipts and Curvegrid-indexed activity. Indexer delay/outage is labeled separately from RPC confirmation. [Authentication](docs/INVESTOR_AUTH.md) · [Trading and Curvegrid setup](docs/INVESTOR_TRADING.md).
+
+For the hosted demo, set these **API runtime settings**:
+
+- Existing `WORLD_*` registration, `WORLD_ENVIRONMENT=sandbox`, `WORLD_CREDENTIAL=document`, and your registered `WORLD_ACTION` (currently `humanity`).
+- `INVESTOR_AGREEMENT_IDS`: comma-separated **deployed cashier agreement IDs** deliberately published by the operator. This does not expose their source documents. The default `stack` is the older eligibility-only deployment and is intentionally read-only for investor trades because its router lacks minimum-output/deadline bounds.
+- `INVESTOR_ALLOWED_ORIGINS`: optional comma-separated frontend origins. Defaults to `https://legalmirror.github.io`, plus localhost outside production. To test a local browser against the hosted API, explicitly include `http://localhost:3100` in the hosted API's list.
+- `MULTIBAAS_URL` / `MULTIBAAS_API_KEY`: server-only indexing credentials. After deploying a new cashier, register its actual addresses/ABIs deliberately using `npm run multibaas:sync:fund -- <agreement-id> <starting-block>`; replace the placeholders with the actual values. This writes Curvegrid indexing resources but does not deploy or fund contracts.
+
+Publication, independent compliance attestations, mockUSD reserves, investor test tokens and Sepolia gas must be prepared explicitly. Investor endpoints cannot grant themselves KYC, faucet issuer ETH, deploy contracts or trade through the operator signer. Passport/NFC is the selected World credential; an extra Orb proof is not required. World App MiniKit transactions target World Chain, so this Sepolia flow uses the connected browser wallet.
+
+```sh
+npm run test:chain:investor        # disposable Anvil: approvals, buys/mints, sells/burns, refusals and receipts
+node --test test/investor-auth.test.js test/investor-api.test.js test/investor-service.test.js
+```
+
+Anvil tests use synthetic World results, not the World Sandbox app. Local investor API mock login additionally requires explicit `INVESTOR_ALLOW_MOCK=true`, chain 31337 and non-production mode; the browser investor trading view remains Sepolia-only. A real Sandbox Passport proof and production-provider success are not established by these tests.
 
 ## Workbench and NAV cashier
 
@@ -103,7 +125,7 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 - **Three-valued facts.** True, false, or not established. Unknown never satisfies a requirement, and an expired attestation makes every fact unknown, so screening is continuous. `contracts/PolicyEval.sol` and `src/policy/evaluate.js` decide identically or the compiler refuses to emit.
 - **Observable vs attested.** Sanctions come from the oracle the agreement names, the market's term state from the market; the compliance function attests the rest into `PolicyAttestor` with an expiry. `PolicyOracle` assembles both for every venue.
 - **Provenance on every revert.** `LegalClauseViolation(clauseId, policyHash)` / `CounterpartyRefused(subject, clauseId, policyHash)`; the clause table's hash is committed on chain, so the sentence a front end shows cannot be substituted.
-- **No generated code.** Extraction emits schema-validated JSON; the compiler emits bitmasks into fixed templates; one audited evaluator serves every policy.
+- **No generated code.** Extraction emits schema-validated JSON; the compiler emits bitmasks into fixed templates; one shared evaluator serves every policy.
 
 ## Venues
 

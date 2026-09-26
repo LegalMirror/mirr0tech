@@ -1,5 +1,6 @@
 // The gateway's OpenAPI 3.1 document, served at /openapi.json and rendered by Swagger UI at /docs.
 // Hand-written next to the routes it describes: every path here is one src/app.js mounts.
+import { addInvestorApi } from './investor-openapi.js';
 const ref = (name) => ({ $ref: `#/components/schemas/${name}` });
 const obj = (properties, required = Object.keys(properties)) => ({ type: 'object', properties, required });
 const str = (description, extra = {}) => ({ type: 'string', description, ...extra });
@@ -109,7 +110,7 @@ export function openapiDocument({ serverUrl = '/' } = {}) {
   const agreementId = { ...path('id'), description: 'Agreement id (agr_…)' };
   const document = openapiBase(serverUrl, agreementId);
   Object.assign(document.paths, agreementVenuePaths(document.paths, agreementId));
-  return document;
+  return addInvestorApi(document);
 }
 
 function openapiBase(serverUrl, agreementId) {

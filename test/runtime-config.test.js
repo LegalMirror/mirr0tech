@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
-import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment, createWriteQueue } from '../src/runtime-config.js';
 
 const remote = { NODE_ENV: 'production', API_KEY: 'test-operator-key-at-least-24-chars', RPC_URL: 'https://rpc.example.invalid', EXPECTED_CHAIN_ID: '11155111' };
 
@@ -30,6 +30,21 @@ test('public-chain startup reuses its record and never falls back to spending ga
   assert.throws(() => reuseDeployment(11155111n, null), /Public-chain startup never deploys/);
   assert.throws(() => reuseDeployment(11155111n, { chainId: 31337 }), /refusing to deploy a replacement/);
   assert.equal(reuseDeployment(31337n, null), false, 'only the explicit local chain may auto-deploy');
+});
+
+test('shared issuer writes stay serialized and recover after a failed transaction', async () => {
+  const queue = createWriteQueue();
+  const events = [];
+  let release;
+  const first = queue(async () => { events.push('deploy:start'); await new Promise((resolve) => { release = resolve; }); events.push('deploy:end'); });
+  await Promise.resolve();
+  const second = queue(async () => { events.push('identity'); throw new Error('test transaction refused'); });
+  const rejected = assert.rejects(second, /test transaction refused/);
+  const third = queue(async () => events.push('next'));
+  assert.deepEqual(events, ['deploy:start']);
+  release();
+  await Promise.all([first, rejected, third]);
+  assert.deepEqual(events, ['deploy:start', 'deploy:end', 'identity', 'next']);
 });
 
 test('remote entrypoint refuses demo seeding before starting Node or accessing any credentials', () => {

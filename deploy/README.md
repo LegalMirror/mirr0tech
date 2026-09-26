@@ -48,6 +48,8 @@ Add the actual values for these **runtime-only** secrets/configuration:
 - `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY` — matching registered World v4 app/RP settings. The RP key is not the Ethereum key.
 - Optional: a distinct `VIEWER_KEY`, and `MULTIBAAS_URL` / `MULTIBAAS_API_KEY` for Curvegrid indexing.
 
+Investor setup additionally uses `INVESTOR_AGREEMENT_IDS` (comma-separated deployed cashier IDs) and optionally `INVESTOR_ALLOWED_ORIGINS` (comma-separated frontend origins; production defaults to `https://legalmirror.github.io`). These publish only fund metadata for the wallet/World ID login flow; private uploads stay private. Do not enable synthetic investor mock login on Sepolia. New cashier addresses must be registered with Curvegrid using their deployed ABIs; see [investor trading setup](../docs/INVESTOR_TRADING.md).
+
 Keep secret **Buildtime off, Runtime on**. Do not copy unrelated IPFS, Privy, mnemonic or other application credentials into this resource. Leave `NOOLOG_API_KEY` unset to use the existing deterministic mock analysis adapter; setting it opts into live provider calls and document sharing.
 
 Startup reuses the committed Sepolia stack. **Do not run `npm run deploy:stack`, `npm run deploy:sepolia` or `npm run seed:stack` as startup/pre-deployment commands.** Those are explicit operator/development operations, not API launch commands. Root `npm start` is the legacy custodial service; the image correctly starts `scripts/dev-stack.js`.

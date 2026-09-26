@@ -31,6 +31,9 @@ services:
       WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
       WORLD_CREDENTIAL: document
       WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
+      INVESTOR_AGREEMENT_IDS: ${INVESTOR_AGREEMENT_IDS:-}
+      INVESTOR_ALLOWED_ORIGINS: ${INVESTOR_ALLOWED_ORIGINS:-https://legalmirror.github.io}
+      PUBLIC_DEMO: ${PUBLIC_DEMO:-true}
       # Empty means the existing deterministic mock Noolog adapter; proof verification is NOT mocked.
       NOOLOG_API_KEY: ${NOOLOG_API_KEY:-}
       MULTIBAAS_URL: ${MULTIBAAS_URL:-}

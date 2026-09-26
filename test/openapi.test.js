@@ -20,6 +20,11 @@ test('the OpenAPI document describes every operation with a tag and responses, w
   }
   for (const schema of JSON.stringify(document).matchAll(/#\/components\/schemas\/(\w+)/g)) assert.ok(document.components.schemas[schema[1]], `schema ${schema[1]} exists`);
 
+  assert.deepEqual(document.paths['/v1/demo/session'].post.security, []);
+  assert.deepEqual(document.paths['/v1/investor/auth/challenge'].post.security, []);
+  assert.deepEqual(document.paths['/v1/investor/transactions/prepare'].post.security, [{ investor: [] }]);
+  assert.deepEqual(document.paths['/v1/agreements'].post.security, [{ bearer: [] }, { demo: [] }]);
+  assert.deepEqual(document.paths['/v1/settings/signing'].put.security, [{ bearer: [] }]);
   const webhook = document.paths['/webhooks/payments'].post;
   assert.deepEqual(webhook.tags, ['Webhooks']);
   assert.deepEqual(webhook.security, [{ stripeSignature: [] }]);

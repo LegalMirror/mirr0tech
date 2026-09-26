@@ -19,6 +19,16 @@ export function stackRuntime(env = process.env) {
   return { apiKey, viewerKey, expectedChainId: rawChain ? BigInt(rawChain) : null };
 }
 
+// Public deployments and credential attestations share one issuer signer in this process.
+export function createWriteQueue() {
+  let tail = Promise.resolve();
+  return (operation) => {
+    const result = tail.then(operation);
+    tail = result.catch(() => {});
+    return result;
+  };
+}
+
 // Public-chain deployment is an explicit operator command, never a side effect of serving HTTP.
 export function reuseDeployment(chainId, record) {
   if (record) {

@@ -8,13 +8,15 @@ import { JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from 'ethers';
 import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { Agreements } from '../src/agreements.js';
 import { DemoWorkspaces } from '../src/demo-workspaces.js';
+import { InvestorAuth } from '../src/investor-auth.js';
+import { InvestorService } from '../src/investor-service.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
 import { SigningSettings } from '../src/signing.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp } from '../src/app.js';
 import { loadPolicyData } from '../src/dashboard-api.js';
-import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment, createWriteQueue } from '../src/runtime-config.js';
 
 const { apiKey, viewerKey, expectedChainId } = stackRuntime();
 const verifier = new WorldIdVerifier();
@@ -57,9 +59,10 @@ const worldId = identityFor(verifier);
 const venues = await new VenueService({ provider, signer, record, multibaas, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json` }).init();
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
+const issuerWrites = createWriteQueue();
 const agreements = await new Agreements({
   path: `${dataDir}/agreements-${record.chainId}.json`, log: (line) => console.log(`agreement ${line}`),
-  deployer: ({ sources }) => deployFund(venues.signer, { record, sources, log: console.log }),
+  deployer: ({ sources }) => issuerWrites(() => deployFund(venues.signer, { record, sources, log: console.log })),
   // One venue per deployed agreement: its token, oracle and hook; the stack's attestor, sanctions oracle and pool manager.
   venueFactory: ({ id, deployment, policy, clauseTable, credential, action }) => new VenueService({
     provider, signer: venues.signer, multibaas, policies: { rwa: { policy, clauseTable }, credit: venues.policies.credit },
@@ -76,6 +79,16 @@ const demoWorkspaces = process.env.PUBLIC_DEMO === 'false' ? null : await new De
 const signing = await new SigningSettings({ venues, fileSigner: signer, multibaas, agreements, path: `${dataDir}/signing-${record.chainId}.json` }).init();
 if (process.env.SIGNER === 'multibaas' && signing.provider === 'key') await signing.configure({ provider: 'multibaas', wallet: process.env.MULTIBAAS_WALLET ?? null, gas: process.env.MULTIBAAS_WALLET_GAS ?? null });
 if (signing.provider === 'multibaas') console.log(`operator signs from the MultiBaas Cloud Wallet ${signing.wallet.address}`);
-const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { signing, demoWorkspaces }).listen(Number(process.env.PORT ?? 3000), host, () =>
+const investorService = new InvestorService({
+  venues, agreements, writeQueue: issuerWrites,
+  publishedAgreementIds: (process.env.INVESTOR_AGREEMENT_IDS ?? '').split(',').map((id) => id.trim()).filter(Boolean),
+});
+const investorAuth = new InvestorAuth({
+  resolveFund: (id) => investorService.resolveFund(id),
+  allowLocalMock: process.env.INVESTOR_ALLOW_MOCK === 'true',
+  ...(process.env.INVESTOR_ALLOWED_ORIGINS ? { allowedOrigins: process.env.INVESTOR_ALLOWED_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean) } : {}),
+});
+const investor = { service: investorService, auth: investorAuth };
+const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { signing, demoWorkspaces, investor }).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

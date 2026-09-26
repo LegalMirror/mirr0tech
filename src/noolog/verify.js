@@ -38,6 +38,9 @@ export function verificationFrom({ jobId, details, references }) {
     claim: d.proposal_claims, evaluator: evaluation.evaluator_agent_id, position: d.evaluator_position, confidence: d.confidence,
     verdict: byId.get(idOf.get(d.claim_id))?.verdicts[0]?.verdict ?? null,
   })));
+  // Seats that score the answer without decomposing it still say how sure they are: their scores, in [0, 1].
+  const raw = (record?.evaluations ?? []).map((evaluation) => evaluation.evaluation?.score).filter(Number.isFinite);
+  const scored = raw.some((score) => score < 0) ? raw.map((score) => (score + 1) / 2) : raw;
   const counts = { verified: 0, contested: 0, unverified: 0, wrong: 0, unknown: 0 };
   for (const claim of claims) for (const v of claim.verdicts) counts[v.verdict in counts ? v.verdict : 'unknown']++;
   const rounds = details.rounds ?? [];
@@ -50,7 +53,9 @@ export function verificationFrom({ jobId, details, references }) {
     claims,
     contested,
     confidence: {
-      overall: claims.length ? Number(mean(claims.map((claim) => claim.score)).toFixed(4)) : unit(winning?.aggregated_score) ?? 0,
+      overall: claims.length ? Number(mean(claims.map((claim) => claim.score)).toFixed(4)) : Number(mean(scored.length ? scored : [unit(winning?.aggregated_score) ?? 0]).toFixed(4)),
+      // What the number rests on: assessed claims, the seats' scores of the answer, or the winner's aggregate alone.
+      basis: claims.length ? 'claims' : scored.length ? 'evaluations' : 'winner',
       byRef: Object.fromEntries(Object.entries(byRef).map(([ref, scores]) => [ref, Number(mean(scores).toFixed(4))])),
       verified: claims.filter((claim) => claim.score === 1).length,
       total: claims.length,

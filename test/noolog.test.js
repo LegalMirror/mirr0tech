@@ -215,6 +215,11 @@ test('the report reads the orchestrator\'s own tree: winner from final_result, c
   assert.deepEqual(v.confidence.counts, { verified: 1, contested: 1, unverified: 0, wrong: 0, unknown: 0 });
   assert.equal(v.contested[0].ref, 'rule:c');
   assert.equal(v.rounds, 2);
+  assert.equal(v.confidence.basis, 'claims');
+  const scoredOnly = verificationFrom({ jobId: 'j', details: { history: [{ round: 1, author_agent_id: 'X', proposal: {}, evaluations: [{ evaluator_agent_id: 'A', evaluation: { score: 1 } }, { evaluator_agent_id: 'B', evaluation: { score: -0.5 } }], aggregated_score: 0.25 }], rounds: [], final_result: { round: 1, author_agent_id: 'X', aggregated_score: 0.25 } }, references: { rounds: [{ round: 1, proposals: [{ author_agent_id: 'X', aggregated_score: 0.25, on_winner_path: true, claims: [] }] }] } });
+  assert.equal(scoredOnly.confidence.basis, 'evaluations');
+  assert.equal(scoredOnly.confidence.overall, 0.625, 'the seats\' scores 1 and -0.5, mapped to [0, 1], averaged');
   const bare = verificationFrom({ jobId: 'j', details: { history: [], rounds: [], final_result: { round: 1, author_agent_id: 'X', aggregated_score: -0.5 } }, references: { rounds: [{ round: 1, proposals: [{ author_agent_id: 'X', aggregated_score: -0.5, on_winner_path: true, claims: [] }] }] } });
-  assert.equal(bare.confidence.overall, 0.25, 'no claims anywhere: the winner\'s score mapped to [0, 1]');
+  assert.equal(bare.confidence.basis, 'winner');
+  assert.equal(bare.confidence.overall, 0.25, 'no claims, no scores: the winner\'s aggregate mapped to [0, 1]');
 });

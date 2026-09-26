@@ -1280,7 +1280,9 @@
   color: #b2c5d5;
   line-height: 1.85;
 }
-.wb-mobile-head,
+.wb-mobile-head {
+  display: none;
+}
 @media (min-width: 1650px) {
   .wb-clause-quote {
     font-size: 13px;

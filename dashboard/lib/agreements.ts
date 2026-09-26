@@ -152,6 +152,20 @@ export type Upload = {
   documents: { name: string; text: string }[];
   config?: Record<string, unknown>;
 };
+/** Noolog when the gateway reads with it; otherwise a local workspace picks the fixture or OpenAI, a hosted one leaves it to the gateway. */
+export function generationFor({
+  provider,
+  localWorkspace,
+  mode,
+}: {
+  provider: string | undefined;
+  localWorkspace: boolean;
+  mode: "demo" | "files";
+}): Upload["generation"] {
+  if (provider === "noolog") return "noolog";
+  if (localWorkspace) return mode === "demo" ? "demo" : "openai";
+  return undefined;
+}
 export type AccessDecision = {
   wallet: string;
   address: string;

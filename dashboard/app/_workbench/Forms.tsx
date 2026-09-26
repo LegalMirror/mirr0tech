@@ -6,6 +6,7 @@ import { CREDENTIAL_COPY } from "@/lib/identity";
 import { gatewayUrl, hasGatewaySession, setSession, type GatewaySession } from "@/lib/session";
 import { startDemoWorkspace } from "@/lib/demo-session";
 import {
+  generationFor,
   validateUpload,
   type Constraints,
   type IdentityConstraint,
@@ -178,11 +179,6 @@ export function UploadDialog({
   const [name, setName] = useState("BUIDL demo");
   const [profile, setProfile] = useState<ProfileId>("rwa-secondary");
   const [mode, setMode] = useState<"demo" | "files">("demo");
-  // A live multi-model deliberation (Noolog legal_rwa_pro) instead of the fixture or a single OpenAI call.
-  const [deliberate, setDeliberate] = useState(false);
-  // When the gateway reads with Noolog by default (EXTRACTOR=noolog), the box starts ticked.
-  const noologDefault = status?.model.provider === "noolog";
-  useEffect(() => setDeliberate(noologDefault), [noologDefault]);
   const [bundle, setBundle] = useState<Upload | null>(null);
   const [cashierDemo, setCashierDemo] = useState(false);
   const [demoError, setDemoError] = useState("");
@@ -216,13 +212,10 @@ export function UploadDialog({
         mode === "demo"
           ? demoDocuments
           : await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
+      const generation = generationFor({ provider: status?.model.provider, localWorkspace: Boolean(localWorkspace), mode });
       const upload: Upload = {
         name: name.trim(),
-        ...(deliberate
-          ? { generation: "noolog" as const }
-          : localWorkspace
-            ? { generation: mode === "demo" ? ("demo" as const) : ("openai" as const) }
-            : {}),
+        ...(generation ? { generation } : {}),
         profile: mode === "demo" ? "rwa-secondary" : profile,
         documents,
         ...(mode === "demo" && cashierDemo ? { config: bundle?.config } : {}),
@@ -298,17 +291,13 @@ export function UploadDialog({
             Upload files
           </button>
         </div>
-        <label className="wb-check">
-          <input type="checkbox" checked={deliberate} onChange={(event) => setDeliberate(event.target.checked)} />
-          Deliberate with Noolog: several legal models read the agreement and check each other&apos;s claims (live,
-          about 10–25 minutes)
-        </label>
         {mode === "demo" ? (
           <div className="wb-demo-bundle">
             <h3>BUIDL contract → executable policy</h3>
             <p>
-              Generate a sample AST from the bundled contract using a deterministic fixture. No API key is
-              needed.
+              {status?.model.provider === "noolog"
+                ? "Noolog legal models read the bundled contract and check each other's claims."
+                : "Generate a sample AST from the bundled contract using a deterministic fixture. No API key is needed."}
             </p>
             <label className="wb-check">
               <input

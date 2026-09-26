@@ -11,7 +11,7 @@ export function amountUnits(value) {
   ensure(units > 0n && units <= MAX_UINT, 400, 'INVALID_AMOUNT', 'Amount must be positive and fit uint256');
   return units;
 }
-export const COMPLIANCE_FIELDS = ['kycApproved', 'amlApproved', 'sanctionsClear', 'subscriptionAccepted', 'issuerAuthorized', 'offeringCompliant', 'redemptionAuthorized', 'humanVerified'];
+export const COMPLIANCE_FIELDS = ['kycApproved', 'amlApproved', 'sanctionsClear', 'subscriptionAccepted', 'issuerAuthorized', 'offeringCompliant', 'redemptionAuthorized', 'identityVerified'];
 const timestamp = () => new Date().toISOString();
 const audit = (state, type, details) => state.audit.push({ id: randomUUID(), at: timestamp(), type, ...details });
 

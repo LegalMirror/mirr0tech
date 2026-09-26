@@ -20,7 +20,7 @@ export const FACT_LABEL: Record<string, string> = {
   screeningCurrent: "Screening is up to date",
   openTermState: "Market is open",
   borrowerOverride: "Borrower override in place",
-  humanVerified: "Verified human (World ID)",
+  identityVerified: "Identity verified (World ID document)",
 };
 export const factLabel = (name: string) => FACT_LABEL[name] ?? name;
 
@@ -63,7 +63,7 @@ export const EFFECT_SENTENCE: Record<Effect, string> = {
 
 /** Timeline event kinds as a reader would say them. */
 export const KIND_LABEL: Record<string, string> = {
-  HumanVerified: "Proof of human",
+  HumanVerified: "Identity verified",
   Attested: "Facts attested",
   Revoked: "Designated / revoked",
   CredentialDecision: "Deposit decision",

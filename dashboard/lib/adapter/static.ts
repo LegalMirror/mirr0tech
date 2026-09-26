@@ -78,6 +78,7 @@ export const staticSource: DataSource = {
     app_id: "app_mock",
     rp_id: "rp_mock",
     action: "onboard-investor",
+    credential: "document",
     environment: "mock",
     mock: true,
     rp_context: { rp_id: "rp_mock", nonce: "0x0", created_at: 0, expires_at: 0, signature: "0xmock" },
@@ -85,7 +86,7 @@ export const staticSource: DataSource = {
   // The static build has no verifier: a proof marks the human verified in memory.
   verifyHuman: async (profile, id) =>
     update(profile, id, (party) => {
-      party.facts.humanVerified = true;
+      party.facts.identityVerified = true;
       party.screenedAt ??= Math.floor(Date.now() / 1000);
     }),
   subscribe(listener) {

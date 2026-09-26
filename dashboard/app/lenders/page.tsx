@@ -90,9 +90,9 @@ function PartyCard({ policy, party, others }: { policy: PolicyData; party: Party
       {!credit && party.role !== "borrower" && (
         <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
           <HumanCheck profile={policy.profile} party={party} />
-          {party.facts.humanVerified !== true &&
+          {party.facts.identityVerified !== true &&
             others
-              .filter((other) => other.facts.humanVerified === true && other.id !== party.id)
+              .filter((other) => other.facts.identityVerified === true && other.id !== party.id)
               .slice(0, 1)
               .map((other) => (
                 <HumanCheck key={other.id} profile={policy.profile} party={party} asParty={other} />

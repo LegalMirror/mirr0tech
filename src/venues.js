@@ -156,13 +156,13 @@ export class VenueService {
     const now = (await this.provider.getBlock('latest')).timestamp;
     return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, now + days * 86400));
   }
-  /// A World ID proof of human for `wallet`: verified, its nullifier bound to this wallet, then
-  /// attested as `humanVerified` under the fund policy so every venue reads it.
+  /// A World ID credential proof for `wallet`: verified, its nullifier bound to this wallet, then
+  /// attested as `identityVerified` under the fund policy so every venue reads it.
   async verifyHuman(wallet, proof, days = 30) {
     const address = this.address(wallet);
     let nullifier;
     try {
-      ({ nullifier } = await this.worldId.verifier.verify(proof));
+      ({ nullifier } = await this.worldId.verifier.verify(proof, address));
       await this.worldId.registry.bind(nullifier, address);
     } catch (error) {
       if (!(error instanceof WorldIdError)) throw error;
@@ -171,9 +171,9 @@ export class VenueService {
       throw new AppError(error.status, error.code, error.message);
     }
     const { policy } = this.policy('rwa');
-    const { known, value } = this.pack('rwa', { humanVerified: true });
+    const { known, value } = this.pack('rwa', { identityVerified: true });
     const now = (await this.provider.getBlock('latest')).timestamp;
-    return this.run('worldid.verify', { policy: 'rwa', wallet: this.name(address), nullifier: `${nullifier.slice(0, 10)}…`, facts: { humanVerified: true } }, async () => {
+    return this.run('worldid.verify', { policy: 'rwa', wallet: this.name(address), nullifier: `${nullifier.slice(0, 10)}…`, facts: { identityVerified: true } }, async () => {
       const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
       return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, now + days * 86400);
     });

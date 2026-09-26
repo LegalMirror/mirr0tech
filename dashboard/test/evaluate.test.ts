@@ -140,7 +140,7 @@ describe("the secondary RWA profile", () => {
       kycApproved: true,
       amlApproved: true,
       sanctionsClear: true,
-      humanVerified: true,
+      identityVerified: true,
     };
     expect(explain(policy, "transfer", onboarded).onchain).toEqual({ allowed: true, clauseId: 0 });
     const stranger = explain(policy, "transfer", {

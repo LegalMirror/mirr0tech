@@ -71,9 +71,9 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
       </ul>
 
       <h3>Confirm</h3>
-      {factsForAction(policy, action).includes("humanVerified") && facts.humanVerified !== true && (
+      {factsForAction(policy, action).includes("identityVerified") && facts.identityVerified !== true && (
         <p className="meta" style={{ marginBottom: 8 }}>
-          Needs a World ID proof of human, not a confirmation:{" "}
+          Needs a World ID document credential, not a confirmation:{" "}
           <HumanCheck profile={policy.profile} party={party} />
         </p>
       )}

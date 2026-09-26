@@ -16,7 +16,7 @@ const artifacts = Object.fromEntries(await Promise.all(
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
-const ONBOARDED = { kycApproved: true, amlApproved: true, humanVerified: true };
+const ONBOARDED = { kycApproved: true, amlApproved: true, identityVerified: true };
 const pack = (facts) => {
   let known = 0n; let value = 0n;
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }
@@ -92,7 +92,7 @@ test('the fund agreement compiles into the token and into the only door a pool c
     await (await token.configureSecondary(await addr(oracle), mined.address)).wait();
     await assert.rejects(token.release(id('release-0'), await stranger.getAddress(), 1n), (error) => {
       const parsed = decode(error);
-      return parsed?.name === 'TransferRefused' && clauseOf(parsed.args.clauseId).ruleId === 'transfer-proof-of-human';
+      return parsed?.name === 'TransferRefused' && clauseOf(parsed.args.clauseId).ruleId === 'transfer-identity-verified';
     });
     await attest(await investor.getAddress(), ONBOARDED);
     await (await token.release(id('release-1'), await investor.getAddress(), 500_000n * 10n ** 6n)).wait();

@@ -11,7 +11,7 @@ export const FACT_KIND_LABEL: Record<FactKind, string> = {
   operator: "operator attestation",
   ledger: "gateway ledger",
   screening: "mock screening result",
-  worldid: "World ID proof of human, bound to this wallet",
+  worldid: "World ID document credential, bound to this wallet",
 };
 
 const CREDIT: Record<string, FactKind> = {
@@ -29,7 +29,7 @@ const CUSTODIAL: Record<string, FactKind> = {
   kycApproved: "screening",
   amlApproved: "screening",
   sanctionsClear: "screening",
-  humanVerified: "worldid",
+  identityVerified: "worldid",
   subscriptionAccepted: "operator",
   issuerAuthorized: "operator",
   offeringCompliant: "operator",

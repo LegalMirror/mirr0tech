@@ -50,7 +50,7 @@ describe("staticSource", () => {
     const verified = await staticSource.verifyHuman("custodial-rwa", "investor-1", {
       protocol_version: "4.0",
     });
-    expect(verified.facts.humanVerified).toBe(true);
+    expect(verified.facts.identityVerified).toBe(true);
   });
 
   it("serves the exported deployment and null when the build has none", async () => {

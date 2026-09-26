@@ -24,7 +24,11 @@ export function gatewaySource(baseUrl: string, apiKey = process.env.NEXT_PUBLIC_
         ...init.headers,
       },
     });
-    if (!response.ok) throw new Error(`${init.method ?? "GET"} ${path}: ${response.status}`);
+    if (!response.ok) {
+      // The gateway explains refusals in plain words; surface that, or the status when there is none.
+      const body = await response.json().catch(() => null);
+      throw new Error(body?.error?.message ?? `${init.method ?? "GET"} ${path}: ${response.status}`);
+    }
     return (await response.json()) as T;
   };
   const mutate = async <T>(path: string, method: string, body?: unknown): Promise<T> => {

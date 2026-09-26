@@ -71,7 +71,7 @@ say(`  custody holds ${await token.balanceOf(admin.address) / M} MIRROR`);
 
 step('Act 1 · Release: only an onboarded investor may hold shares');
 report('Release 500,000 to the Stranger', await refused(token.release(id('release-0'), await stranger.getAddress(), 500_000n * M), clauseTables.rwa));
-await attest(policies.rwa, await investor.getAddress(), ['kycApproved', 'amlApproved', 'humanVerified']);
+await attest(policies.rwa, await investor.getAddress(), ['kycApproved', 'amlApproved', 'identityVerified']);
 report('Release 500,000 to the Investor after onboarding', await refused(token.release(id('release-1'), await investor.getAddress(), 500_000n * M), clauseTables.rwa));
 
 step('Act 1 · Trade: anyone may create a pool with the hook — nobody asked the issuer');

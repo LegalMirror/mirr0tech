@@ -74,7 +74,9 @@ export function dashboardRoutes(venues, policyData) {
     const current = (await party(profile, name)).facts;
     const merged = {};
     for (const [fact, tri] of Object.entries({ ...current, ...req.body.facts })) {
-      if (['sanctionsClear', 'openTermState', 'screeningCurrent', 'humanVerified'].includes(fact)) continue;
+      if (['sanctionsClear', 'openTermState', 'screeningCurrent'].includes(fact)) continue;
+      // Only a verified World ID proof sets identityVerified; a hand attestation keeps what the proof established.
+      if (fact === 'identityVerified') { if (current.identityVerified === true) merged[fact] = true; continue; }
       if (tri === true || tri === false) merged[fact] = tri;
     }
     await venues.attest(kind, name, merged);

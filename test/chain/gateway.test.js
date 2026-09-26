@@ -40,10 +40,10 @@ test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t)
   assert.equal((await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true } })).status, 200);
   const before = await call('/wallets/Investor/explain?policy=rwa&action=transfer');
   assert.equal(before.data.allowed, false, 'onboarding facts alone do not admit: the human is not proven');
-  assert.equal(before.data.clause.ruleId, 'transfer-proof-of-human');
+  assert.equal(before.data.clause.ruleId, 'transfer-identity-verified');
   const human = await call('/wallets/Investor/worldid', { proof: mockProof('Investor') });
   assert.equal(human.status, 200);
-  assert.equal(human.data.facts.humanVerified, true);
+  assert.equal(human.data.facts.identityVerified, true);
   const after = await call('/wallets/Investor/explain?policy=rwa&action=transfer');
   assert.equal(after.data.allowed, true, 'a verified human with onboarding facts may transfer');
   assert.equal(after.data.facts.kycApproved, true, 'the proof attestation kept the earlier facts');

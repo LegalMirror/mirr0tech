@@ -35,7 +35,7 @@ const ACTION = {
 function summaryOf(entry) {
   switch (entry.type) {
     case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
-    case 'worldid.verify': return `proof of human verified (World ID, nullifier ${entry.nullifier})`;
+    case 'worldid.verify': return `identity verified with a World ID document (nullifier ${entry.nullifier})`;
     case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;
     case 'override': return 'borrower override under MLA 13(c)(y)';
     case 'sanction': return entry.sanctioned ? 'designated by the sanctions oracle' : 'designation lifted';

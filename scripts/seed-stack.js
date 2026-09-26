@@ -16,9 +16,9 @@ const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvid
 // Act 1
 await call('/rwa/mint', { amount: '1000000' });
 await call('/rwa/release', { wallet: 'Stranger', amount: '10' });                 // refused: not onboarded
-const investor = (await call('/wallets')).find((wallet) => wallet.name === 'Investor').address;
-await call('/wallets/Investor/worldid', { proof: mockProof(investor) });                     // World ID proof of human → humanVerified
 await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true } });
+const investor = (await call('/wallets')).find((wallet) => wallet.name === 'Investor').address;
+await call('/wallets/Investor/worldid', { proof: mockProof(investor) });                     // World ID document proof → identityVerified
 await call('/rwa/release', { wallet: 'Investor', amount: '500000' });
 for (const wallet of ['Investor', 'Stranger']) await call(`/wallets/${encodeURIComponent(wallet)}/fund`, { amount: '1000000' });
 await call('/rwa/pools', { wallet: 'Stranger', hooked: true });

@@ -25,7 +25,7 @@
     "ui:export": "node scripts/export-ui.js",
     "build:secondary": "node scripts/compile.js --secondary --demo && node scripts/build-contracts.js",
     "deploy:stack": "node scripts/deploy-stack.js",
-    "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js test/chain/dashboard-api.test.js test/chain/agreements-deploy.test.js test/chain/payments.test.js test/chain/flow.test.js",
+    "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js test/chain/dashboard-api.test.js test/chain/agreements-deploy.test.js test/chain/payments.test.js test/chain/flow.test.js test/chain/signing.test.js",
     "demo:golden": "node scripts/demo-golden.js",
     "dev:stack": "node scripts/dev-stack.js",
     "multibaas:sync": "node scripts/multibaas-sync.js",

@@ -9,7 +9,7 @@ import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { Agreements } from '../src/agreements.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
-import { MultiBaasSigner, cloudWallet } from '../src/multibaas-signer.js';
+import { SigningSettings } from '../src/signing.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp } from '../src/app.js';
 import { loadPolicyData } from '../src/dashboard-api.js';
@@ -27,17 +27,9 @@ provider.pollingInterval = 100;
 for (let attempt = 0; attempt < 200; attempt++) { try { await provider.getBlockNumber(); break; } catch { await new Promise((r) => setTimeout(r, 50)); } }
 const chainId = (await provider.getNetwork()).chainId;
 const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaasClient() : null;
-// The operator signs from a file key, or from a MultiBaas Cloud Wallet (HSM) when one is named.
-let signer;
-if (process.env.SIGNER === 'multibaas') {
-  if (!multibaas) throw new Error('SIGNER=multibaas needs MULTIBAAS_URL and MULTIBAAS_API_KEY on a public chain');
-  signer = new MultiBaasSigner(multibaas, (await cloudWallet(multibaas)).publicAddress, provider);
-  console.log(`operator signs from the MultiBaas Cloud Wallet ${await signer.getAddress()}`);
-} else {
-  const key = process.env.DEPLOYER_PRIVATE_KEY ?? (chainId === 31337n ? ANVIL_DEV_KEY : undefined);
-  if (!key) throw new Error(`Set DEPLOYER_PRIVATE_KEY for chain ${chainId}, or SIGNER=multibaas`);
-  signer = new Wallet(key, provider);
-}
+const key = process.env.DEPLOYER_PRIVATE_KEY ?? (chainId === 31337n ? ANVIL_DEV_KEY : undefined);
+if (!key) throw new Error(`Set DEPLOYER_PRIVATE_KEY for chain ${chainId}`);
+const signer = new Wallet(key, provider);
 const canonical = { poolManager: process.env.POOL_MANAGER, aqua: process.env.AQUA, weth: process.env.WETH };
 const saved = process.env.DEPLOYMENT_PATH ? JSON.parse(await readFile(process.env.DEPLOYMENT_PATH, 'utf8')) : null;
 if (saved && saved.chainId !== Number(chainId)) console.warn(`DEPLOYMENT_PATH is for chain ${saved.chainId}, RPC is chain ${chainId}: deploying fresh`);
@@ -61,6 +53,10 @@ const agreements = await new Agreements({
     auditPath: `${dataDir}/audit-${record.chainId}-${id}.json`,
   }).init(),
 }).init();
-const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null, agreements).listen(Number(process.env.PORT ?? 3000), host, () =>
+// Key custody: the saved choice wins; SIGNER=multibaas moves signing into the Cloud Wallet on this boot.
+const signing = await new SigningSettings({ venues, fileSigner: signer, multibaas, agreements, path: `${dataDir}/signing-${record.chainId}.json` }).init();
+if (process.env.SIGNER === 'multibaas' && signing.provider === 'key') await signing.configure({ provider: 'multibaas', wallet: process.env.MULTIBAAS_WALLET ?? null, gas: process.env.MULTIBAAS_WALLET_GAS ?? null });
+if (signing.provider === 'multibaas') console.log(`operator signs from the MultiBaas Cloud Wallet ${signing.wallet.address}`);
+const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null, agreements, { signing }).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

@@ -4,7 +4,7 @@
 // on a public chain they are derived from the operator key and topped up with gas when funded.
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
-import { Contract, MaxUint256, Wallet, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
+import { Contract, MaxUint256, Wallet, ZeroHash, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
@@ -36,15 +36,8 @@ export class VenueService {
     const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'PoolManager']);
     const credit = await loadArtifacts('wildcat-credit', ['PolicyOracle', 'MirrortechRoleProvider', 'MockWildcatMarket', 'MirrortechRouter', 'Aqua']);
     this.policies ??= { rwa: { policy: rwa.policy, clauseTable: rwa.clauseTable }, credit: { policy: credit.policy, clauseTable: credit.clauseTable } };
-    const at = (address, artifact, signer = this.signer) => new Contract(address, artifact.abi, signer);
-    const r = this.record;
-    this.c = {
-      attestor: at(r.attestor, rwa.artifacts.PolicyAttestor), sanctions: at(r.sanctions, rwa.artifacts.MockSanctionsOracle), usdc: at(r.usdc, rwa.artifacts.MockERC20),
-      token: at(r.rwa.token, rwa.artifacts.CompiledMirrorToken), hook: at(r.rwa.hook, rwa.artifacts.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.artifacts.PolicyOracle),
-      poolManager: at(r.rwa.poolManager, rwa.artifacts.PoolManager), v4Router: at(r.rwa.router, rwa.artifacts.MirrorLiquidityRouter),
-      roleProvider: at(r.credit.roleProvider, credit.artifacts.MirrortechRoleProvider), market: at(r.credit.market, credit.artifacts.MockWildcatMarket),
-      aqua: at(r.credit.aqua, credit.artifacts.Aqua), swapRouter: at(r.credit.router, credit.artifacts.MirrortechRouter),
-    };
+    this.artifacts = { rwa: rwa.artifacts, credit: credit.artifacts };
+    this.bind(this.signer);
     this.wallets = { Operator: await this.signer.getAddress() };
     if (this.record.chainId === 31337) {
       for (const [index, name] of DEMO_WALLETS.entries()) this.wallets[name] = await (await this.provider.getSigner(index + 1)).getAddress();
@@ -56,6 +49,44 @@ export class VenueService {
     if (this.auditPath) this.audit = await readFile(this.auditPath, 'utf8').then(JSON.parse, () => []);
     await this.worldId.registry.load();
     return this;
+  }
+  bind(signer) {
+    const at = (address, artifact) => new Contract(address, artifact.abi, signer);
+    const r = this.record;
+    const { rwa, credit } = this.artifacts;
+    this.c = {
+      attestor: at(r.attestor, rwa.PolicyAttestor), sanctions: at(r.sanctions, rwa.MockSanctionsOracle), usdc: at(r.usdc, rwa.MockERC20),
+      token: at(r.rwa.token, rwa.CompiledMirrorToken), hook: at(r.rwa.hook, rwa.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.PolicyOracle),
+      poolManager: at(r.rwa.poolManager, rwa.PoolManager), v4Router: at(r.rwa.router, rwa.MirrorLiquidityRouter),
+      roleProvider: at(r.credit.roleProvider, credit.MirrortechRoleProvider), market: at(r.credit.market, credit.MockWildcatMarket),
+      aqua: at(r.credit.aqua, credit.Aqua), swapRouter: at(r.credit.router, credit.MirrortechRouter),
+    };
+  }
+  /// Signs from `signer` from now on: every handle rebinds and the operator wallet is its address.
+  async useSigner(signer) {
+    this.signer = signer;
+    this.bind(signer);
+    this.wallets.Operator = await signer.getAddress();
+  }
+  /// Hands the operator's roles to `address` (attest, watch, override; mint and admin on the fund
+  /// token and on `tokens`), plus `gas` in ETH, so a vault key can take over. The current signer must
+  /// hold the admin roles; grants already in place are skipped.
+  async handover(address, { gas = null, tokens = [] } = {}) {
+    const txs = {};
+    const grant = async (contract, label, role) => {
+      const hash = role === 'DEFAULT_ADMIN_ROLE' ? ZeroHash : id(role);
+      if (await contract.hasRole(hash, address)) return;
+      txs[`${label}.${role}`] = (await (await contract.grantRole(hash, address)).wait()).hash;
+    };
+    for (const role of ['ATTESTOR_ROLE', 'WATCHER_ROLE', 'BORROWER_ROLE']) await grant(this.c.attestor, 'attestor', role);
+    for (const [index, token] of [this.c.token, ...tokens.map((at) => new Contract(at, this.artifacts.rwa.CompiledMirrorToken.abi, this.signer))].entries()) {
+      for (const role of ['MINTER_ROLE', 'DEFAULT_ADMIN_ROLE']) await grant(token, index ? `token:${await token.getAddress()}` : 'token', role);
+    }
+    if (gas) txs.gas = (await (await this.signer.sendTransaction({ to: address, value: parseEther(gas) })).wait()).hash;
+    const entry = { id: id(`handover:${address}:${Date.now()}`).slice(0, 18), at: new Date().toISOString(), type: 'signing.handover', from: this.wallets.Operator, to: address, status: 'ok', txs };
+    this.audit.push(entry);
+    await this.persist();
+    return txs;
   }
   /// A load-balanced RPC can serve a receipt from one node and the next call from a node still a
   /// block behind; a quote right after a ship would then see no strategy. Wait until the RPC reads

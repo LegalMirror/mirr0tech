@@ -74,6 +74,23 @@ export const schemas = {
   }, ['id', 'type', 'paymentId', 'wallet', 'amount', 'status']),
   PaymentReceived: obj({ received: { type: 'boolean' }, ignored: str('Event type, when not a settling payment'), payment: { type: 'object' }, settlement: ref('Settlement') }, ['received']),
   Constraints: obj({ identity: { type: ['object', 'null'], description: 'null lifts the constraint', properties: { credential: str('document | proof_of_human | selfie', { example: 'document' }), actions: { type: 'array', items: { type: 'string', enum: ['mint', 'burn', 'transfer'] }, example: ['mint', 'transfer'] }, quote: str('The sentence of the agreement this enforces, verbatim; defaults to the current constraint\'s'), clause: str('Where it is in the agreement') } } }),
+  Signing: obj({
+    provider: str('key | multibaas'), address: str('The signing address now'), balance: str('Its ETH balance'), fileKey: str('The file key the gateway started with'),
+    multibaas: { type: 'boolean', description: 'A MultiBaas client is configured' },
+    wallet: { type: ['object', 'null'], properties: { address: str('Cloud Wallet address'), keyName: str('Key name in the vault'), vaultName: { type: ['string', 'null'] } } },
+    hsm: { type: ['object', 'null'], description: 'What MultiBaas holds: Azure accounts and Cloud Wallets', properties: { configs: { type: 'array', items: { type: 'object' } }, wallets: { type: 'array', items: obj({ address: str('Address'), keyName: str('Key'), vaultName: { type: ['string', 'null'] } }) } } },
+    steps: { type: 'object', description: 'On a switch: config, key, handover (role grants and gas, by tx hash)' },
+  }, ['provider', 'address']),
+  SigningRequest: {
+    type: 'object', required: ['provider'],
+    properties: {
+      provider: str('key | multibaas', { example: 'multibaas' }),
+      azure: obj({ label: str('A name for this account'), clientID: str('Azure application id'), clientSecret: str('Its secret; goes to MultiBaas, never stored here'), tenantID: str('Directory id'), subscriptionID: str('Subscription'), baseGroupName: str('Resource group') }),
+      key: obj({ clientID: str('The Azure application id above'), keyName: str('Key name'), vaultName: str('Key Vault name'), keyVersion: str('Existing key version (omit with create)'), create: { type: 'boolean', description: 'Create the key in the vault' }, useHardwareModule: { type: 'boolean', description: 'HSM-backed key (default true)' } }, ['clientID', 'keyName', 'vaultName']),
+      wallet: str('The Cloud Wallet address to sign from; the only one when omitted'),
+      gas: str('ETH to send the wallet for gas', { example: '0.05' }),
+    },
+  },
   Facts: { type: 'object', additionalProperties: { type: 'boolean' }, description: 'Fact name → value; names come from the policy factOrder', example: { kycApproved: true, amlApproved: true, sanctionsClear: true } },
   Decision: obj({ wallet: str('Name'), address: str('Address'), action: str('Policy action'), allowed: { type: 'boolean' }, clauseId: { type: 'integer' }, clause: { type: ['object', 'null'], description: 'The deciding clause: ruleId, clause, quote' }, facts: { type: 'object' }, sanctioned: { type: 'boolean' }, screeningCurrent: { type: 'boolean' } }),
   AuditEntry: obj({ id: str('Entry id'), at: str('ISO time'), type: str('attest | worldid.verify | rwa.* | credit.* | payment.settle | sanction | override'), status: str('ok | refused | held'), txHash: { type: ['string', 'null'] }, refusal: { type: ['object', 'null'] } }, ['id', 'at', 'type', 'status']),
@@ -108,6 +125,7 @@ function openapiBase(serverUrl, agreementId) {
       { name: 'Agreements', description: 'The core loop: upload → generate → verify → compile → deploy' },
       { name: 'Webhooks', description: 'Endpoints other systems call. Signed, never bearer-authenticated, always 2xx once verified so the caller does not retry a policy decision.' },
       { name: 'Stack', description: 'The deployed two-act stack: facts, identity, the fund token and its pool, the credit market and its buyback' },
+      { name: 'Settings', description: 'Platform settings the issuer configures: key custody' },
       { name: 'Dashboard', description: 'Read models and lender operations the dashboard uses' },
     ],
     paths: {
@@ -173,6 +191,14 @@ function openapiBase(serverUrl, agreementId) {
       '/v1/stack/audit': { get: op('Stack', 'The local audit, oldest first', { responses: ok({ type: 'array', items: ref('AuditEntry') }) }) },
       '/v1/stack/events': { get: op('Stack', 'Indexed events (MultiBaas when registered, else the local audit)', { params: [{ name: 'contract', in: 'query', schema: { type: 'string' }, description: 'MultiBaas contract label, e.g. mirr0tech_policy_attestor' }, { name: 'event', in: 'query', schema: { type: 'string' }, description: 'Event signature, e.g. Attested(address,bytes32,uint256,uint256,uint32)' }], responses: ok(obj({ source: str('local | multibaas'), events: { type: 'array', items: { type: 'object' } } })) }) },
 
+      '/v1/settings/signing': {
+        get: op('Settings', 'Who signs for the operator, and what the vault offers', { responses: ok(ref('Signing')) }),
+        put: op('Settings', 'Move signing into a MultiBaas Cloud Wallet (HSM), or back to the file key', {
+          description: 'With `provider: multibaas`: registers the Azure Key Vault account (`azure`) and the key (`key`, `create: true` to make one) with MultiBaas when given, picks the Cloud Wallet (`wallet`, or the only one), hands the operator roles on the attestor and every fund token to it plus `gas` ETH, and signs from the vault from then on. The choice persists across restarts. `provider: key` returns to the file key.',
+          body: ref('SigningRequest'),
+          responses: { ...ok(ref('Signing'), 'Switched; `steps` lists what was done'), 400: error('INVALID_BODY or NO_HSM_WALLET'), 502: error('MULTIBAAS: the vault refused'), 503: error('NO_MULTIBAAS: no MultiBaas configured') },
+        }),
+      },
       '/v1/policy/profiles': { get: op('Dashboard', 'The compiled profiles with coverage', { responses: ok({ type: 'array', items: { type: 'object' } }) }) },
       '/v1/policy': { get: op('Dashboard', 'One profile\'s compiled reading', { params: [{ name: 'profile', in: 'query', schema: { type: 'string' } }], responses: ok({ type: 'object' }) }) },
       '/v1/lenders': { get: op('Dashboard', 'Parties under a profile with their standing', { params: [{ name: 'profile', in: 'query', schema: { type: 'string' } }], responses: ok({ type: 'array', items: { type: 'object' } }) }) },

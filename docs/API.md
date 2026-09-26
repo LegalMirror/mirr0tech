@@ -23,6 +23,10 @@ Bearer token `local-dev-stack-operator-key-only` (or `API_KEY`). Demo wallets (`
 
 Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { name, clause: { clause, quote, ruleId } } } } }`.
 
+## Key custody
+
+`GET /v1/settings/signing` says who signs for the operator (the file key, or a MultiBaas Cloud Wallet), its balance, and what the vault holds. `PUT /v1/settings/signing { provider: "multibaas", azure?, key?, wallet?, gas? }` moves signing into an HSM-backed key: `azure` registers the Key Vault account with MultiBaas, `key` adds an existing key (`keyVersion`) or creates one (`create: true`), `wallet` names the Cloud Wallet (the only one when omitted); the gateway then hands its roles (attestor, fund tokens) and `gas` ETH to that address and signs every attestation, mint and deploy through MultiBaas from then on. The choice persists in `${DATA_DIR}/signing-<chainId>.json`; `SIGNER=multibaas` at boot does the same; `{ provider: "key" }` returns to the file key. `src/signing.js`, `src/multibaas-signer.js`, `VenueService.handover`; tests `test/signing.test.js`, `test/chain/signing.test.js` (anvil's unlocked account stands in for the vault).
+
 ## Payment webhook
 
 `POST /webhooks/payments` takes a payment rail's event (Stripe shape; a wire notification in the same shape works) signed with `PAYMENT_WEBHOOK_SECRET` under `Stripe-Signature` (`t=<unix>,v1=<HMAC-SHA256 of "<t>.<raw body>">`, 5-minute tolerance). No bearer: the signature is the credential. A settled USD event (`payment_intent.succeeded`, `charge.succeeded`, `wire.received`) with `metadata.wallet` attests `depositConfirmed` for that wallet (merged into its facts), then asks the policy about `mint`: allowed → mint to custody and release to the wallet; refused → the money is **held** and the audit names the sentence. Same event id twice settles once (`replay: true`). Other event types answer `{ received: true, ignored }`. Always 2xx once the signature verifies, so the rail never retries a policy decision. `src/payments.js`, `VenueService.settlePayment`; tests `test/payments.test.js`, `test/chain/payments.test.js`.

@@ -6,6 +6,7 @@ import { dashboardRoutes } from './dashboard-api.js';
 import { agreementRoutes, stackStatus } from './agreements-api.js';
 import { paymentWebhook } from './payments.js';
 import { openapiDocument, swaggerHtml } from './openapi.js';
+import { signingRoutes } from './signing.js';
 
 function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
@@ -15,7 +16,7 @@ function bodyFields(body, required, optional = []) {
 const VIEWER_POSTS = new Set(['/stack/credit/buyback/quote']);
 
 /// `viewerKey`, when set, opens the GET routes and quotes only: a dashboard build can carry it without carrying the operator key.
-export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null, { paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET ?? null } = {}) {
+export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null, { paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET ?? null, signing = null } = {}) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
   if (viewerKey && (viewerKey.length < 24 || viewerKey === apiKey)) throw new Error('Set VIEWER_KEY to at least 24 characters, different from API_KEY');
   const app = express();
@@ -48,6 +49,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
   app.use(express.json({ limit: '32kb' }));
   if (venues) app.use('/v1/stack', venueRoutes(venues));
   if (agreements) app.use('/v1', agreementRoutes(agreements, () => stackStatus(venues)));
+  if (signing) app.use('/v1', signingRoutes(signing));
   // The dashboard's routes take the place of the custodial ledger's when only the stack is served.
   if (venues && policyData && !service) app.use('/v1', dashboardRoutes(venues, policyData));
   if (service) {

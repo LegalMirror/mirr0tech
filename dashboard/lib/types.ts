@@ -177,7 +177,23 @@ export type Verification = {
     disputed: boolean;
     score: number;
   }[];
-  confidence: { overall: number; byRef: Record<string, number>; verified: number; total: number };
+  /** What an evaluator pushed back on, with its counter-position and how sure it was */
+  contested: {
+    key: string | null;
+    ref: string | null;
+    claim: string;
+    evaluator: string;
+    position: string;
+    confidence: "high" | "medium" | "low";
+    verdict: string | null;
+  }[];
+  confidence: {
+    overall: number;
+    byRef: Record<string, number>;
+    verified: number;
+    total: number;
+    counts: { verified: number; contested: number; unverified: number; wrong: number; unknown: number };
+  };
 };
 
 export type PolicyData = {

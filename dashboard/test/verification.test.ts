@@ -28,7 +28,14 @@ const verification: Verification = {
       score: 0.5,
     },
   ],
-  confidence: { overall: 0.93, byRef: { "rule:a": 1, "unresolved:x": 0.5 }, verified: 1, total: 2 },
+  contested: [],
+  confidence: {
+    overall: 0.93,
+    byRef: { "rule:a": 1, "unresolved:x": 0.5 },
+    verified: 1,
+    total: 2,
+    counts: { verified: 1, contested: 0, unverified: 1, wrong: 0, unknown: 0 },
+  },
 };
 
 describe("verification", () => {
@@ -39,7 +46,7 @@ describe("verification", () => {
     expect(claimsFor(verification, "rule:a")).toHaveLength(1);
     expect(claimsFor(undefined, "rule:a")).toEqual([]);
     expect(verificationSentence(verification)).toBe(
-      "1 of 2 claims verified by Noolog agents extractor and critic over 2 rounds · confidence 0.93 (high)"
+      "1 of 2 claims verified by extractor and critic over 2 rounds · confidence 0.93 (high)"
     );
   });
 });

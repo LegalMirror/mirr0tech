@@ -4,8 +4,11 @@ import { once } from 'node:events';
 import { NoologClient, NoologError } from '../src/noolog/client.js';
 import { createMockNoolog, claimsOf } from '../src/noolog/mock.js';
 import { verificationFrom, VERDICT_WEIGHT } from '../src/noolog/verify.js';
-import { deliberateExtraction, deliberationRequest } from '../src/noolog/deliberate.js';
+import { extractWithNoolog, chatRequest } from '../src/noolog/extract.js';
+import { deliberationRequest } from './noolog-request.js';
 import { document, envelope } from './helpers.js';
+import { readDocuments } from '../src/policy/document.js';
+import { mlaFixture } from '../src/policy/mla-fixture.js';
 
 test('the client sends the bearer token and surfaces the orchestrator status codes', async () => {
   const calls = [];
@@ -28,6 +31,12 @@ test('the mock deliberates a candidate extraction end to end over HTTP with the 
     await assert.rejects(client.startDeliberation({ room_id: 'r', agent_names: ['one'] }), (e) => e.status === 400, 'fewer than two agents');
     const request = deliberationRequest({ profile: 'custodial-rwa', envelope, document });
     const { job_id: jobId } = await client.startDeliberation(request);
+    const chat = await client.chatCompletion(chatRequest({ profile: 'custodial-rwa', document, draft: envelope.ast }));
+    assert.equal(chat.completion.object, 'chat.completion');
+    assert.match(chat.jobId, /^[0-9a-f-]{36}$/);
+    assert.equal(JSON.parse(chat.completion.choices[0].message.content).rules.length, envelope.ast.rules.length);
+    const noDraft = await fetch(`${url}/v1/chat/completions`, { method: 'POST', headers: { Authorization: 'Bearer secret', 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content: 'x' }] }) });
+    assert.equal(noDraft.status, 422, 'the mock needs a draft to deliberate over');
     assert.match(jobId, /^[0-9a-f-]{36}$/);
     await assert.rejects(client.startDeliberation(request), (e) => e.status === 409, 'the room is busy until the job completes');
     const first = await client.status(jobId);
@@ -54,15 +63,17 @@ test('claims are checked against the document: a fabricated quote is wrong and d
   const claims = claimsOf(forged.ast, document.text);
   assert.equal(claims.find((c) => c.key === `rule:${forged.ast.rules[0].id}:quote`).verdict, 'wrong');
   assert.ok(claims.some((c) => c.verdict === 'unverified'), 'open items are unverified, never verified');
-  const report = await deliberateExtraction({ profile: 'custodial-rwa', envelope: forged, document });
+  const { envelope: generated, verification: report } = await extractWithNoolog({ profile: 'custodial-rwa', document, draft: forged.ast });
   assert.equal(report.mock, true);
   assert.ok(report.confidence.overall > 0 && report.confidence.overall < 1);
-  assert.equal(JSON.parse(report.finalResult).rules.length, forged.ast.rules.length - 1, 'the winner dropped the forged rule');
+  assert.equal(generated.ast.rules.length, forged.ast.rules.length - 1, 'the winner dropped the forged rule');
+  assert.equal(generated.extraction.provider, 'noolog');
+  assert.equal(generated.extraction.responseId, report.jobId);
   assert.ok(!report.claims.some((c) => c.ref === `rule:${forged.ast.rules[0].id}`), 'the winner carries no claim about the dropped rule');
 });
 
 test('the verification report scores every rule, term and open item from the winner\'s verdicts', async () => {
-  const report = await deliberateExtraction({ profile: 'custodial-rwa', envelope, document });
+  const { verification: report } = await extractWithNoolog({ profile: 'custodial-rwa', document, draft: envelope.ast });
   assert.equal(report.provider, 'noolog');
   assert.deepEqual(report.agents, ['extractor', 'critic']);
   assert.equal(report.rounds, 2);
@@ -74,4 +85,19 @@ test('the verification report scores every rule, term and open item from the win
   const empty = verificationFrom({ jobId: 'x', details: { history: [], rounds: [] }, references: { rounds: [], edges: [], hunk_edges: [], winner: null } });
   assert.equal(empty.winner, null);
   assert.equal(empty.confidence.overall, 0);
+});
+
+test('the critic contests quotes that repeat in the agreement or are too short to anchor a clause', async () => {
+  const bundle = await readDocuments(['test/human_contracts/wildcat-mla.md', 'test/human_contracts/lender-check-policy.md', 'test/human_contracts/buyback-addendum.md']);
+  const credit = mlaFixture(bundle);
+  const { envelope: generated, verification: report } = await extractWithNoolog({ profile: 'wildcat-credit', document: bundle, draft: credit.ast });
+  assert.equal(generated.ast.rules.length, credit.ast.rules.length, 'contested claims stay; only wrong ones drop');
+  assert.ok(report.confidence.counts.contested >= 2, 'the MLA repeats itself: at least two quotes are ambiguous');
+  assert.equal(report.confidence.counts.wrong, 0);
+  assert.ok(report.contested.every((item) => item.evaluator === 'critic' && item.position && ['medium', 'high'].includes(item.confidence)));
+  const ambiguous = report.contested.find((item) => item.ref === 'rule:deposit-not-insolvent');
+  assert.ok(ambiguous, 'the not-insolvent quote appears twice');
+  assert.match(ambiguous.position, /occur elsewhere/);
+  assert.equal(report.confidence.byRef['rule:deposit-not-insolvent'], (0.25 + 1) / 2, 'one contested claim and one verified claim about the rule');
+  assert.ok(report.confidence.overall < 1 && report.confidence.overall > 0.8);
 });

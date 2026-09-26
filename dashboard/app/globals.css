@@ -1961,3 +1961,17 @@ blockquote.why {
 .verified-line {
   margin-top: 4px;
 }
+
+.verification {
+  margin: var(--sp-md) 0;
+}
+.schema {
+  margin: 0;
+  padding: 10px 12px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}

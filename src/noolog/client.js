@@ -18,6 +18,18 @@ export class NoologClient {
   }
   /// POST /deliberation → { job_id }
   startDeliberation(body) { return this.call('POST', '/deliberation', body); }
+  /// POST /v1/chat/completions (OpenAI-compatible, deliberating model). The job behind the answer is
+  /// named by the x-nsed-session-id header, so its history and reference tree can be read afterwards.
+  async chatCompletion(body) {
+    const response = await this.fetchImpl(`${this.url}/v1/chat/completions`, {
+      method: 'POST', headers: { Authorization: `Bearer ${this.apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new NoologError(response.status, `POST /v1/chat/completions: ${response.status} ${await response.text().catch(() => '')}`.trim());
+    const completion = await response.json();
+    const jobId = response.headers?.get?.('x-nsed-session-id') ?? completion.nsed_metadata?.session_id ?? null;
+    if (!jobId) throw new NoologError(502, 'The completion named no deliberation job (x-nsed-session-id)');
+    return { completion, jobId };
+  }
   /// GET /deliberation/{id}/result → { job_id, status, result }
   status(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/result`); }
   details(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/details`); }

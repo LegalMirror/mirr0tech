@@ -126,7 +126,13 @@ describe("verification export", () => {
     expect(v.agents).toEqual(["extractor", "critic"]);
     expect(v.confidence.overall).toBeGreaterThan(0.5);
     expect(v.confidence.overall).toBeLessThanOrEqual(1);
-    for (const rule of policy.rules) expect(v.confidence.byRef[`rule:${rule.id}`]).toBe(1);
+    for (const rule of policy.rules) {
+      expect(v.confidence.byRef[`rule:${rule.id}`]).toBeGreaterThan(0);
+      expect(v.confidence.byRef[`rule:${rule.id}`]).toBeLessThanOrEqual(1);
+    }
+    expect(v.confidence.counts.contested).toBeGreaterThan(0);
+    expect(v.contested.length).toBe(v.confidence.counts.contested);
+    expect(v.contested.every((item) => item.position.length > 0)).toBe(true);
     expect(v.claims.every((c) => c.verdicts.length > 0)).toBe(true);
   });
 });

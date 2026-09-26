@@ -11,7 +11,7 @@ import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { buildOnchainPolicy } from '../src/policy/onchain.js';
 import { auditEvents } from '../src/audit-events.js';
-import { deliberateExtraction } from '../src/noolog/deliberate.js';
+import { extractWithNoolog } from '../src/noolog/extract.js';
 import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -402,13 +402,12 @@ export function coverageOf({ parts, rules, terms, unresolved, enforcedBy }) {
 
 export async function exportProfile(spec) {
   const document = await readDocuments(spec.documents.map(at));
-  const envelope = spec.fixture(document);
+  // The extraction is a Noolog deliberation over the document (the hand-authored reading is the draft it starts from).
+  const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast });
   const config = JSON.parse(await readFile(at(spec.config), 'utf8'));
   const compiled = compilePolicy(envelope, config, document, { demo: true });
   const onchain = buildOnchainPolicy(envelope.ast);
   if (onchain.clauseTableHash !== compiled.policy.clauseTableHash) throw new Error('On-chain policy disagrees with the compiled policy');
-  // The extraction goes through a Noolog deliberation: agents check every claim against the text.
-  const { finalResult: _finalResult, ...verification } = await deliberateExtraction({ profile: spec.profile, envelope, document });
 
   // Per-part display text, and each part's offset inside the bundled normalized text.
   const parts = [];

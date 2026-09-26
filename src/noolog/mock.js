@@ -11,20 +11,30 @@ const claimId = (key) => createHash('sha256').update(key).digest('hex').slice(0,
 const mean = (values) => (values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0);
 
 /// The claims a candidate extraction makes, each checkable against the document text.
+const SHORT_QUOTE = 30;
+/// The critic's reading of a quote: not in the text → wrong; in the text more than once or too short
+/// to anchor one clause → contested; otherwise verified.
+export function quoteVerdict(quote, text) {
+  const occurrences = text.split(quote).length - 1;
+  if (occurrences === 0) return { verdict: 'wrong', reason: 'quote is not in the document', position: 'the quote is not in the document' };
+  if (occurrences > 1) return { verdict: 'contested', reason: `quote appears ${occurrences} times; the anchor is ambiguous`, position: 'the same words occur elsewhere in the agreement; cite the clause that governs' };
+  if (quote.length < SHORT_QUOTE) return { verdict: 'contested', reason: `quote is ${quote.length} characters; too short to anchor a clause on its own`, position: 'quote more of the sentence so the rule cannot be read out of context' };
+  return { verdict: 'verified', reason: 'quote found verbatim, once, in the document', position: null };
+}
+
 export function claimsOf(ast, text) {
   const claims = [];
-  const verbatim = (quote) => text.includes(quote);
   for (const rule of ast.rules ?? []) {
-    claims.push({ key: `rule:${rule.id}:quote`, claim: `${rule.source.clause} says “${rule.source.quote}”`,
-      verdict: verbatim(rule.source.quote) ? 'verified' : 'wrong', reason: verbatim(rule.source.quote) ? 'quote found verbatim in the document' : 'quote is not in the document' });
+    const q = quoteVerdict(rule.source.quote, text);
+    claims.push({ key: `rule:${rule.id}:quote`, claim: `${rule.source.clause} says “${rule.source.quote}”`, verdict: q.verdict, reason: q.reason, position: q.position });
     const facts = [...factsIn(rule.condition)];
     const known = facts.every((name) => FACTS.includes(name));
     claims.push({ key: `rule:${rule.id}:facts`, claim: `${rule.id} reads ${facts.join(', ')} under ${rule.action}`,
       verdict: known ? 'verified' : 'contested', reason: known ? 'every fact is in the schema' : 'a fact is outside the schema' });
   }
   for (const term of ast.terms ?? []) {
-    claims.push({ key: `term:${term.name}:quote`, claim: `${term.source.clause} sets ${term.name} = ${term.value} ${term.unit ?? ''}`.trim(),
-      verdict: verbatim(term.source.quote) ? 'verified' : 'wrong', reason: verbatim(term.source.quote) ? 'quote found verbatim in the document' : 'quote is not in the document' });
+    const q = quoteVerdict(term.source.quote, text);
+    claims.push({ key: `term:${term.name}:quote`, claim: `${term.source.clause} sets ${term.name} = ${term.value} ${term.unit ?? ''}`.trim(), verdict: q.verdict, reason: q.reason, position: q.position });
   }
   for (const entry of ast.unresolved ?? []) {
     claims.push({ key: `unresolved:${entry.clause}:open`, claim: `${entry.clause} cannot be compiled: ${entry.description}`,
@@ -73,7 +83,7 @@ export function deliberate({ jobId, body }) {
           score: score(proposal.ast), justification: `${assessed.filter((c) => c.verdict === 'verified').length} of ${assessed.length} claims verified against the document`,
           token_usage: null,
           claim_assessments: assessed.map((c) => ({ claim_id: claimId(c.key), claim: c.claim, verdict: c.verdict, reason: c.reason, anchor: null })),
-          disagreements: assessed.filter((c) => c.verdict === 'wrong').map((c) => ({ claim_id: claimId(c.key), proposal_claims: c.claim, evaluator_position: 'the quote is not in the document', confidence: 'high', anchor: null })),
+          disagreements: assessed.filter((c) => c.verdict === 'wrong' || c.verdict === 'contested').map((c) => ({ claim_id: claimId(c.key), proposal_claims: c.claim, evaluator_position: c.position ?? c.reason, confidence: c.verdict === 'wrong' ? 'high' : 'medium', anchor: null })),
           stance: null, is_final_solution: round === totalRounds, category_scores: null, operator_annotations: [], edited_by: null, finish_reason: 'stop', published_at_ms: now + round * 1000 + 500,
         } }],
         aggregated_score: score(proposal.ast),
@@ -141,6 +151,25 @@ export function createMockNoolog({ apiKey = null } = {}) {
     const jobId = randomUUID();
     jobs.set(jobId, deliberate({ jobId, body }));
     res.status(202).json({ job_id: jobId });
+  });
+  // OpenAI-compatible generation: the deliberation runs, the winner's content is the answer, the job id travels in the header.
+  app.post('/v1/chat/completions', (req, res) => {
+    const body = req.body ?? {};
+    const nsed = body.nsed ?? {};
+    const text = body.messages?.find((m) => m.role === 'user')?.content;
+    const draft = body.messages?.find((m) => m.role === 'assistant')?.content;
+    if (!text) return res.status(400).json({ error: 'a user message with the document is required' });
+    if (!draft) return res.status(422).json({ error: 'the mock has no model: it deliberates over the draft in an assistant message' });
+    const roomId = nsed.room_id ?? `chat-${Date.now()}`;
+    if ([...jobs.values()].some((job) => job.roomId === roomId && statusOf(job) !== 'completed')) return res.status(409).json({ error: 'job already running for this room' });
+    const jobId = randomUUID();
+    const job = deliberate({ jobId, body: { room_id: roomId, user_query: body.messages?.find((m) => m.role === 'system')?.content ?? '', agent_names: nsed.agent_names ?? ['extractor', 'critic'], deliberation_rounds: nsed.deliberation_rounds ?? 2, messages: [{ role: 'user', content: text }, { role: 'assistant', content: draft }] } });
+    jobs.set(jobId, job);
+    res.set('x-nsed-session-id', jobId).json({
+      id: `chatcmpl-${jobId.slice(0, 8)}`, object: 'chat.completion', created: Math.floor(Date.now() / 1000), model: body.model ?? 'nsed:mock',
+      choices: [{ index: 0, message: { role: 'assistant', content: job.finalResult }, finish_reason: 'stop' }],
+      nsed_metadata: { mode: 'deliberation', session_id: jobId, rounds: job.rounds.length, winner: job.winner },
+    });
   });
   const load = (req, res) => { const job = jobs.get(req.params.id); if (!job) res.status(404).json({ error: 'job not found' }); return job; };
   app.get('/deliberation/:id/result', (req, res) => {

@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
+import { extractWithNoolog } from '../src/noolog/extract.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { astSchema } from '../src/policy/schema.js';
 import { buybackTermsFrom } from '../src/policy/programs.js';
@@ -16,14 +17,14 @@ const secondary = args.includes('--secondary');
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
 const defaults = credit
-  ? { document: 'test/human_contracts/wildcat-mla.md,test/human_contracts/lender-check-policy.md,test/human_contracts/buyback-addendum.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
+  ? { profile: 'wildcat-credit', document: 'test/human_contracts/wildcat-mla.md,test/human_contracts/lender-check-policy.md,test/human_contracts/buyback-addendum.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
   : secondary
-    ? { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/rwa-secondary-config.json', fixture: (document) => sampleFixture(document, { secondary: true }) }
-    : { document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/demo-config.json', fixture: sampleFixture };
+    ? { profile: 'rwa-secondary', document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/rwa-secondary-config.json', fixture: (document) => sampleFixture(document, { secondary: true }) }
+    : { profile: 'custodial-rwa', document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/demo-config.json', fixture: sampleFixture };
 
 // Several documents may be compiled as one bundle: pass them comma-separated.
 const document = await readDocuments((paths[1] ?? defaults.document).split(','));
-const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : defaults.fixture(document);
+const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : (await extractWithNoolog({ profile: defaults.profile, document, draft: defaults.fixture(document).ast })).envelope;
 const config = JSON.parse(await readFile(paths[2] ?? defaults.config, 'utf8'));
 const result = compilePolicy(envelope, config, document, { demo });
 

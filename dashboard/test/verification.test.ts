@@ -39,7 +39,7 @@ describe("verification", () => {
     expect(claimsFor(verification, "rule:a")).toHaveLength(1);
     expect(claimsFor(undefined, "rule:a")).toEqual([]);
     expect(verificationSentence(verification)).toBe(
-      "1 of 2 claims verified by extractor and critic over 2 rounds · confidence 0.93 (high)"
+      "1 of 2 claims verified by Noolog agents extractor and critic over 2 rounds · confidence 0.93 (high)"
     );
   });
 });

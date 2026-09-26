@@ -26,7 +26,7 @@ function Intro({ policy }: { policy: PolicyData }) {
       {policy.verification && (
         <div className="meta verified-line">
           <span className={`chip chip-${policy.verification.confidence.overall >= 0.9 ? "ok" : "review"}`}>
-            ✓ extraction verified by deliberation
+            ✓ verified by Noolog
           </span>{" "}
           {verificationSentence(policy.verification)}
         </div>

@@ -54,7 +54,7 @@ function ActCard({ act }: { act: ActData }) {
       </p>
       {policy.verification && (
         <p className="meta" title={verificationSentence(policy.verification)}>
-          Extraction verified by deliberation · confidence {policy.verification.confidence.overall.toFixed(2)}
+          Verified by Noolog · confidence {policy.verification.confidence.overall.toFixed(2)}
         </p>
       )}
       <ul className="standings">

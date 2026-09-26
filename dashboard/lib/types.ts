@@ -156,6 +156,46 @@ export type Buyback =
       } | null;
     };
 
+/** What the deliberation established about the extraction: one entry per claim, a confidence per rule. */
+export type Verification = {
+  provider: "noolog";
+  jobId: string;
+  mock: boolean;
+  agents: string[];
+  rounds: number;
+  winner: { round: number; agent: string; score: number | null } | null;
+  convergence: number | null;
+  claims: {
+    key: string;
+    ref: string;
+    claim: string;
+    verdicts: {
+      agent: string;
+      verdict: "verified" | "contested" | "unverified" | "wrong" | "unknown";
+      reason: string | null;
+    }[];
+    disputed: boolean;
+    score: number;
+  }[];
+  /** What an evaluator pushed back on, with its counter-position and how sure it was */
+  contested: {
+    key: string | null;
+    ref: string | null;
+    claim: string;
+    evaluator: string;
+    position: string;
+    confidence: "high" | "medium" | "low";
+    verdict: string | null;
+  }[];
+  confidence: {
+    overall: number;
+    byRef: Record<string, number>;
+    verified: number;
+    total: number;
+    counts: { verified: number; contested: number; unverified: number; wrong: number; unknown: number };
+  };
+};
+
 export type PolicyData = {
   schemaVersion: 1;
   profile: ProfileId;
@@ -175,6 +215,7 @@ export type PolicyData = {
   equivalenceChecks: number;
   demo: boolean;
   config: Record<string, unknown> & { assumptions: string[] };
+  verification?: Verification;
   extraction: { provider: string; model: string | null };
   factOrder: string[];
   actionOrder: string[];

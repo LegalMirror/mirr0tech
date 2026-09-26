@@ -11,6 +11,7 @@ import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { buildOnchainPolicy } from '../src/policy/onchain.js';
 import { auditEvents } from '../src/audit-events.js';
+import { extractWithNoolog } from '../src/noolog/extract.js';
 import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -401,7 +402,8 @@ export function coverageOf({ parts, rules, terms, unresolved, enforcedBy }) {
 
 export async function exportProfile(spec) {
   const document = await readDocuments(spec.documents.map(at));
-  const envelope = spec.fixture(document);
+  // The extraction is a Noolog deliberation over the document (the hand-authored reading is the draft it starts from).
+  const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast });
   const config = JSON.parse(await readFile(at(spec.config), 'utf8'));
   const compiled = compilePolicy(envelope, config, document, { demo: true });
   const onchain = buildOnchainPolicy(envelope.ast);
@@ -462,6 +464,7 @@ export async function exportProfile(spec) {
     demo: compiled.policy.demo,
     config,
     extraction: envelope.extraction,
+    verification,
     factOrder: onchain.facts,
     actionOrder: onchain.actions,
     text: document.text,

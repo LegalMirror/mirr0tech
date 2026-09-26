@@ -8,7 +8,7 @@ const cache = new Map<string, Promise<PolicyData>>();
 export function compiled(profile: ProfileId): Promise<PolicyData> {
   if (!cache.has(profile)) {
     const spec = (PROFILES as { profile: string }[]).find((entry) => entry.profile === profile);
-    cache.set(profile, exportProfile(spec) as Promise<PolicyData>);
+    cache.set(profile, exportProfile(spec) as unknown as Promise<PolicyData>);
   }
   return cache.get(profile)!;
 }

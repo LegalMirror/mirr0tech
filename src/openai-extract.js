@@ -46,7 +46,8 @@ export async function extractWorkspace({ generation = defaultGeneration(), draft
   if (generation === 'demo') {
     if (!draft) throw new Error('Demo generation supports the bundled demo documents. Choose Upload files for your own contract.');
     const ast = validateAst(draft, document.text);
-    const verification = paceMs > 0 ? await simulateDeliberation({ profile, document, draft, config, onProgress, paceMs, tickMs }) : null;
+    // Only a job someone watches is paced; the boot-time policy export reads instantly.
+    const verification = paceMs > 0 && onProgress ? await simulateDeliberation({ profile, document, draft, config, onProgress, paceMs, tickMs }) : null;
     return { envelope: { ast, source: sourceOf(document), extraction: { provider: 'demo', model: 'deterministic-fixture', ...(verification ? { simulated: true } : {}) } }, verification };
   }
   const result = await extractWithOpenAI({ document, ...options });

@@ -165,7 +165,8 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     }
   }
   try {
-    const policy = SEATED(MODEL) ? null : await client.policyFor(tagOf(MODEL));
+    // The in-process mock seats its own agents; only the orchestrator resolves NOOLOG_MODEL to a policy.
+    const policy = server || SEATED(MODEL) ? null : await client.policyFor(tagOf(MODEL));
     const policyId = policy?.policy_id ?? null;
     // The policy may run more rounds than requested; the larger bounds the progress bar.
     const rounds = Math.max(2, policy?.max_rounds ?? 2);

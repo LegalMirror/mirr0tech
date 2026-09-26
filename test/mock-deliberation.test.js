@@ -39,3 +39,25 @@ test('with a pace the fixture reading plays a simulated deliberation: rounds, a 
   assert.ok(verification.claims.length > 0);
   assert.ok(verification.confidence.overall > 0 && verification.confidence.overall <= 1);
 });
+
+test('a reading nobody watches (the boot-time policy export) is never paced, whatever the pace', async () => {
+  const started = Date.now();
+  const { verification } = await extractDemo({ profile: 'rwa-secondary', document, draft, paceMs: 5000 });
+  assert.ok(Date.now() - started < 1000);
+  assert.equal(verification, null);
+});
+
+test('the simulated seats do not depend on NOOLOG_MODEL: a gateway configured with any model name still simulates', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const script = `
+    import { extractDemo } from './src/openai-extract.js';
+    import { draftFor } from './src/agreements.js';
+    import { PROFILES } from './scripts/export-ui.js';
+    import { readDocuments } from './src/policy/document.js';
+    const document = await readDocuments(['test/human_contracts/ea026411904ex10-9.htm']);
+    const draft = draftFor(PROFILES.find((p) => p.profile === 'rwa-secondary'), document, { profile: 'rwa-secondary' });
+    const { verification } = await extractDemo({ profile: 'rwa-secondary', document, draft, paceMs: 100, tickMs: 50, onProgress: () => {} });
+    console.log(verification.mock, verification.claims.length > 0);`;
+  const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { env: { ...process.env, NOOLOG_MODEL: 'mock', NOOLOG_API_KEY: '' }, encoding: 'utf8' });
+  assert.equal(run.stdout.trim(), 'true true', run.stderr.slice(-500));
+});

@@ -1,0 +1,5 @@
+{
+  "mcpServers": {
+    "noolog-docs": { "type": "http", "url": "https://noolog.io/mcp" }
+  }
+}

@@ -12,6 +12,6 @@ export function claimsFor(verification: Verification | undefined, ref: string) {
 
 /** One sentence for the intro: who verified what, and how sure. */
 export function verificationSentence(verification: Verification): string {
-  const { confidence, agents, rounds } = verification;
-  return `${confidence.verified} of ${confidence.total} claims verified by ${agents.join(" and ")} over ${rounds} rounds · confidence ${confidence.overall.toFixed(2)} (${confidenceLabel(confidence.overall)})`;
+  const { confidence } = verification;
+  return `${confidence.verified} of ${confidence.total} claims verified · confidence ${confidence.overall.toFixed(2)} (${confidenceLabel(confidence.overall)})`;
 }

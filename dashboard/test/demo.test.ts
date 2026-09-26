@@ -79,3 +79,14 @@ describe("real demo document upload", () => {
     expect(current).toContain('data-complete="false"><strong>Compile &amp; equivalence');
   });
 });
+
+describe("short template", () => {
+  it("loads the short agreement served beside the demo bundle", async () => {
+    await mockStaticFiles();
+    const { loadShortTemplate, SHORT_TEMPLATE } = await import("@/lib/demo");
+    const template = await loadShortTemplate();
+    expect(template.name).toBe(SHORT_TEMPLATE);
+    expect(template.text).toContain("Tokenized Fund Share Agreement");
+    expect(new TextEncoder().encode(template.text).length).toBeLessThan(4000);
+  });
+});

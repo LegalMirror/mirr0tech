@@ -61,6 +61,8 @@ export class DemoWorkspaces {
       const specs = PROFILES.filter((spec) => PUBLIC_PROFILES.includes(spec.profile));
       this.configs = Object.fromEntries(await Promise.all(specs.map(async (spec) => [spec.profile, { ...JSON.parse(await readFile(new URL(`../${spec.config}`, import.meta.url), 'utf8')), profile: spec.profile }])));
       this.documentHashes = await Promise.all(['ea026411904ex10-9.htm', 'nav-cashier-addendum.md'].map(async (name) => documentFrom(name, await readFile(new URL(`../test/human_contracts/${name}`, import.meta.url))).textSha256));
+      // A short template has no fixture reading; the public demo accepts it only for a live Noolog reading.
+      this.templateHash = documentFrom('short-fund-agreement.md', await readFile(new URL('../test/human_contracts/short-fund-agreement.md', import.meta.url))).textSha256;
       return this;
     })();
     return this.ready;
@@ -235,8 +237,9 @@ export class DemoWorkspaces {
     let parts;
     try { parts = input.documents.map((part) => documentFrom(part.name, part.text)); }
     catch (error) { throw new AppError(400, 'INVALID_DOCUMENT', error.message); }
+    if (input.generation === 'noolog' && parts.length === 1 && parts[0].textSha256 === this.templateHash) return;
     const expected = input.config.cashier ? this.documentHashes : this.documentHashes.slice(0, 1);
-    unavailable(parts.length === expected.length && parts.every((part, index) => part.textSha256 === expected[index]), 'Public demo supports only the bundled BUIDL document, optionally followed by the bundled NAV cashier addendum with cashier config. New documents require the operator API; no public live model calls are made.');
+    unavailable(parts.length === expected.length && parts.every((part, index) => part.textSha256 === expected[index]), 'Public demo supports only the bundled BUIDL document, optionally followed by the bundled NAV cashier addendum with cashier config, or the short template read by Noolog. New documents require the operator API; no public live model calls are made.');
     const document = bundleDocuments(parts);
     const draft = draftFor(PROFILES.find((spec) => spec.profile === input.profile), document, input.config);
     unavailable(draft, 'No deterministic mock reading is available for these documents');

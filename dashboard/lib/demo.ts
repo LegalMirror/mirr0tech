@@ -7,6 +7,13 @@ export const DEMO_FILES = [
   { name: "rwa-cashier-config.json", label: "Opt-in cashier compiler configuration", role: "config" },
 ] as const;
 export const demoUrl = (name: string) => `${BASE}/demo/${name}`;
+/** A two-page agreement a live Noolog reading finishes quickly; it has no fixture reading. */
+export const SHORT_TEMPLATE = "short-fund-agreement.md";
+export async function loadShortTemplate(signal?: AbortSignal): Promise<{ name: string; text: string }> {
+  const response = await fetch(demoUrl(SHORT_TEMPLATE), { signal });
+  if (!response.ok) throw new Error(`Could not load ${SHORT_TEMPLATE}. Run pnpm run demo:sync in dashboard and retry.`);
+  return { name: SHORT_TEMPLATE, text: await response.text() };
+}
 export async function loadDemoBundle(signal?: AbortSignal): Promise<Upload> {
   const files = await Promise.all(
     DEMO_FILES.map(async (file) => {

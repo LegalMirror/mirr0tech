@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { demoUrl, loadDemoBundle } from "@/lib/demo";
+import { demoUrl, loadDemoBundle, loadShortTemplate } from "@/lib/demo";
 import { CREDENTIAL_COPY } from "@/lib/identity";
 import { gatewayUrl, hasGatewaySession, setSession, type GatewaySession } from "@/lib/session";
 import { startDemoWorkspace } from "@/lib/demo-session";
@@ -196,7 +196,28 @@ export function UploadDialog({
       });
     return () => controller.abort();
   }, [mode, demoRetry]);
-  const demoDocuments = bundle?.documents.filter((_, index) => cashierDemo || index === 0) ?? [];
+  // Only a live Noolog reading can read the short template; the BUIDL bundle also has a fixture reading.
+  const noolog = status?.model.provider === "noolog";
+  const [buidl, setBuidl] = useState(false);
+  const short = noolog && !buidl;
+  const [template, setTemplate] = useState<{ name: string; text: string } | null>(null);
+  useEffect(() => {
+    if (mode !== "demo" || !short || template) return;
+    const controller = new AbortController();
+    loadShortTemplate(controller.signal)
+      .then((value) => {
+        if (!controller.signal.aborted) setTemplate(value);
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) setDemoError(error.message);
+      });
+    return () => controller.abort();
+  }, [mode, short, template, demoRetry]);
+  const demoDocuments = short
+    ? template
+      ? [template]
+      : []
+    : (bundle?.documents.filter((_, index) => cashierDemo || index === 0) ?? []);
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -212,13 +233,17 @@ export function UploadDialog({
         mode === "demo"
           ? demoDocuments
           : await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
-      const generation = generationFor({ provider: status?.model.provider, localWorkspace: Boolean(localWorkspace), mode });
+      const generation = generationFor({
+        provider: status?.model.provider,
+        localWorkspace: Boolean(localWorkspace),
+        mode,
+      });
       const upload: Upload = {
         name: name.trim(),
         ...(generation ? { generation } : {}),
         profile: mode === "demo" ? "rwa-secondary" : profile,
         documents,
-        ...(mode === "demo" && cashierDemo ? { config: bundle?.config } : {}),
+        ...(mode === "demo" && !short && cashierDemo ? { config: bundle?.config } : {}),
       };
       validateUpload(upload);
       await onUpload(upload);
@@ -293,27 +318,39 @@ export function UploadDialog({
         </div>
         {mode === "demo" ? (
           <div className="wb-demo-bundle">
-            <h3>BUIDL contract → executable policy</h3>
+            {noolog && (
+              <div className="wb-segmented" aria-label="Demo agreement">
+                <button type="button" aria-pressed={short} onClick={() => setBuidl(false)}>
+                  Short agreement
+                </button>
+                <button type="button" aria-pressed={!short} onClick={() => setBuidl(true)}>
+                  BUIDL contract
+                </button>
+              </div>
+            )}
+            <h3>{short ? "Short fund agreement" : "BUIDL contract"} → executable policy</h3>
             <p>
-              {status?.model.provider === "noolog"
-                ? "Noolog legal models read the bundled contract and check each other's claims."
+              {noolog
+                ? `Noolog legal models read the ${short ? "two-page agreement (a few minutes)" : "full BUIDL contract (longer)"} and check each other's claims.`
                 : "Generate a sample AST from the bundled contract using a deterministic fixture. No API key is needed."}
             </p>
-            <label className="wb-check">
-              <input
-                type="checkbox"
-                checked={cashierDemo}
-                onChange={(event) => setCashierDemo(event.target.checked)}
-              />
-              Include the separate NAV demo addendum and opt in to the cashier compiler
-            </label>
-            {cashierDemo && (
+            {!short && (
+              <label className="wb-check">
+                <input
+                  type="checkbox"
+                  checked={cashierDemo}
+                  onChange={(event) => setCashierDemo(event.target.checked)}
+                />
+                Include the separate NAV demo addendum and opt in to the cashier compiler
+              </label>
+            )}
+            {!short && cashierDemo && (
               <Notice>
                 The addendum is separately authored—not BlackRock or Securitize economics. Upload will include
                 cashier.enabled=true. No real assets, reserves or NAV feed are implied.
               </Notice>
             )}
-            {!bundle && !demoError && <p role="status">Loading bundled documents…</p>}
+            {!demoDocuments.length && !demoError && <p role="status">Loading bundled documents…</p>}
             {demoError && (
               <Notice error>
                 {demoError}
@@ -333,7 +370,7 @@ export function UploadDialog({
                 <pre className="wb-json">{document.text}</pre>
               </details>
             ))}
-            {cashierDemo && bundle?.config && (
+            {!short && cashierDemo && bundle?.config && (
               <details>
                 <summary>rwa-cashier-config.json · compiler config, not a contract</summary>
                 <a href={demoUrl("rwa-cashier-config.json")} download>

@@ -449,3 +449,19 @@ test('EXTRACTOR=noolog with a key makes Noolog the hosted demo\'s default reader
     for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
   }
 });
+
+test('the short template is a public upload for a Noolog reading only; other new documents stay operator-only', async () => {
+  const { workspaces } = await service();
+  const text = await readFile(new URL('./human_contracts/short-fund-agreement.md', import.meta.url), 'utf8');
+  const short = { name: 'Short fund', documents: [{ name: 'short-fund-agreement.md', text }] };
+  const saved = process.env.NOOLOG_API_KEY;
+  try {
+    process.env.NOOLOG_API_KEY = 'test-only-never-send';
+    workspaces.supported(workspaces.prepare({ ...short, generation: 'noolog' }));
+    assert.throws(() => workspaces.supported(workspaces.prepare({ ...short, generation: 'demo' })), rejected(503, 'UNAVAILABLE'), 'no fixture reads it');
+    const edited = { ...short, documents: [{ name: 'short-fund-agreement.md', text: `${text}\n## 9. Extra\nAnything.` }] };
+    assert.throws(() => workspaces.supported(workspaces.prepare({ ...edited, generation: 'noolog' })), rejected(503, 'UNAVAILABLE'), 'only the template itself');
+  } finally {
+    if (saved === undefined) delete process.env.NOOLOG_API_KEY; else process.env.NOOLOG_API_KEY = saved;
+  }
+});

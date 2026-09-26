@@ -21,3 +21,21 @@ it("the upload dialog offers no Noolog toggle", () => {
   );
   expect(html).not.toContain("Deliberate with Noolog");
 });
+
+const statusWith = (provider: string) =>
+  ({ model: { provider, mode: "live", model: "m" }, compiler: { solidity: {} }, chain: { chainId: 11155111 } }) as never;
+
+it("with Noolog reading, the demo offers the short agreement first", () => {
+  const html = renderToStaticMarkup(
+    createElement(UploadDialog, { onClose: () => {}, onUpload: async () => {}, writable: true, status: statusWith("noolog") })
+  );
+  expect(html).toContain("Short agreement");
+  expect(html).toMatch(/aria-pressed="true"[^>]*>Short agreement/);
+});
+
+it("without Noolog the demo stays on the BUIDL contract, the only one with a fixture reading", () => {
+  const html = renderToStaticMarkup(
+    createElement(UploadDialog, { onClose: () => {}, onUpload: async () => {}, writable: true, status: statusWith("openai") })
+  );
+  expect(html).not.toContain("Short agreement");
+});

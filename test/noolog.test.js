@@ -114,9 +114,10 @@ test('a request names a fresh room each run, seats only the generic model, and a
   assert.equal(policy.model, 'nsed:legal_rwa_pro');
   assert.equal(policy.nsed.agent_names, undefined, 'the policy brings its own seats');
   assert.equal(policy.nsed.deliberation_rounds, 2);
-  const broke = { startDeliberation: async () => { throw new NoologError(429, 'POST /deliberation: 429 {"error":"Insufficient budget","credits_remaining":0.0,"estimated_cost":50.0}'); } };
+  const seats = { policyFor: async () => ({ policy_id: 'b245' }) };
+  const broke = { ...seats, startDeliberation: async () => { throw new NoologError(429, 'POST /deliberation: 429 {"error":"Insufficient budget","credits_remaining":0.0,"estimated_cost":50.0}'); } };
   await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: broke }), /out of credits \(429\)/);
-  const down = { startDeliberation: async () => { throw new NoologError(500, 'boom'); } };
+  const down = { ...seats, startDeliberation: async () => { throw new NoologError(500, 'boom'); } };
   await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: down }), /boom/);
 });
 
@@ -132,6 +133,14 @@ test('the native submit carries the instructions in the user turn, the draft as 
   const generic = deliberationRequest({ profile: 'rwa-secondary', document });
   assert.deepEqual(generic.agent_names, ['extractor', 'critic']);
   assert.equal(generic.messages.length, 1);
+
+  // Live, the draft stays home: a fake orchestrator sees the document alone under the policy.
+  const seats = { policyFor: async () => ({ policy_id: 'b245' }) };
+  const sent = [];
+  const live = { ...seats, startDeliberation: async (body) => { sent.push(body); throw new NoologError(500, 'stop here'); } };
+  await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, draft: envelope.ast, client: live, live: true }), /stop here/);
+  assert.equal(sent[0].policy_id, 'b245');
+  assert.equal(sent[0].messages.length, 1, 'no assistant turn for the legal seats');
 
   // Progress: the mock walks pending → running → completed and the caller sees every step.
   const seen = [];
@@ -186,4 +195,26 @@ test('the models the token may name are listed, the mock included', async () => 
     const client = new NoologClient({ url: `http://127.0.0.1:${server.address().port}`, apiKey: 'secret' });
     assert.deepEqual(await client.models(), ['nsed:deep', 'nsed:legal_rwa_pro']);
   } finally { server.close(); }
+});
+
+test('the report reads the orchestrator\'s own tree: winner from final_result, claims from the winner\'s round, scores in [-1, 1]', async () => {
+  const { verificationFrom } = await import('../src/noolog/verify.js');
+  const claim = (key, verdict, id) => ({ key, claim_id: id, claim: `claim ${id}`, anchor: null, verdicts: [{ evaluator_agent_id: 'RwaCompliance', verdict }], disputed: verdict === 'contested' });
+  const references = { rounds: [
+    { round: 1, proposals: [{ author_agent_id: 'RwaCompliance', aggregated_score: -0.97, on_winner_path: false, claims: [claim('rule:a:quote', 'verified', 'c1')] }, { author_agent_id: 'RwaScrivener', aggregated_score: 0, on_winner_path: false, claims: [] }] },
+    { round: 2, proposals: [{ author_agent_id: 'RwaCompliance', aggregated_score: -0.8, on_winner_path: false, claims: [claim('rule:b:quote', 'verified', 'c2'), claim('rule:c:quote', 'contested', 'c3')] }, { author_agent_id: 'RwaScrivener', aggregated_score: 0, on_winner_path: true, claims: [] }] },
+  ], edges: [], hunk_edges: [] };
+  const details = { history: [
+    { round: 1, author_agent_id: 'RwaCompliance', proposal: {}, evaluations: [], aggregated_score: -0.97 },
+    { round: 2, author_agent_id: 'RwaScrivener', proposal: {}, evaluations: [{ evaluator_agent_id: 'RwaCompliance', evaluation: { score: 1, disagreements: [{ claim_id: 'c3', proposal_claims: 'claim c3', evaluator_position: 'no', confidence: 0.7 }] } }], aggregated_score: 0 },
+  ], rounds: [{ round: 1, convergence_score: -1 }, { round: 2, convergence_score: 0 }], final_result: { round: 2, author_agent_id: 'RwaScrivener', aggregated_score: 0 } };
+  const v = verificationFrom({ jobId: 'j', details, references });
+  assert.deepEqual(v.winner, { round: 2, agent: 'RwaScrivener', score: 0 });
+  assert.deepEqual(v.claims.map((c) => c.key), ['rule:b:quote', 'rule:c:quote'], 'the winner\'s round, not the winner alone');
+  assert.equal(v.confidence.overall, (VERDICT_WEIGHT.verified + VERDICT_WEIGHT.contested) / 2, 'the mean of the assessed claims\' verdict weights');
+  assert.deepEqual(v.confidence.counts, { verified: 1, contested: 1, unverified: 0, wrong: 0, unknown: 0 });
+  assert.equal(v.contested[0].ref, 'rule:c');
+  assert.equal(v.rounds, 2);
+  const bare = verificationFrom({ jobId: 'j', details: { history: [], rounds: [], final_result: { round: 1, author_agent_id: 'X', aggregated_score: -0.5 } }, references: { rounds: [{ round: 1, proposals: [{ author_agent_id: 'X', aggregated_score: -0.5, on_winner_path: true, claims: [] }] }] } });
+  assert.equal(bare.confidence.overall, 0.25, 'no claims anywhere: the winner\'s score mapped to [0, 1]');
 });

@@ -11,7 +11,7 @@ import { createMockNoolog } from './mock.js';
 import { verificationFrom } from './verify.js';
 
 export const AGENTS = ['extractor', 'critic'];
-export const MODEL = process.env.NOOLOG_MODEL ?? 'nsed:deep';
+export const MODEL = process.env.NOOLOG_MODEL ?? 'nsed:legal_rwa_pro';
 export const MODES = ['mock', 'noolog', 'openai'];
 
 export function extractorMode(env = process.env) {
@@ -20,7 +20,7 @@ export function extractorMode(env = process.env) {
   return mode;
 }
 
-const INSTRUCTIONS = `Read the agreement and return only JSON matching this schema: the executable rules and numeric terms, each quoting the document verbatim, and what cannot be compiled under "unresolved".
+const INSTRUCTIONS = `Read the agreement and return only JSON matching this schema: the executable rules and numeric terms, each quoting the document verbatim, and what cannot be compiled under "unresolved". Answer with the JSON object only: no prose, no headings, no code fence.
 Schema: ${JSON.stringify(astSchema)}`;
 
 // A policy model (nsed:legal_rwa_pro …) brings its own seats; only the generic model needs agents named.
@@ -85,8 +85,9 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
   }
   try {
     const policyId = SEATED(MODEL) ? null : (await client.policyFor(tagOf(MODEL))).policy_id;
+    // The legal seats review a draft instead of answering; live, they read the document alone. The mock needs the draft.
     let jobId;
-    try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft, policyId }))); } catch (error) { throw budgetError(error); }
+    try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft: server ? draft : null, policyId }))); } catch (error) { throw budgetError(error); }
     // A live deliberation with a legal seat list takes minutes; the mock answers at once.
     const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 2000), timeoutMs: 15 * 60_000, onProgress });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);

@@ -103,7 +103,7 @@ export function bindCashierClauses(onchain, ast, cashier) {
 export function emitCashierTerms(cashier) {
   if (!cashier) return null;
   if (cashier.configurationHash !== cashierConfigurationHash(cashier)) throw new Error('Cashier configuration commitment mismatch');
-  return `// SPDX-License-Identifier: UNLICENSED
+  return `// SPDX-License-Identifier: MIT
 // Only the authorization commitment is compiled in. Quote terms are constructor arguments.
 pragma solidity ^0.8.24;
 library CompiledCashierTerms {

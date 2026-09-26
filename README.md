@@ -89,7 +89,7 @@ Choose **Noolog** as the generation for an upload (`generation: "noolog"`, or `E
 
 ## How we used Curvegrid MultiBaas
 
-The MultiBaas integration (contract registration under policy-hash versions, event indexing behind `GET /v1/stack/events`, and a Cloud Wallet signer) was built and exercised on Sepolia, but is **not in this branch**: the workspace rewrite removed `src/multibaas.js`, `scripts/multibaas-sync.js` and `src/multibaas-signer.js`. They remain in git history (merge of PR #5).
+MultiBaas is the policy ledger. `scripts/multibaas-index.js` registers three contracts of the Sepolia agreement (the attestor, the fund token and the policy hook) and indexes them. `src/onchain/indexer.js` answers the dashboard's **Ledger** page with three event queries: every `PolicyChecked` decision of the hook with its clause, every `Attested` fact set, and minted and redeemed supply summed by the query language (`groupBy` + `add`). The page also shows the hook's boundaries: the callbacks it gates, the pool it guards, and the clauses that decide a transfer. `GET /v1/indexed/ledger` is public, read-only and cached for two minutes, so the free plan's 30k API calls a month hold. Limits we designed around: 10 active contracts, 2 indexed events a second, 100 blocks of backfill, so indexing starts at the link. A refused swap reverts before a transaction exists, so refusals reach the ledger only when a decision is recorded.
 
 ## How it works
 

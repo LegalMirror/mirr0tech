@@ -29,6 +29,7 @@ function nav(profile: ProfileId) {
     { href: "/queue", label: "Decisions", hint: "waiting on a person" },
     { href: "/exit", label: profile === "wildcat-credit" ? "Exit" : "Trade", hint: "venue" },
     { href: "/audit", label: "History", hint: "every decision" },
+    { href: "/ledger", label: "Ledger", hint: "indexed by MultiBaas" },
   ];
 }
 

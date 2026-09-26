@@ -15,6 +15,7 @@ import { VenueService } from '../src/onchain/venues.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp, loadPolicyData } from '../src/routes.js';
 import { WorldLogin } from '../src/world-login.js';
+import { multibaasClient, ledgerService } from '../src/onchain/indexer.js';
 import { stackRuntime, assertExpectedChain, reuseDeployment, assertWritableDataDir } from '../src/onchain/runtime-config.js';
 
 const { apiKey, viewerKey, expectedChainId } = stackRuntime();
@@ -76,6 +77,16 @@ const demoWorkspaces = process.env.PUBLIC_DEMO === 'false' ? null : await new De
   agreements, chainId: record.chainId, path: `${dataDir}/demo-workspaces-${record.chainId}.json`,
 }).init();
 const worldLogin = await WorldLogin.open();
-const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { demoWorkspaces, worldLogin }).listen(Number(process.env.PORT ?? 3000), host, () =>
+// The policy ledger: MultiBaas indexes the Sepolia agreement's attestor, token and hook (scripts/multibaas-index.js).
+const indexed = record.chainId === 11155111 ? JSON.parse(await readFile('deployments/sepolia-agreements.json', 'utf8').catch(() => '[]')).find((entry) => entry.deployment?.hook) : null;
+// Refusals come from the agreement venue's audit (live), or the committed Sepolia snapshot before the first one.
+const refusalAudit = async () => {
+  for (const path of [`${dataDir}/audit-${record.chainId}-${indexed.id}.json`, 'deployments/sepolia-agreement-audit.json']) {
+    try { return JSON.parse(await readFile(path, 'utf8')); } catch {}
+  }
+  return [];
+};
+const multibaasLedger = indexed && multibaasClient() ? ledgerService({ client: multibaasClient(), record, agreement: indexed, refusals: refusalAudit }) : null;
+const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { demoWorkspaces, worldLogin, ledger: multibaasLedger }).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

@@ -21,7 +21,7 @@ const VIEWER_POSTS = new Set(['/stack/credit/buyback/quote']);
 const isSwapRead = (req) => req.method === 'POST' && /^\/agreements\/[^/]+\/swap\/(quote|approval|transaction)$/.test(req.path);
 
 /// `viewerKey`, when set, opens the GET routes and quotes only: a dashboard build can carry it without carrying the operator key.
-export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null, { paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET ?? null, demoWorkspaces = null, worldLogin = null } = {}) {
+export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null, { paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET ?? null, demoWorkspaces = null, worldLogin = null, ledger = null } = {}) {
   if (!apiKey || apiKey.length < 24) throw new Error('Set API_KEY to at least 24 characters');
   if (viewerKey && (viewerKey.length < 24 || viewerKey === apiKey)) throw new Error('Set VIEWER_KEY to at least 24 characters, different from API_KEY');
   const app = express();
@@ -40,6 +40,8 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
     status: service?.pending() ? 'reconciliation_required' : 'ok', mode: service?.chain.mode ?? 'stack',
     policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,
   }));
+  // Indexed chain data is public already; the ledger is read-only and cached, so it needs no key.
+  if (ledger) app.get('/v1/indexed/ledger', (_req, res, next) => ledger().then((value) => res.set('Cache-Control', 'public, max-age=60').json(value)).catch(next));
   // The payment rail signs its events instead of carrying the bearer; the raw body is what it signed.
   if (venues) app.use('/webhooks', paymentWebhook(venues, paymentSecret, agreements));
   if (worldLogin) app.use('/v1/auth/world', worldLoginRoutes(worldLogin));

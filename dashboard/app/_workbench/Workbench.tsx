@@ -222,7 +222,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
       <aside className="wb-views" aria-label="Workbench views">
         <div>
           <span className="wb-eyebrow">WORKSPACE</span>
-          <h2>Views</h2>
         </div>
         <nav aria-label="Contract views">
           {views.map((item) => (
@@ -245,12 +244,12 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             <h1 title={record?.name}>
               {record?.name ?? (sample ? "Sample workspace" : "Contracts workspace")}
             </h1>
-            <span>/</span>
-            <span>
-              {!sample && record?.status === "deployed" && record.deployment
-                ? `Chain ${record.deployment.chainId}`
-                : "Offchain"}
-            </span>
+            {!sample && record?.status === "deployed" && record.deployment && (
+              <>
+                <span>/</span>
+                <span>Chain {record.deployment.chainId}</span>
+              </>
+            )}
           </div>
           <div className="wb-top-actions">
             <button

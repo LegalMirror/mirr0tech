@@ -39,7 +39,6 @@
   letter-spacing: -0.045em;
   margin-bottom: 14px;
 }
-.wb-identity-overview,
 .wb-identity-live-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -100,30 +99,6 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-}
-.wb-trust-sequence h3 {
-  font-size: 20px;
-  margin: 12px 0;
-}
-.wb-trust-sequence ol {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.wb-trust-sequence li {
-  border-bottom: 1px solid #2c3b45;
-  padding: 15px 0;
-}
-.wb-trust-sequence li strong {
-  color: #bbd3df;
-  font-size: 12px;
-  font-weight: 550;
-}
-.wb-trust-sequence li p {
-  color: #9faebd;
-  font-size: 11px;
-  margin-top: 7px;
-  line-height: 1.8;
 }
 .wb-privacy {
   font-size: 10px !important;
@@ -504,7 +479,6 @@
   font-size: 11px;
 }
 @media (max-width: 1250px) {
-  .wb-identity-overview,
   .wb-identity-live-grid {
     grid-template-columns: 1fr;
     gap: 0;

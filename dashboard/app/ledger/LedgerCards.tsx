@@ -29,7 +29,6 @@ export function Boundaries({ ledger }: { ledger: Ledger }) {
           </span>
         ))}
       </p>
-      <p className="small">Every one of these asks the agreement first. A wallet enters the pool only if these clauses allow it:</p>
       <ul className="plain-list">
         {b.transferClauses.map((clause) => (
           <li key={clause.clauseId}>
@@ -48,14 +47,7 @@ export function Boundaries({ ledger }: { ledger: Ledger }) {
 export function Decisions({ ledger }: { ledger: Ledger }) {
   return (
     <section className="card">
-      <h2>Decisions: admitted on chain, refused before a transaction</h2>
-      <p className="meta">
-        {ledger.byClause.map((entry) => (
-          <span key={String(entry.clauseId)} style={{ marginRight: 12 }}>
-            {entry.ruleId ?? "admitted"}: {entry.allowed} allowed · {entry.refused} refused
-          </span>
-        ))}
-      </p>
+      <h2>Decisions</h2>
       <ClauseBars ledger={ledger} />
       <DecisionTimeline ledger={ledger} />
       {ledger.decisions.length === 0 ? (
@@ -96,10 +88,6 @@ export function Decisions({ ledger }: { ledger: Ledger }) {
           </table>
         </div>
       )}
-      <p className="meta">
-        A refused swap reverts before a transaction exists, so MultiBaas never sees it. Those rows come from the gateway&apos;s
-        audit, which records the clause that refused.
-      </p>
     </section>
   );
 }
@@ -109,8 +97,7 @@ export function Supply({ ledger }: { ledger: Ledger }) {
     <section className="card">
       <h2>Supply and attestations</h2>
       <p>
-        <strong>{shares(ledger.supply.minted)}</strong> shares minted · <strong>{shares(ledger.supply.burned)}</strong> redeemed{" "}
-        <span className="meta">(summed by the MultiBaas query language)</span>
+        <strong>{shares(ledger.supply.minted)}</strong> shares minted · <strong>{shares(ledger.supply.burned)}</strong> redeemed
       </p>
       <ul className="plain-list">
         {ledger.attestations.slice(0, 8).map((a) => (

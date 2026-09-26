@@ -335,7 +335,7 @@ export class Agreements {
     return { ...operation };
   }
 
-  async mint(id, body) {
+  async mint(id, body, { signer = null } = {}) {
     const input = mintInput(body);
     const record = this.record(id);
     ensure(this.minter, 503, 'NO_MINTER', 'This gateway has no backend mint signer configured.');
@@ -349,7 +349,9 @@ export class Agreements {
     }
     ensure(!this.jobs.has(id), 409, 'BUSY', 'Wait for the current agreement operation to finish.');
     if (!operation) {
-      operation = { ...input, token: record.deployment.token, chainId: record.deployment.chainId, createdAt: now(), stage: 'mint' };
+      operation = { ...input, token: record.deployment.token, chainId: record.deployment.chainId, createdAt: now(), stage: 'mint',
+        ...(signer ? { signOff: { worldId: signer.id, provider: signer.provider, environment: signer.environment, credential: signer.credential ?? null, mock: Boolean(signer.mock), policyHash: record.policyHash, at: now() } } : {}) };
+      if (signer) this.log(`${record.id} mint ${input.amount} → ${input.recipient} signed off by World ID ${signer.id}`);
       record.mintOperations.push(operation);
     }
     Object.assign(operation, { status: 'pending', error: null });

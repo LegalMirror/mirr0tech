@@ -314,6 +314,9 @@ export class DemoWorkspaces {
         // A retry resends the stored operation; keep only the mint fields, as the operator API does.
         invalid(object(body), 'Expected a mint request');
         body = Object.fromEntries(['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit', 'testAttestations'].filter((key) => key in body).map((key) => [key, body[key]]));
+        // The signed-in World ID human is the issuing executive: their sign-off stands for the issuer's
+        // approvals (subscription accepted, funds received, issuance authorized). Recipient checks stay.
+        if (signer) body = { ...body, bypassSubscription: true, simulateDeposit: true, testAttestations: { ...(object(body.testAttestations) ? body.testAttestations : {}), issuerAuthorized: true, offeringCompliant: true } };
         invalid(typeof body.amount === 'string' && /^\d+(\.\d{1,6})?$/.test(body.amount) && Number(body.amount) <= PUBLIC_MINT_CAP, `A public demo mint is at most ${PUBLIC_MINT_CAP} shares`);
       }
       if (method === 'regenerate') this.mockOnly();
@@ -334,7 +337,7 @@ export class DemoWorkspaces {
         this.mockOnly();
       }
       // A deploy names the World ID human who approved it; the record binds them to the policy hash.
-      return safeRecord(await (method === 'deploy' ? this.agreements.deploy(id, { signer }) : this.agreements[method](id, body)));
+      return safeRecord(await (method === 'deploy' ? this.agreements.deploy(id, { signer }) : method === 'mint' ? this.agreements.mint(id, body, { signer }) : this.agreements[method](id, body)));
     });
   }
 }

@@ -1,0 +1,273 @@
+{
+ "source": "multibaas",
+ "url": "https://opslmgbu45agbhyjtipksqjxoq.multibaas.com",
+ "chainId": 11155111,
+ "agreement": "agr_1b8a5c438bb1",
+ "policyHash": "0xf16e378c3b6fd49c5f6e077713fb87a1bb5417d5c17a5ada44cb7f1c60fc2bfb",
+ "fetchedAt": "2026-09-26T19:40:51.058Z",
+ "contracts": [
+  {
+   "alias": "mirr0_attestor",
+   "label": "mirr0_policy_attestor",
+   "address": "0xB815feD73361792Ff2116f4BAd47BcAA3EEC28ff"
+  },
+  {
+   "alias": "mirr0_fund_token",
+   "label": "mirr0_fund_token",
+   "address": "0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE"
+  },
+  {
+   "alias": "mirr0_policy_hook",
+   "label": "mirr0_policy_hook",
+   "address": "0x326B840E25bdf27B16da9e4619741c691Ec4CA80"
+  }
+ ],
+ "boundaries": {
+  "hook": "0x326B840E25bdf27B16da9e4619741c691Ec4CA80",
+  "token": "0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE",
+  "poolId": "0xc0f464195376aadfc87f5e2de72d21282f81eba5603c78a85e93ea94e6ce03e4",
+  "poolKey": {
+   "currency0": "0x68EBB62f76ee7880d7CC71892ec8e3d25565dC67",
+   "currency1": "0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE",
+   "fee": 3000,
+   "tickSpacing": 60,
+   "hooks": "0x326B840E25bdf27B16da9e4619741c691Ec4CA80"
+  },
+  "callbacks": {
+   "beforeAddLiquidity": true,
+   "beforeRemoveLiquidity": true,
+   "beforeSwap": true
+  },
+  "transferClauses": [
+   {
+    "clauseId": 5,
+    "ruleId": "transfer-onboarded-holder",
+    "action": "transfer",
+    "effect": "permit",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+   },
+   {
+    "clauseId": 6,
+    "ruleId": "transfer-sanctions-block",
+    "action": "transfer",
+    "effect": "forbid",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "escalating and applying blocks in accordance with Sanctions Laws."
+   },
+   {
+    "clauseId": 12,
+    "ruleId": "transfer-identity-verified",
+    "action": "transfer",
+    "effect": "require",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
+   }
+  ],
+  "clauses": [
+   {
+    "clauseId": 1,
+    "ruleId": "issuance-authorized",
+    "action": "mint",
+    "effect": "permit",
+    "clause": "2.1–2.2",
+    "quote": "Securitize is authorized and directed to issue and credit"
+   },
+   {
+    "clauseId": 2,
+    "ruleId": "subscription-documents",
+    "action": "mint",
+    "effect": "require",
+    "clause": "2.2",
+    "quote": "completed Subscription Documents determined to be in good form"
+   },
+   {
+    "clauseId": 3,
+    "ruleId": "funds-received",
+    "action": "mint",
+    "effect": "require",
+    "clause": "2.2",
+    "quote": "confirmation of receipt or crediting of funds for such order"
+   },
+   {
+    "clauseId": 4,
+    "ruleId": "redemption-authorized",
+    "action": "burn",
+    "effect": "permit",
+    "clause": "2.2",
+    "quote": "redemption is legally authorized."
+   },
+   {
+    "clauseId": 5,
+    "ruleId": "transfer-onboarded-holder",
+    "action": "transfer",
+    "effect": "permit",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+   },
+   {
+    "clauseId": 6,
+    "ruleId": "transfer-sanctions-block",
+    "action": "transfer",
+    "effect": "forbid",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "escalating and applying blocks in accordance with Sanctions Laws."
+   },
+   {
+    "clauseId": 7,
+    "ruleId": "mint-onboarding",
+    "action": "mint",
+    "effect": "require",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+   },
+   {
+    "clauseId": 8,
+    "ruleId": "mint-sanctions-block",
+    "action": "mint",
+    "effect": "forbid",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "escalating and applying blocks in accordance with Sanctions Laws."
+   },
+   {
+    "clauseId": 9,
+    "ruleId": "burn-onboarding",
+    "action": "burn",
+    "effect": "require",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "and sanctions checks during onboarding of investors and apply risk rating to each investor"
+   },
+   {
+    "clauseId": 10,
+    "ruleId": "burn-sanctions-block",
+    "action": "burn",
+    "effect": "forbid",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "escalating and applying blocks in accordance with Sanctions Laws."
+   },
+   {
+    "clauseId": 11,
+    "ruleId": "mint-identity-verified",
+    "action": "mint",
+    "effect": "require",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
+   },
+   {
+    "clauseId": 12,
+    "ruleId": "transfer-identity-verified",
+    "action": "transfer",
+    "effect": "require",
+    "clause": "Exhibit A — Investor Onboarding",
+    "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
+   }
+  ]
+ },
+ "decisions": [
+  {
+   "at": "2026-09-26 19:38:12+00",
+   "tx": "0xc44397b45a4aed55a80e78eb0c76fdb21252d509d521a0fdc6dd4a4d02d747a7",
+   "subject": "0x55da01025ea2f709f746ea32db8444596b0d78ec",
+   "action": "transfer",
+   "allowed": true,
+   "clauseId": 0,
+   "clause": null
+  },
+  {
+   "at": "2026-09-26 19:37:48+00",
+   "tx": "0xbbe7b1db663d24a864d4fe8528c93a3112563524420e6be6d293cc3ca12e2b15",
+   "subject": "0x55da01025ea2f709f746ea32db8444596b0d78ec",
+   "action": "transfer",
+   "allowed": true,
+   "clauseId": 0,
+   "clause": null
+  },
+  {
+   "at": "2026-09-26 19:03:00+00",
+   "tx": "0xa14174839400e33357c57f21829be689080d82e43211e28851e7dcfde4da3ece",
+   "subject": "0x55da01025ea2f709f746ea32db8444596b0d78ec",
+   "action": "transfer",
+   "allowed": true,
+   "clauseId": 0,
+   "clause": null
+  }
+ ],
+ "byClause": [
+  {
+   "clauseId": null,
+   "ruleId": null,
+   "allowed": 3,
+   "refused": 0
+  }
+ ],
+ "attestations": [
+  {
+   "at": "2026-09-26 19:24:48+00",
+   "tx": "0x0a1932ab201a24e27edf00a3c6ef6821390295954ac5a34170ade7743385c07e",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "131259",
+   "value": "131259",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:24:36+00",
+   "tx": "0xaca7d4b9b797643f3826a8b0ac2e3e732f1c0b15a1c078d4172d38ce0e4f56ee",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "131257",
+   "value": "131257",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:24:24+00",
+   "tx": "0x04e969a224019dd78dd39f777bfdfaf225140022d52bd932fcffe136ae35bff2",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "131256",
+   "value": "131256",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:24:12+00",
+   "tx": "0xebb874c901a8e0da3adb9c8ab2acac058c064508e1e0ba558230c0638699d622",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "184",
+   "value": "184",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:24:00+00",
+   "tx": "0xdb2f2405cf3c26af6d53e7dfb879eb3ac7c680eba32522a327dc9034faa2f9fc",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "152",
+   "value": "152",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:23:36+00",
+   "tx": "0xd3ca2d52dcb1169cac978d772f4e7798bdfe9a3fa75191f866f37d98fe589a72",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "136",
+   "value": "136",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 19:23:24+00",
+   "tx": "0x1d4e84e8302b1d77ca4f7ebf41dbd4e268864dc6ccce8ac688339411ad6ebaca",
+   "subject": "0x8583ad4a0f59ba45c7e201318c6f774f31f7bbc8",
+   "known": "8",
+   "value": "8",
+   "expiresAt": 1790536980
+  },
+  {
+   "at": "2026-09-26 18:59:48+00",
+   "tx": "0xe2710678b1ff19e2a3dc20806a4e26d9f45fc5654243057d0fa6ce1a49e35816",
+   "subject": "0x55da01025ea2f709f746ea32db8444596b0d78ec",
+   "known": "131135",
+   "value": "131135",
+   "expiresAt": 1792992504
+  }
+ ],
+ "supply": {
+  "minted": "8500000000",
+  "burned": "0"
+ }
+}

@@ -70,6 +70,9 @@ export async function worldRequest<T>(url: string, path: string, body?: unknown)
     if (!response.ok) {
       const code = value?.error?.code;
       details.code = typeof code === "string" && /^[A-Z_]{1,64}$/.test(code) ? code : "HTTP_ERROR";
+      // The backend's message names the failing checks or World's refusal code; it carries no proof material.
+      const message = value?.error?.message;
+      if (typeof message === "string") details.message = message.slice(0, 400);
       if (response.status === 401) worldSessionRejected();
       throw new Error(value?.error?.message || "World ID login is unavailable. Please try again.");
     }

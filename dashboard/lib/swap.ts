@@ -22,7 +22,7 @@ export type SwapState = {
   route: "uniswap-api";
 };
 export type SwapQuote = {
-  route?: "uniswap-api";
+  route?: "uniswap-api" | "direct";
   id: string;
   expiresAt: number;
   chainId: number;

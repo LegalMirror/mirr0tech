@@ -10,6 +10,7 @@ const key = (k) => [k.currency0, k.currency1, k.fee, k.tickSpacing, k.hooks];
 /// v4-periphery Actions.sol opcodes, as hex bytes.
 export const ACTIONS = Object.freeze({ MINT_POSITION: '02', SWAP_EXACT_IN_SINGLE: '06', SETTLE_ALL: '0c', SETTLE_PAIR: '0d', TAKE_ALL: '0f' });
 const V4_SWAP = '0x10';
+const PERMIT2_PERMIT = '0x0a';
 
 export const POSITION_MANAGER = new Interface(['function modifyLiquidities(bytes unlockData, uint256 deadline) payable']);
 export const UNIVERSAL_ROUTER = new Interface(['function execute(bytes commands, bytes[] inputs, uint256 deadline) payable']);
@@ -29,7 +30,8 @@ export function mintPositionCall({ key: k, tickLower, tickUpper, liquidity, amou
   return POSITION_MANAGER.encodeFunctionData('modifyLiquidities', [unlockData, deadline]);
 }
 
-export function swapExactInSingleCall({ key: k, zeroForOne, amountIn, amountOutMinimum, deadline }) {
+/// The V4_SWAP input: SWAP_EXACT_IN_SINGLE through this pool, SETTLE_ALL what is paid, TAKE_ALL what comes out.
+export function v4SwapInput({ key: k, zeroForOne, amountIn, amountOutMinimum }) {
   const [paid, received] = zeroForOne ? [k.currency0, k.currency1] : [k.currency1, k.currency0];
   const params = [
     // Universal Router 2.1 (v4-periphery with per-hop price limits) reads minHopPriceX36 before hookData; 0 means none.
@@ -37,6 +39,17 @@ export function swapExactInSingleCall({ key: k, zeroForOne, amountIn, amountOutM
     coder.encode(['address', 'uint256'], [paid, amountIn]),
     coder.encode(['address', 'uint256'], [received, amountOutMinimum]),
   ];
-  const input = coder.encode(['bytes', 'bytes[]'], [actions(ACTIONS.SWAP_EXACT_IN_SINGLE, ACTIONS.SETTLE_ALL, ACTIONS.TAKE_ALL), params]);
-  return UNIVERSAL_ROUTER.encodeFunctionData('execute', [concat([V4_SWAP]), [input], deadline]);
+  return coder.encode(['bytes', 'bytes[]'], [actions(ACTIONS.SWAP_EXACT_IN_SINGLE, ACTIONS.SETTLE_ALL, ACTIONS.TAKE_ALL), params]);
+}
+
+export function swapExactInSingleCall({ deadline, ...swap }) {
+  return UNIVERSAL_ROUTER.encodeFunctionData('execute', [concat([V4_SWAP]), [v4SwapInput(swap)], deadline]);
+}
+
+/// One call a wallet signs for: PERMIT2_PERMIT with its signed PermitSingle, then the V4_SWAP.
+export function permitAndSwapCall({ permit, signature, deadline, ...swap }) {
+  const d = permit.details;
+  const permitInput = coder.encode(['tuple(tuple(address token,uint160 amount,uint48 expiration,uint48 nonce) details,address spender,uint256 sigDeadline)', 'bytes'],
+    [[[d.token, d.amount, d.expiration, d.nonce], permit.spender, permit.sigDeadline], signature]);
+  return UNIVERSAL_ROUTER.encodeFunctionData('execute', [concat([PERMIT2_PERMIT, V4_SWAP]), [permitInput, v4SwapInput(swap)], deadline]);
 }

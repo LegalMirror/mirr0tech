@@ -7,6 +7,7 @@ import { deployStack } from '../../src/deploy.js';
 import { VenueService } from '../../src/venues.js';
 import { loadPolicyData } from '../../src/dashboard-api.js';
 import { createApp } from '../../src/app.js';
+import { mockProof } from '../../src/worldid.js';
 
 test('the dashboard adapter routes are served live from the stack', { timeout: 300_000 }, async (t) => {
   const { provider } = await startAnvil(t);
@@ -49,6 +50,12 @@ test('the dashboard adapter routes are served live from the stack', { timeout: 3
   assert.equal(partial.data.decision.allowed, false);
   assert.equal(partial.data.decision.clause.clause, 'Lender Check Policy 2.1');
 
+  const proven = await call('/lenders/investor/worldid?profile=rwa-secondary', 'POST', { proof: mockProof('0x00000000000000000000000000000000000000c1') });
+  assert.equal(proven.status, 200);
+  assert.equal(proven.data.facts.identityVerified, true);
+  const later = await call('/lenders/investor/attestations?profile=rwa-secondary', 'PATCH', { facts: { kycApproved: true, amlApproved: true, identityVerified: false } });
+  assert.equal(later.data.facts.identityVerified, true, 'a hand attestation can neither drop nor set the World ID fact');
+  assert.equal(later.data.facts.kycApproved, true);
   const approved = await call('/lenders/lender-a/approve?profile=wildcat-credit', 'POST');
   assert.equal(approved.data.resolution, 'approved');
   const revoked = await call('/lenders/lender-a/revoke?profile=wildcat-credit', 'POST');

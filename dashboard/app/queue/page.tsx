@@ -10,6 +10,7 @@ import { effectiveFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
 import { Failed, Glyph, Loading, PageHead, triState } from "../_components/common";
 import { usePolicyAndParties } from "../_components/usePageData";
+import { HumanCheck } from "../_components/HumanCheck";
 
 /** Only facts a person attests can be ticked; the oracle, the market and expiry are read. */
 const ATTESTABLE = new Set(["attested", "operator", "screening", "ledger"]);
@@ -70,6 +71,12 @@ function ReviewItem({ policy, party }: { policy: PolicyData; party: Party }) {
       </ul>
 
       <h3>Confirm</h3>
+      {factsForAction(policy, action).includes("identityVerified") && facts.identityVerified !== true && (
+        <p className="meta" style={{ marginBottom: 8 }}>
+          Needs a World ID document credential, not a confirmation:{" "}
+          <HumanCheck profile={policy.profile} party={party} />
+        </p>
+      )}
       {unknown.length === 0 && (
         <p className="small muted">Nothing to confirm by hand; the missing facts are read from the chain.</p>
       )}

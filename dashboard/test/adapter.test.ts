@@ -41,6 +41,18 @@ describe("staticSource", () => {
     await expect(staticSource.attest("wildcat-credit", "nobody", {})).rejects.toThrow(/Unknown party/);
   });
 
+  it("verifies a human in memory and serves a mock World ID context", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("", { status: 404 }))
+    );
+    expect((await staticSource.worldIdContext()).mock).toBe(true);
+    const verified = await staticSource.verifyHuman("custodial-rwa", "investor-1", {
+      protocol_version: "4.0",
+    });
+    expect(verified.facts.identityVerified).toBe(true);
+  });
+
   it("serves the exported deployment and null when the build has none", async () => {
     const record = { chainId: 11155111, attestor: "0xa" };
     vi.stubGlobal(
@@ -110,6 +122,8 @@ describe("gatewaySource", () => {
     await gateway.resolve("wildcat-credit", "lender-b", "reject");
     await gateway.revoke("wildcat-credit", "lender-a");
     expect(await gateway.deployment()).toBeNull();
+    await gateway.worldIdContext();
+    await gateway.verifyHuman("rwa-secondary", "investor", { protocol_version: "4.0" });
     expect(calls.map((call) => `${call.init.method ?? "GET"} ${call.url}`)).toEqual([
       "GET http://gw.test/v1/policy?profile=wildcat-credit",
       "GET http://gw.test/v1/lenders?profile=wildcat-credit",
@@ -118,11 +132,13 @@ describe("gatewaySource", () => {
       "POST http://gw.test/v1/lenders/lender-b/reject?profile=wildcat-credit",
       "POST http://gw.test/v1/lenders/lender-a/revoke?profile=wildcat-credit",
       "GET http://gw.test/v1/stack",
+      "GET http://gw.test/v1/worldid/context",
+      "POST http://gw.test/v1/lenders/investor/worldid?profile=rwa-secondary",
     ]);
     const headers = calls[3].init.headers as Record<string, string>;
     expect(headers["idempotency-key"]).toMatch(/[0-9a-f-]{36}/);
     expect(JSON.parse(String(calls[3].init.body))).toEqual({ facts: { mlaCountersigned: true } });
-    expect(heard).toHaveBeenCalledTimes(3);
+    expect(heard).toHaveBeenCalledTimes(4);
   });
 
   it("surfaces a failed call with its status", async () => {

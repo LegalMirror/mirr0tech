@@ -6,6 +6,7 @@ import { startAnvil, DEV_KEY } from './anvil.js';
 import { deployStack } from '../../src/deploy.js';
 import { VenueService } from '../../src/venues.js';
 import { createApp } from '../../src/app.js';
+import { mockProof } from '../../src/worldid.js';
 
 test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t) => {
   const { provider } = await startAnvil(t);
@@ -34,7 +35,23 @@ test('the stack API drives both acts over REST', { timeout: 300_000 }, async (t)
   assert.equal(refused.status, 403);
   assert.equal(refused.data.error.code, 'POLICY_REFUSED');
   assert.ok(refused.data.error.details.refusal.clause.quote);
+  const context = await call('/worldid/context');
+  assert.equal(context.data.mock, true, 'no rp id: the mock verifier serves the context');
   assert.equal((await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true } })).status, 200);
+  const before = await call('/wallets/Investor/explain?policy=rwa&action=transfer');
+  assert.equal(before.data.allowed, false, 'onboarding facts alone do not admit: the human is not proven');
+  assert.equal(before.data.clause.ruleId, 'transfer-identity-verified');
+  const human = await call('/wallets/Investor/worldid', { proof: mockProof('Investor') });
+  assert.equal(human.status, 200);
+  assert.equal(human.data.facts.identityVerified, true);
+  const after = await call('/wallets/Investor/explain?policy=rwa&action=transfer');
+  assert.equal(after.data.allowed, true, 'a verified human with onboarding facts may transfer');
+  assert.equal(after.data.facts.kycApproved, true, 'the proof attestation kept the earlier facts');
+  const twice = await call('/wallets/Stranger/worldid', { proof: mockProof('Investor') });
+  assert.equal(twice.status, 409, 'the same human cannot onboard a second wallet');
+  assert.equal(twice.data.error.code, 'HUMAN_ALREADY_BOUND');
+  const bad = await call('/wallets/Stranger/worldid', { proof: { protocol_version: '1.0' } });
+  assert.equal(bad.status, 400);
   assert.equal((await call('/rwa/release', { wallet: 'Investor', amount: '500000' })).status, 200);
   for (const wallet of ['Investor', 'Stranger']) assert.equal((await call(`/wallets/${encodeURIComponent(wallet)}/fund`, { amount: '1000000' })).status, 200);
   assert.equal((await call('/rwa/pools', { wallet: 'Stranger', hooked: true })).status, 200);

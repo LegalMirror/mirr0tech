@@ -8,6 +8,7 @@ import { JsonRpcProvider, Wallet } from 'ethers';
 import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
+import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp } from '../src/app.js';
 import { loadPolicyData } from '../src/dashboard-api.js';
 
@@ -33,7 +34,9 @@ const record = saved?.chainId === Number(chainId) ? saved : (await deployStack(s
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const multibaas = process.env.MULTIBAAS_API_KEY && chainId !== 31337n ? multibaasClient() : null;
-const venues = await new VenueService({ provider, signer, record, multibaas, auditPath: process.env.AUDIT_PATH ?? `${process.env.DATA_DIR ?? 'generated'}/audit-${record.chainId}.json` }).init();
+const dataDir = process.env.DATA_DIR ?? 'generated';
+const worldId = { verifier: new WorldIdVerifier(), registry: new HumanRegistry(`${dataDir}/humans-${record.chainId}.json`) };
+const venues = await new VenueService({ provider, signer, record, multibaas, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json` }).init();
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();

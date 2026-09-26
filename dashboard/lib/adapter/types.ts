@@ -1,4 +1,13 @@
-import type { AuditEvent, Deployment, Party, PolicyData, ProfileId, ProfileSummary, Tri } from "../types";
+import type {
+  AuditEvent,
+  Deployment,
+  Party,
+  PolicyData,
+  ProfileId,
+  ProfileSummary,
+  Tri,
+  WorldIdContext,
+} from "../types";
 
 /**
  * Everything a screen reads or changes. The static source serves exported JSON and mock parties; the
@@ -15,6 +24,10 @@ export interface DataSource {
   attest(profile: ProfileId, partyId: string, facts: Record<string, Tri>): Promise<Party>;
   resolve(profile: ProfileId, partyId: string, verdict: "approve" | "reject"): Promise<Party>;
   revoke(profile: ProfileId, partyId: string): Promise<Party>;
+  /** What IDKit needs to open a World ID request; `mock` when no app is registered */
+  worldIdContext(): Promise<WorldIdContext>;
+  /** Submit a World ID proof for a party; the gateway verifies it and attests the human */
+  verifyHuman(profile: ProfileId, partyId: string, proof: unknown): Promise<Party>;
   /** Called after a mutation so every screen re-reads */
   subscribe(listener: () => void): () => void;
 }

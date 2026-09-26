@@ -1,7 +1,7 @@
 import type { ProfileId } from "./types";
 
 export type FactKind =
-  "attested" | "observable" | "derived" | "override" | "operator" | "ledger" | "screening";
+  "attested" | "observable" | "derived" | "override" | "operator" | "ledger" | "screening" | "worldid";
 
 export const FACT_KIND_LABEL: Record<FactKind, string> = {
   attested: "attested by the borrower's compliance function",
@@ -11,6 +11,7 @@ export const FACT_KIND_LABEL: Record<FactKind, string> = {
   operator: "operator attestation",
   ledger: "gateway ledger",
   screening: "mock screening result",
+  worldid: "World ID document credential, bound to this wallet",
 };
 
 const CREDIT: Record<string, FactKind> = {
@@ -28,6 +29,7 @@ const CUSTODIAL: Record<string, FactKind> = {
   kycApproved: "screening",
   amlApproved: "screening",
   sanctionsClear: "screening",
+  identityVerified: "worldid",
   subscriptionAccepted: "operator",
   issuerAuthorized: "operator",
   offeringCompliant: "operator",

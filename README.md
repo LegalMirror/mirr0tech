@@ -63,6 +63,10 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 
 Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
 
+## How we used World ID
+
+Exhibit A of the fund agreement says onboarding starts with "Know-your-customer (KYC)… checks during onboarding of investors". KYC is an identity check, so the proportionate credential is a **Passport/NFC document**, not a proof of human; it compiles to the fact `identityVerified`, required to be issued shares and to enter the Uniswap pool. `src/worldid.js` verifies the proof with World (`POST /api/v4/verify/{rp_id}`, `rp_context` signed server-side), refuses a proof bound to another wallet, binds the nullifier so one person cannot onboard twice, and attests the fact with an expiry; every venue reads it like any other fact. The Investors screen opens the IDKit widget when an app is registered, a mock proof otherwise; "Use the Investor's proof" on the Stranger shows the refusal. Trust moment, credential choice, alternative paths and the integration debrief: [docs/WORLD_ID.md](docs/WORLD_ID.md).
+
 ## How we used Noolog
 
 New to Noolog? [docs/NOOLOG.md](docs/NOOLOG.md): what it is, the docs MCP server (`.mcp.json` wires it into this checkout), the API and SDK links.
@@ -89,29 +93,29 @@ Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json
 
 | Contract | Address |
 | --- | --- |
-| PolicyAttestor | [`0xAE7C29817d1d38C873097b5b0FBB16b81B02D079`](https://sepolia.etherscan.io/address/0xAE7C29817d1d38C873097b5b0FBB16b81B02D079) |
-| MockSanctionsOracle | [`0xC422CEFE3041Aa161128DdD1345051cBF8E8D5cD`](https://sepolia.etherscan.io/address/0xC422CEFE3041Aa161128DdD1345051cBF8E8D5cD) |
-| mUSDC | [`0x96E131fb063Db27D7f9077C24DD953054beD19A0`](https://sepolia.etherscan.io/address/0x96E131fb063Db27D7f9077C24DD953054beD19A0) |
-| PolicyOracle (fund) | [`0xc9301248cB175C3B1978d559C15153841C749FfB`](https://sepolia.etherscan.io/address/0xc9301248cB175C3B1978d559C15153841C749FfB) |
-| CompiledMirrorToken | [`0x7B7e2db76b862e77f1910c73F3FE22987B56AFE0`](https://sepolia.etherscan.io/address/0x7B7e2db76b862e77f1910c73F3FE22987B56AFE0) |
-| MirrorPolicyHook | [`0x008505d4ce3c99f52BB8dA311E66ec1aF8F24A80`](https://sepolia.etherscan.io/address/0x008505d4ce3c99f52BB8dA311E66ec1aF8F24A80) |
-| MirrorLiquidityRouter | [`0x3d2dd14dbBF28D00412e92c399d0bA136E226922`](https://sepolia.etherscan.io/address/0x3d2dd14dbBF28D00412e92c399d0bA136E226922) |
+| PolicyAttestor | [`0xB815feD73361792Ff2116f4BAd47BcAA3EEC28ff`](https://sepolia.etherscan.io/address/0xB815feD73361792Ff2116f4BAd47BcAA3EEC28ff) |
+| MockSanctionsOracle | [`0x10A9cd9873AA4e9527694Ac06825e21F068A8859`](https://sepolia.etherscan.io/address/0x10A9cd9873AA4e9527694Ac06825e21F068A8859) |
+| mUSDC | [`0x68EBB62f76ee7880d7CC71892ec8e3d25565dC67`](https://sepolia.etherscan.io/address/0x68EBB62f76ee7880d7CC71892ec8e3d25565dC67) |
+| PolicyOracle (fund) | [`0x56e6d3CcF611a55BA7C40960C6Ab2497A1FD7fD7`](https://sepolia.etherscan.io/address/0x56e6d3CcF611a55BA7C40960C6Ab2497A1FD7fD7) |
+| CompiledMirrorToken | [`0x2092e533cb40e61F7C335898258c9F15A487C963`](https://sepolia.etherscan.io/address/0x2092e533cb40e61F7C335898258c9F15A487C963) |
+| MirrorPolicyHook | [`0x8218A26F0f3c145D99f673Fc98A362D83c554a80`](https://sepolia.etherscan.io/address/0x8218A26F0f3c145D99f673Fc98A362D83c554a80) |
+| MirrorLiquidityRouter | [`0xdCF15E8b14BA3D38D1b024783F656a79d40015eD`](https://sepolia.etherscan.io/address/0xdCF15E8b14BA3D38D1b024783F656a79d40015eD) |
 | Uniswap v4 PoolManager (canonical) | [`0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543) |
-| PolicyOracle (credit) | [`0x4369706eAAE3f228F965Ec0Fc1120B442EB9D4E8`](https://sepolia.etherscan.io/address/0x4369706eAAE3f228F965Ec0Fc1120B442EB9D4E8) |
-| MirrortechRoleProvider | [`0x2541fcC3b63518A79981a6C637AC8364a94A664f`](https://sepolia.etherscan.io/address/0x2541fcC3b63518A79981a6C637AC8364a94A664f) |
-| MockWildcatMarket | [`0xFd99ea7F7C63C3c0BBFf56c7EB629B3760c19E93`](https://sepolia.etherscan.io/address/0xFd99ea7F7C63C3c0BBFf56c7EB629B3760c19E93) |
-| MirrortechRouter (SwapVM + PolicyGuard) | [`0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C`](https://sepolia.etherscan.io/address/0x5B6637fdae665AF9EBD4179C4a6a74C1B61aAe0C) |
+| PolicyOracle (credit) | [`0x0d1Bf438432997f0ccd18E80B45510d7064389cD`](https://sepolia.etherscan.io/address/0x0d1Bf438432997f0ccd18E80B45510d7064389cD) |
+| MirrortechRoleProvider | [`0x91f3F5c3d452C0F53319387AcdF311Cc4d28a76F`](https://sepolia.etherscan.io/address/0x91f3F5c3d452C0F53319387AcdF311Cc4d28a76F) |
+| MockWildcatMarket | [`0x172a0577Be38DE23a91274e149957e8d109daB44`](https://sepolia.etherscan.io/address/0x172a0577Be38DE23a91274e149957e8d109daB44) |
+| MirrortechRouter (SwapVM + PolicyGuard) | [`0x71b61324b041c8469602dB051Fea7534024fe0f6`](https://sepolia.etherscan.io/address/0x71b61324b041c8469602dB051Fea7534024fe0f6) |
 | 1inch Aqua (canonical) | [`0x1111113ccf1426a8e30e2bff5e005d929bf6a90a`](https://sepolia.etherscan.io/address/0x1111113ccf1426a8e30e2bff5e005d929bf6a90a) |
 
 Golden path on Sepolia, as the audit records it:
-[hooked pool created](https://sepolia.etherscan.io/tx/0xa22610f0ae976bf538ce0ba0396084910ccdcc9fb6bd417d8ba69e0ed3ab850a) on the canonical PoolManager ·
-[liquidity through the hook](https://sepolia.etherscan.io/tx/0xf87a0b8f25294007698a160a6553661637557cb3b29c3fdd5baa4a108f03c15b) ·
-[swap](https://sepolia.etherscan.io/tx/0x9a2cbc65c98d65e2a12a2f19e3e09ed3e3e09a41f158401167bfa6b1fc524210) ·
-[Lender A admitted and deposits](https://sepolia.etherscan.io/tx/0x3a3074b0f8634c65d5be398965fdfb5cb6c44b55540488687e24d0de47dbf2b7) ·
-[buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0x604a19d5dacbb37ded2937eece8d0fbc7d39a8806b22c3fc27ac1dab0c746cb8) ·
-[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0xd42e703d2f20eaccbd0387c1257786340720172054c70dfc759f6d4fd37de82d) ·
-[tender offer posted with DutchAuctionBalanceOut](https://sepolia.etherscan.io/tx/0x2a2dba2abd9a1b30afe95c48a6805b09487d6ec00e98b16daadef1d2a4c75602) and quoted at 0.9602 minutes into its window.
-The refusals (stranger release, hookless pool, stranger liquidity, Lender C deposit, stranger quote) never became transactions.
+[identity verified with a World ID document](https://sepolia.etherscan.io/tx/0xbfa9779df88b5aeb5b7587a5a2ad6368226ebd045757dcd80f0889b57861b748) ·
+[shares released to the verified investor](https://sepolia.etherscan.io/tx/0x3baa0a49d05a385f88584ddfd6eb80d12def27226a683811d773171d7704f1cf) ·
+[hooked pool created](https://sepolia.etherscan.io/tx/0x168ee3e5a5f60e2c1f4eae9abadcc4a50517af35cf6deec20120a8bdcc3622f3) on the canonical PoolManager ·
+[liquidity through the hook](https://sepolia.etherscan.io/tx/0x5c29af26ac59903924890347f0902ee4773d9e8a6f1bc2cb0b304d51a077ad88) ·
+[swap](https://sepolia.etherscan.io/tx/0xc315cb93ce6eb203e612a7caf0e55d7d8acbfaef90da73b3fb1870f22d777ad6) ·
+[Lender A admitted and deposits](https://sepolia.etherscan.io/tx/0x35f150eb239754991595604735eebdf34cd8bd47ba7597415580b19e12c40c89) ·
+[buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0xf732931467f914badca599ffc884bef8379ccd5e8903ed68b1b24a8ada615c6f) ·
+[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0x5564bf23bfa078e91e1b9178bf78e3e3507db7361abb963e99e7c5444c2f0467).
 
 ## Limits
 

@@ -9,11 +9,12 @@ import { fmtTime, short } from "@/lib/format";
 import { credentialExpiry, effectiveFacts, relevantFacts, statusAction } from "@/lib/parties";
 import type { Party, PolicyData } from "@/lib/types";
 import { Failed, Glyph, Loading, PageHead, Refusal, triState } from "../_components/common";
+import { HumanCheck } from "../_components/HumanCheck";
 import { usePolicyAndParties } from "../_components/usePageData";
 
 const unix = (seconds: number) => fmtTime(new Date(seconds * 1000).toISOString());
 
-function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
+function PartyCard({ policy, party, others }: { policy: PolicyData; party: Party; others: Party[] }) {
   const [busy, setBusy] = useState(false);
   const facts = effectiveFacts(policy, party);
   const status = explain(policy, statusAction(policy), facts);
@@ -86,6 +87,18 @@ function PartyCard({ policy, party }: { policy: PolicyData; party: Party }) {
         </>
       )}
 
+      {!credit && party.role !== "borrower" && (
+        <div className="row" style={{ marginTop: 10, gap: 8, flexWrap: "wrap" }}>
+          <HumanCheck profile={policy.profile} party={party} />
+          {party.facts.identityVerified !== true &&
+            others
+              .filter((other) => other.facts.identityVerified === true && other.id !== party.id)
+              .slice(0, 1)
+              .map((other) => (
+                <HumanCheck key={other.id} profile={policy.profile} party={party} asParty={other} />
+              ))}
+        </div>
+      )}
       {credit && party.screenedAt !== null && party.role !== "borrower" && (
         <div className="row" style={{ marginTop: 10 }}>
           <button
@@ -119,7 +132,7 @@ export default function LendersPage() {
       {policy.data && parties.data && (
         <div className="parties">
           {parties.data.map((party) => (
-            <PartyCard key={party.id} policy={policy.data!} party={party} />
+            <PartyCard key={party.id} policy={policy.data!} party={party} others={parties.data!} />
           ))}
         </div>
       )}

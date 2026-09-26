@@ -10,6 +10,7 @@ import { decodeRefusal } from './refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
 import { AppError } from './errors.js';
 import { indexedEvents } from './multibaas.js';
+import { HumanRegistry, WorldIdError, WorldIdVerifier } from './worldid.js';
 
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 const TICK_SPACING = 60;
@@ -18,8 +19,9 @@ export const DEMO_WALLETS = ['Investor', 'Stranger', 'Lender A', 'Lender B', 'Le
 
 export class VenueService {
   /// `auditPath` keeps the audit across restarts; without it the audit lives in memory only.
-  constructor({ provider, signer, record, multibaas = null, auditPath = null, log = () => {} }) {
+  constructor({ provider, signer, record, multibaas = null, auditPath = null, worldId = null, log = () => {} }) {
     Object.assign(this, { provider, signer, record, multibaas, auditPath, log, audit: [], orders: [] });
+    this.worldId = worldId ?? { verifier: new WorldIdVerifier(), registry: new HumanRegistry(null) };
   }
 
   /// Indexed events from MultiBaas when a deployment is registered there; the local audit otherwise.
@@ -50,6 +52,7 @@ export class VenueService {
     }
     this.opcodes = loadOpcodes();
     if (this.auditPath) this.audit = await readFile(this.auditPath, 'utf8').then(JSON.parse, () => []);
+    await this.worldId.registry.load();
     return this;
   }
   /// A load-balanced RPC can serve a receipt from one node and the next call from a node still a
@@ -152,6 +155,28 @@ export class VenueService {
     const { policy } = this.policy(kind);
     const now = (await this.provider.getBlock('latest')).timestamp;
     return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, now + days * 86400));
+  }
+  /// A World ID credential proof for `wallet`: verified, its nullifier bound to this wallet, then
+  /// attested as `identityVerified` under the fund policy so every venue reads it.
+  async verifyHuman(wallet, proof, days = 30) {
+    const address = this.address(wallet);
+    let nullifier;
+    try {
+      ({ nullifier } = await this.worldId.verifier.verify(proof, address));
+      await this.worldId.registry.bind(nullifier, address);
+    } catch (error) {
+      if (!(error instanceof WorldIdError)) throw error;
+      this.audit.push({ id: id(`worldid:${Date.now()}:${Math.random()}`).slice(0, 18), at: new Date().toISOString(), type: 'worldid.verify', policy: 'rwa', wallet: this.name(address), status: 'refused', refusal: { name: error.code, clauseId: null, clause: null }, message: error.message });
+      await this.persist();
+      throw new AppError(error.status, error.code, error.message);
+    }
+    const { policy } = this.policy('rwa');
+    const { known, value } = this.pack('rwa', { identityVerified: true });
+    const now = (await this.provider.getBlock('latest')).timestamp;
+    return this.run('worldid.verify', { policy: 'rwa', wallet: this.name(address), nullifier: `${nullifier.slice(0, 10)}…`, facts: { identityVerified: true } }, async () => {
+      const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
+      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, now + days * 86400);
+    });
   }
   async revoke(kind, wallet, facts) {
     const address = this.address(wallet);

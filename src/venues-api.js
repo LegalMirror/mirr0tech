@@ -13,6 +13,8 @@ export function venueRoutes(venues) {
   router.get('/wallets/:wallet', wrap(async (req) => venues.wallet(req.params.wallet)));
   router.get('/wallets/:wallet/explain', wrap(async (req) => venues.explain(req.query.policy ?? 'credit', req.params.wallet, req.query.action ?? 'deposit')));
   router.post('/wallets/:wallet/fund', wrap(async (req) => venues.fund(req.params.wallet, field(req.body, 'amount'))));
+  router.get('/worldid/context', wrap(async () => venues.worldId.verifier.context()));
+  router.post('/wallets/:wallet/worldid', wrap(async (req) => venues.verifyHuman(req.params.wallet, field(req.body, 'proof', 'object'), req.body.days)));
   router.post('/wallets/:wallet/facts', wrap(async (req) => venues.attest(field(req.body, 'policy'), req.params.wallet, field(req.body, 'facts', 'object'), req.body.days)));
   router.delete('/wallets/:wallet/facts', wrap(async (req) => venues.revoke(field(req.body, 'policy'), req.params.wallet, field(req.body, 'facts', 'object'))));
   router.post('/wallets/:wallet/sanction', wrap(async (req) => venues.sanction(req.params.wallet, field(req.body, 'sanctioned', 'boolean'))));

@@ -58,6 +58,14 @@ export function dashboardRoutes(venues, policyData) {
   }));
   router.get('/policy', wrap(async (req) => (await policyData).get(profileOf(req))));
   router.get('/lenders', wrap(async (req) => { const profile = profileOf(req); return Promise.all(WALLETS_FOR[KIND[profile]].map((name) => party(profile, name))); }));
+  router.get('/worldid/context', wrap(async () => venues.worldId.verifier.context()));
+  router.post('/lenders/:id/worldid', wrap(async (req) => {
+    const profile = profileOf(req);
+    const name = walletOf(profile, req.params.id);
+    ensure(req.body && typeof req.body.proof === 'object', 400, 'INVALID_BODY', 'Expected proof');
+    await venues.verifyHuman(name, req.body.proof);
+    return party(profile, name);
+  }));
   router.patch('/lenders/:id/attestations', wrap(async (req) => {
     const profile = profileOf(req);
     const name = walletOf(profile, req.params.id);
@@ -67,6 +75,8 @@ export function dashboardRoutes(venues, policyData) {
     const merged = {};
     for (const [fact, tri] of Object.entries({ ...current, ...req.body.facts })) {
       if (['sanctionsClear', 'openTermState', 'screeningCurrent'].includes(fact)) continue;
+      // Only a verified World ID proof sets identityVerified; a hand attestation keeps what the proof established.
+      if (fact === 'identityVerified') { if (current.identityVerified === true) merged[fact] = true; continue; }
       if (tri === true || tri === false) merged[fact] = tri;
     }
     await venues.attest(kind, name, merged);

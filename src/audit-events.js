@@ -2,7 +2,7 @@
 // gateway and the static export (the Sepolia timeline shipped with the repo) render the same rows.
 const KIND = { 'custodial-rwa': 'rwa', 'rwa-secondary': 'rwa', 'wildcat-credit': 'credit' };
 const VENUE = { rwa: 'token / uniswap-v4', credit: 'wildcat / aqua' };
-const KINDS = { attest: 'Attested', override: 'Attested', revoke: 'Revoked', 'rwa.mint': 'Minted', 'rwa.release': 'PolicyChecked', 'rwa.pool.create': 'PolicyChecked',
+const KINDS = { 'worldid.verify': 'HumanVerified', attest: 'Attested', override: 'Attested', revoke: 'Revoked', 'rwa.mint': 'Minted', 'rwa.release': 'PolicyChecked', 'rwa.pool.create': 'PolicyChecked',
   'rwa.pool.addLiquidity': 'PolicyChecked', 'rwa.pool.swap': 'PolicyChecked', 'credit.deposit': 'CredentialDecision', 'credit.withdraw': 'CredentialDecision',
   'credit.buyback.ship': 'Shipped', 'credit.buyback.quote': 'PolicyChecked', 'credit.buyback.fill': 'Fill', 'credit.buyback.dock': 'Shipped' };
 
@@ -35,6 +35,7 @@ const ACTION = {
 function summaryOf(entry) {
   switch (entry.type) {
     case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
+    case 'worldid.verify': return `identity verified with a World ID document (nullifier ${entry.nullifier})`;
     case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;
     case 'override': return 'borrower override under MLA 13(c)(y)';
     case 'sanction': return entry.sanctioned ? 'designated by the sanctions oracle' : 'designation lifted';

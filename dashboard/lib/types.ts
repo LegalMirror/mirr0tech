@@ -309,3 +309,14 @@ export type Deployment = {
     aqua: string;
   };
 };
+
+/** The relying-party context a World ID request opens with (server-signed), or a mock one. */
+export type WorldIdContext = {
+  app_id: string;
+  rp_id: string;
+  action: string;
+  credential: "document" | "proof_of_human" | "selfie";
+  environment: string;
+  mock: boolean;
+  rp_context: { rp_id: string; nonce: string; created_at: number; expires_at: number; signature: string };
+};

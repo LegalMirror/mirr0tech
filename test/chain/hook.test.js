@@ -13,7 +13,7 @@ const [attestorArtifact, oracleArtifact, sanctionsArtifact, hookArtifact, router
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
-const ADMITTED = { kycApproved: true, amlApproved: true };
+const ADMITTED = { kycApproved: true, amlApproved: true, identityVerified: true };
 const pack = (facts) => {
   let known = 0n; let value = 0n;
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }

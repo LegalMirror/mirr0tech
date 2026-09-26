@@ -19,7 +19,13 @@ export function sampleFixture(document, { secondary = false } = {}) {
         'confirmation of receipt or crediting of funds for such order', 'Mint only after the custodian confirms funding.'),
       rule('redemption-authorized', 'burn', 'permit', all('redemptionAuthorized', 'offeringCompliant'), '2.2',
         'redemption is legally authorized.', 'The operator attests that this redemption is authorized and complies with the offering memorandum.'),
+      rule('mint-identity-verified', 'mint', 'require', fact('identityVerified'), 'Exhibit A — Investor Onboarding',
+        'perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors',
+        'KYC is an identity check, so the proportionate credential is a government document: a World ID Passport/NFC credential, verified by the gateway and bound to the wallet, satisfies it; its nullifier keeps one person from onboarding twice. A proof of human alone would prove a person, not who.'),
       ...(secondary ? [
+        rule('transfer-identity-verified', 'transfer', 'require', fact('identityVerified'), 'Exhibit A — Investor Onboarding',
+          'perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors',
+          'A wallet at the venue must belong to a document-verified investor before it may hold or move shares.'),
         rule('transfer-onboarded-holder', 'transfer', 'permit', all('kycApproved', 'amlApproved'), 'Exhibit A — Investor Onboarding',
           'and sanctions checks during onboarding of investors and apply risk rating to each investor',
           'Only an investor who completed onboarding may receive or hold shares, at a venue or otherwise.'),

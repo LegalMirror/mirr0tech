@@ -9,10 +9,10 @@
   },
   "scripts": {
     "demo:sync": "node scripts/sync-demo.mjs",
-    "export": "npm run demo:sync && npm --prefix .. run ui:export --silent",
-    "dev": "npm run export && node scripts/build-info.mjs && next dev -p 3100",
-    "build": "npm run export && node scripts/build-info.mjs && next build",
-    "start": "npx --yes serve@14 out -l 3100",
+    "export": "pnpm run demo:sync && pnpm --dir .. --silent run ui:export",
+    "dev": "pnpm run export && node scripts/build-info.mjs && next dev -p 3100",
+    "build": "pnpm run export && node scripts/build-info.mjs && next build",
+    "start": "serve out -l 3100",
     "test": "vitest run",
     "typecheck": "node scripts/build-info.mjs && tsc --noEmit",
     "lint": "prettier --check 'app/**/*.{ts,tsx}' 'lib/**/*.ts' 'test/**/*.ts'",
@@ -21,9 +21,11 @@
   "dependencies": {
     "@worldcoin/idkit": "^4.3.0",
     "ethers": "6.17.0",
+    "html-to-text": "^10.0.1",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "serve": "14.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -32,5 +34,6 @@
     "prettier": "^3.6.2",
     "typescript": "^5.7.0",
     "vitest": "^3.2.4"
-  }
+  },
+  "packageManager": "pnpm@10.29.2"
 }

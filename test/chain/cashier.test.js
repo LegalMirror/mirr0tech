@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { AbiCoder, Contract, ContractFactory, Interface, MaxUint256, ZeroAddress, Wallet, id, keccak256 } from 'ethers';
 import { startAnvil, DEV_KEY, warp } from './anvil.js';
 import { readDocuments, documentFrom } from '../../src/policy/document.js';
-import { cashierFixture, cashierConstructorConfig, cashierConfigurationHash } from '../../src/policy/cashier.js';
+import { cashierFixture, cashierConstructorConfig, cashierConfigurationHash } from '../../src/onchain/cashier.js';
 import { compilePolicy } from '../../src/policy/compile.js';
-import { compileBundle } from '../../src/solc.js';
-import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, CASHIER_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/policy/hookAddress.js';
-import { deployFund, cashierInitialSqrtPrice } from '../../src/deploy.js';
+import { compileBundle } from '../../src/onchain/solc.js';
+import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, CASHIER_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/onchain/hookAddress.js';
+import { deployFund, cashierInitialSqrtPrice } from '../../src/onchain/deploy.js';
 
 // Compiles entirely in memory: does not change generated/, deployments/ or tracked artifacts.
 const document = await readDocuments(['test/human_contracts/ea026411904ex10-9.htm', 'test/human_contracts/nav-cashier-addendum.md']);

@@ -6,10 +6,10 @@
   "type": "module",
   "description": "Legal documents to executable RWA mint and redemption policies",
   "engines": {
-    "node": ">=18.17"
+    "node": ">=22.13"
   },
   "scripts": {
-    "start": "node src/server.js",
+    "start": "node scripts/start.js",
     "demo": "node scripts/demo.js",
     "extract": "node scripts/extract.js",
     "compile": "node scripts/compile.js",
@@ -18,26 +18,24 @@
     "deploy": "node scripts/deploy.js",
     "test": "node --test test/*.test.js",
     "test:chain": "node --test test/chain/credit.test.js test/chain/swapvm.test.js",
-    "check": "npm test && npm run build && npm run build:secondary && npm run test:chain:rwa && npm run build:credit && npm run test:chain && npm run test:chain:stack && npm run test:chain:cashier",
-    "build:credit": "npm run vendor --silent && node scripts/compile.js --mla --demo && node scripts/build-contracts.js",
-    "demo:credit": "npm run build:credit --silent && node scripts/demo-credit.js",
+    "check": "pnpm test && pnpm run build && pnpm run build:secondary && pnpm run test:chain:rwa && pnpm run build:credit && pnpm run test:chain && pnpm run test:chain:stack && pnpm run test:chain:cashier",
+    "build:credit": "pnpm --silent run vendor && node scripts/compile.js --mla --demo && node scripts/build-contracts.js",
+    "demo:credit": "pnpm --silent run build:credit && node scripts/demo-credit.js",
     "test:chain:rwa": "node --test test/chain/evm.test.js test/chain/rwa-pool.test.js test/chain/hook.test.js",
     "vendor": "sh scripts/vendor.sh",
     "ui:export": "node scripts/export-ui.js",
     "build:secondary": "node scripts/compile.js --secondary --demo && node scripts/build-contracts.js",
-        "build:cashier": "node scripts/compile.js --cashier --demo && node scripts/build-contracts.js",
-        "test:chain:cashier": "node --test test/chain/cashier.test.js",
+    "build:cashier": "node scripts/compile.js --cashier --demo && node scripts/build-contracts.js",
+    "test:chain:cashier": "node --test test/chain/cashier.test.js",
     "deploy:stack": "node scripts/deploy-stack.js",
-    "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js test/chain/dashboard-api.test.js test/chain/agreements-deploy.test.js test/chain/payments.test.js test/chain/flow.test.js test/chain/signing.test.js",
+    "test:chain:stack": "node --test test/chain/stack.test.js test/chain/gateway.test.js test/chain/dashboard-api.test.js test/chain/agreements-deploy.test.js test/chain/payments.test.js test/chain/flow.test.js",
     "demo:golden": "node scripts/demo-golden.js",
     "dev:stack": "node scripts/dev-stack.js",
-    "multibaas:sync": "node scripts/multibaas-sync.js",
-    "deploy:sepolia": "node scripts/deploy-stack.js && node scripts/multibaas-sync.js",
+    "deploy:sepolia": "node scripts/deploy-stack.js",
     "seed:stack": "node scripts/seed-stack.js",
     "cli": "node scripts/mirr0.js"
   },
   "dependencies": {
-    "@curvegrid/multibaas-sdk": "^1.1.1",
     "@openzeppelin/contracts": "5.6.1",
     "@uniswap/v4-core": "^1.0.2",
     "@worldcoin/idkit-core": "^4.3.0",
@@ -47,19 +45,17 @@
     "express": "5.2.1",
     "html-to-text": "9.0.5"
   },
-  "overrides": {
-    "tmp": "0.2.7"
-  },
   "devDependencies": {
     "@1inch/aqua-sdk": "^0.3.4",
     "@1inch/solidity-utils": "^6.9.7",
     "@1inch/swap-vm-sdk": "^0.4.4",
     "solc": "0.8.37",
-    "solc-swapvm": "npm:solc@^0.8.30",
-    "solc-v4": "npm:solc@^0.8.26",
+    "solc-swapvm": "npm:solc@0.8.30",
+    "solc-v4": "npm:solc@0.8.26",
     "solmate": "^6.8.0"
   },
   "bin": {
     "mirr0": "scripts/mirr0.js"
-  }
+  },
+  "packageManager": "pnpm@10.29.2"
 }

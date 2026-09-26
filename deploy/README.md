@@ -43,14 +43,14 @@ WORLD_ACTION=humanity
 Add the actual values for these **runtime-only** secrets/configuration:
 
 - `RPC_URL` — Sepolia RPC endpoint. An existing `ETH_SEPOLIA_RPC_URL` must be mapped to this name.
-- `DEPLOYER_PRIVATE_KEY` — authorized testnet operator key. An existing `REGISTRAR_KEY` can be mapped to this name, but its wallet must have the required roles; renaming or funding it does not grant permissions.
+- `DEPLOYER_PRIVATE_KEY` or `PRIVATE_KEY` — authorized testnet operator key. An existing `REGISTRAR_KEY` can be mapped to this name, but its wallet must have the required roles; renaming or funding it does not grant permissions.
 - `API_KEY` — a separate, random operator bearer secret of at least 24 characters, **not** an Ethereum private key.
 - `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY` — matching registered World v4 app/RP settings. The RP key is not the Ethereum key.
-- Optional: a distinct `VIEWER_KEY`, and `MULTIBAAS_URL` / `MULTIBAAS_API_KEY` for Curvegrid indexing.
+- Optional: a distinct `VIEWER_KEY` for read-only access.
 
-Keep secret **Buildtime off, Runtime on**. Do not copy unrelated IPFS, Privy, mnemonic or other application credentials into this resource. Leave `NOOLOG_API_KEY` unset to use the existing deterministic mock analysis adapter; setting it opts into live provider calls and document sharing.
+Keep secret **Buildtime off, Runtime on**. Do not copy unrelated IPFS, Privy, mnemonic or other application credentials into this resource. Set `OPENAI_API_KEY` as a runtime secret for operator uploads using Astra light. Public demo workspaces use explicit deterministic fixtures without paid model calls.
 
-Startup reuses the committed Sepolia stack. **Do not run `npm run deploy:stack`, `npm run deploy:sepolia` or `npm run seed:stack` as startup/pre-deployment commands.** Those are explicit operator/development operations, not API launch commands. Root `npm start` is the legacy custodial service; the image correctly starts `scripts/dev-stack.js`.
+Startup reuses the committed Sepolia stack. **Do not run `pnpm run deploy:stack`, `pnpm run deploy:sepolia` or `pnpm run seed:stack` as startup/pre-deployment commands.** Those are explicit operator/development operations, not API launch commands. Root `pnpm start` serves the local persistent workspace; the hosted API image separately starts `scripts/dev-stack.js`.
 
 ### Readiness check
 
@@ -69,13 +69,12 @@ GitHub Pages already builds the static dashboard with `NEXT_PUBLIC_GATEWAY_URL=h
 To serve the frontend locally against the hosted backend:
 
 ```sh
-npm ci
-npm run vendor
-npm --prefix dashboard ci
-NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run dev
+pnpm install --frozen-lockfile
+pnpm run vendor
+NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz pnpm --dir dashboard run dev
 ```
 
-Open `http://localhost:3100`. For a static production build, replace `run dev` with `run build`, then use `npm --prefix dashboard start` to serve `dashboard/out/` on port 3100.
+Open `http://localhost:3100`. For a static production build, replace `run dev` with `run build`, then use `pnpm --dir dashboard start` to serve `dashboard/out/` on port 3100.
 
 A separate Coolify frontend may use `/deploy/Dockerfile.dashboard`, port **3100**, and **only** the public API URL as `NEXT_PUBLIC_GATEWAY_URL` at build time. Never pass the operator or RP signing keys as frontend build arguments.
 

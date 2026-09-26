@@ -1,3 +1,4 @@
+import { worldSessionHeaders, worldSessionRejected } from "./world-session";
 // Credentials live only in this module's memory. Never put an operator key in a public env var,
 // URL, localStorage, sessionStorage, or a generated file.
 export type DemoCapabilities = {
@@ -12,6 +13,7 @@ export type GatewaySession = {
   viewerKey: string;
   operatorKey: string;
   revision: number;
+  workspaceToken?: string;
   demoToken?: string;
   demoExpiresAt?: number;
   demoChainId?: number;
@@ -22,7 +24,7 @@ export type GatewaySession = {
   autoDemo?: boolean;
 };
 const initial: GatewaySession = {
-  url: (process.env.NEXT_PUBLIC_GATEWAY_URL || "https://mir-api.peeramid.xyz").replace(/\/$/, ""),
+  url: (process.env.NEXT_PUBLIC_GATEWAY_URL || "http://localhost:3000").replace(/\/$/, ""),
   autoDemo: true,
   viewerKey: "",
   operatorKey: "",
@@ -43,9 +45,11 @@ export const hasDemoSession = (value: GatewaySession, now = Date.now()) =>
     value.demoCapabilities?.agreements
   );
 export const hasGatewaySession = (value: GatewaySession) =>
-  hasInternalSession(value) || hasDemoSession(value);
+  !!value.workspaceToken || hasInternalSession(value) || hasDemoSession(value);
 export const canMutateAgreements = (value: GatewaySession) =>
-  !!value.operatorKey || (hasDemoSession(value) && value.demoCapabilities?.mutateAgreements === true);
+  !!value.workspaceToken ||
+  !!value.operatorKey ||
+  (hasDemoSession(value) && value.demoCapabilities?.mutateAgreements === true);
 export function demoPathAllowed(method: string, path: string): boolean {
   if (method === "GET")
     return (
@@ -131,15 +135,17 @@ export async function gatewayRequest<T>(
       403,
       "DEMO_SCOPE"
     );
-  if (write && !connection.operatorKey && !demo)
+  if (write && !connection.operatorKey && !demo && !connection.workspaceToken)
     throw new Error(
       "This action is unavailable without an authorized workspace or internal operator key. No operator key can be entered in the public demo UI."
     );
-  const key = demo
-    ? connection.demoToken
-    : write
-      ? connection.operatorKey
-      : connection.viewerKey || connection.operatorKey;
+  const key =
+    connection.workspaceToken ||
+    (demo
+      ? connection.demoToken
+      : write
+        ? connection.operatorKey
+        : connection.viewerKey || connection.operatorKey);
   const controller = new AbortController();
   const abort = () => controller.abort();
   if (init.signal?.aborted) controller.abort();
@@ -147,6 +153,7 @@ export async function gatewayRequest<T>(
   const timeout = setTimeout(abort, 30_000);
   try {
     const headers = new Headers(init.headers);
+    for (const [name, value] of Object.entries(worldSessionHeaders(connection.url))) headers.set(name, value);
     if (init.body) headers.set("content-type", "application/json");
     if (key) headers.set("authorization", `Bearer ${key}`);
     if (write) headers.set("idempotency-key", crypto.randomUUID());
@@ -160,6 +167,7 @@ export async function gatewayRequest<T>(
       redirect: "error",
     });
     const body = await response.json().catch(() => null);
+    if (response.status === 401 && body?.error?.code === "WORLD_SESSION_REQUIRED") worldSessionRejected();
     if (demo && response.status === 401) expireDemoSession(connection.demoToken!);
     if (!response.ok)
       throw new GatewayError(

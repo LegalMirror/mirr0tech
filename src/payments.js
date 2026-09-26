@@ -4,8 +4,7 @@
 // under the policy. A refused mint is not an error for the rail: the money is held and the audit
 // names the sentence that held it.
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import express from 'express';
-import { AppError, ensure } from './errors.js';
+import { ensure } from './errors.js';
 
 export const SIGNATURE_HEADER = 'stripe-signature';
 const SETTLING = new Set(['payment_intent.succeeded', 'charge.succeeded', 'wire.received']);
@@ -36,24 +35,4 @@ export function paymentFrom(event) {
   const agreement = object.metadata?.agreement ?? null;
   ensure(agreement === null || (typeof agreement === 'string' && agreement), 400, 'INVALID_PAYMENT', 'metadata.agreement, when given, is an agreement id');
   return { id: event.id, wallet, amount: (object.amount / 100).toFixed(2), currency: 'usd', reference: object.id ?? null, agreement };
-}
-
-/// POST /webhooks/payments: no bearer, the signature is the credential. Always 2xx once verified,
-/// so the rail does not retry a policy decision. `metadata.agreement` settles on that agreement's
-/// token; without it the payment settles on the stack's fund token.
-export function paymentWebhook(venues, secret, agreements = null) {
-  const router = express.Router();
-  router.post('/payments', express.raw({ type: '*/*', limit: '64kb' }), (req, res, next) => (async () => {
-    ensure(secret, 503, 'NO_WEBHOOK_SECRET', 'Set PAYMENT_WEBHOOK_SECRET to accept payment events');
-    const raw = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
-    verifySignature(raw, req.headers[SIGNATURE_HEADER], secret);
-    let event;
-    try { event = JSON.parse(raw); } catch { throw new AppError(400, 'INVALID_JSON', 'Body is not JSON'); }
-    const payment = paymentFrom(event);
-    if (payment.ignored) return res.json({ received: true, ignored: payment.ignored });
-    ensure(!payment.agreement || agreements, 400, 'INVALID_PAYMENT', 'This gateway has no agreements to settle on');
-    const venue = payment.agreement ? await agreements.venue(payment.agreement) : venues;
-    res.json({ received: true, payment, settlement: await venue.settlePayment(payment) });
-  })().catch(next));
-  return router;
 }

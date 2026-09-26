@@ -192,9 +192,9 @@ export function InvestorDashboard() {
           <section className="iv-card iv-empty">
             <h2>No public investor fund is published yet</h2>
             <p>
-              The API can be healthy before a cashier-enabled contract is published. Ask the issuer to
-              publish the bounded cashier deployment; no operator key or arbitrary contract address is
-              accepted on this page.
+              The API can be healthy before a cashier-enabled contract is published. Ask the issuer to publish
+              the bounded cashier deployment; no operator key or arbitrary contract address is accepted on
+              this page.
             </p>
           </section>
         )}
@@ -224,7 +224,7 @@ export function InvestorDashboard() {
       </main>
       <footer className="iv-footer">
         <span>Session tokens stay in memory only · reload or sign out to clear</span>
-        <span>Execution receipts: RPC · activity indexing: Curvegrid when configured</span>
+        <span>Execution receipts and recent activity: RPC</span>
       </footer>
     </div>
   );

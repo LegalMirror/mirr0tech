@@ -1,12 +1,13 @@
+import { deploymentPrivateKey } from '../src/onchain/signer.js';
 // The golden path, both acts, on a local chain. Nothing here is mocked except the chain itself,
-// the USD, the sanctions oracle and the Wildcat market. Run with: npm run demo:golden
+// the USD, the sanctions oracle and the Wildcat market. Run with: pnpm run demo:golden
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { once } from 'node:events';
 import { JsonRpcProvider, Wallet, id, keccak256, MaxUint256 } from 'ethers';
-import { deployStack, ANVIL_DEV_KEY } from '../src/deploy.js';
-import { decodeRefusal } from '../src/refusal.js';
-import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../src/policy/programs.js';
+import { deployStack, ANVIL_DEV_KEY } from '../src/onchain/deploy.js';
+import { decodeRefusal } from '../src/onchain/refusal.js';
+import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../src/onchain/programs.js';
 import { readDocuments, sha256 } from '../src/policy/document.js';
 
 const say = (line = '') => console.log(line);
@@ -28,7 +29,7 @@ if (!rpcUrl) {
 const provider = new JsonRpcProvider(rpcUrl, { chainId: 31337, name: 'anvil' }, { cacheTimeout: -1, staticNetwork: true });
 provider.pollingInterval = 50;
 for (let attempt = 0; attempt < 200; attempt++) { try { await provider.getBlockNumber(); break; } catch { await new Promise((r) => setTimeout(r, 50)); } }
-const admin = new Wallet(process.env.DEPLOYER_PRIVATE_KEY ?? ANVIL_DEV_KEY, provider);
+const admin = new Wallet(deploymentPrivateKey() ?? ANVIL_DEV_KEY, provider);
 const investor = await provider.getSigner(1);
 const stranger = await provider.getSigner(2);
 const lenderA = await provider.getSigner(3);

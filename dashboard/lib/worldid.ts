@@ -20,7 +20,7 @@ export async function mockProof(
   credential: "document" | "proof_of_human" | "selfie" = "document"
 ): Promise<ProofPayload> {
   return {
-    protocol_version: "4.0",
+    protocol_version: "3.0",
     nonce: await sha256Hex(`nonce:${wallet}`),
     action,
     responses: [

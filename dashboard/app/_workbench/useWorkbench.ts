@@ -13,7 +13,7 @@ import {
 } from "@/lib/agreements";
 import { staticSource } from "@/lib/adapter/static";
 import { sampleGraph, sampleSummary } from "@/lib/workbench";
-import type { GatewaySession } from "@/lib/session";
+import { hasGatewaySession, type GatewaySession } from "@/lib/session";
 
 type Loaded = {
   record: AgreementDetail;
@@ -47,6 +47,10 @@ export function useWorkbench(session: GatewaySession, sample: boolean) {
     setListLoading(true);
   }, [sample]);
   useEffect(() => {
+    if (!sample && !hasGatewaySession(session)) {
+      setListLoading(false);
+      return;
+    }
     return poll(
       async (signal) => (sample ? (await staticSource.profiles()).map(sampleSummary) : client.list(signal)),
       (records) => {
@@ -73,9 +77,9 @@ export function useWorkbench(session: GatewaySession, sample: boolean) {
       },
       (records) => (records.some((record) => inFlight(record.status)) ? 2000 : 15000)
     );
-  }, [client, sample, revision]);
+  }, [client, sample, revision, session]);
   useEffect(() => {
-    if (sample) return;
+    if (sample || !hasGatewaySession(session)) return;
     return poll(
       (signal) => client.status(signal),
       (value) => {
@@ -88,7 +92,7 @@ export function useWorkbench(session: GatewaySession, sample: boolean) {
       },
       () => 15000
     );
-  }, [client, sample, revision]);
+  }, [client, sample, revision, session]);
   useEffect(() => {
     setDetailError("");
     if (!id) return;
@@ -114,7 +118,7 @@ export function useWorkbench(session: GatewaySession, sample: boolean) {
         }
         const record = await client.get(id, signal);
         const [graph, constraints] = await Promise.allSettled([
-          record.policyHash ? client.ast(id, signal) : Promise.resolve(null),
+          record.ast || record.policyHash ? client.ast(id, signal) : Promise.resolve(null),
           record.export ? client.constraints(id, signal) : Promise.resolve(null),
         ]);
         return {

@@ -16,12 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
-      - run: npm ci
-      - run: npm run vendor
-      - run: npm --prefix dashboard ci
-      - run: npm --prefix dashboard run build
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run vendor
+      - run: pnpm --dir dashboard run build
         env:
           NEXT_PUBLIC_BASE_PATH: /mirr0tech
           NEXT_PUBLIC_GATEWAY_URL: https://mir-api.peeramid.xyz

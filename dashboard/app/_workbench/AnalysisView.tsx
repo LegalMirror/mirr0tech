@@ -1,5 +1,6 @@
 "use client";
 
+import { isLegalAst } from "@/lib/legal-ast";
 import { useState } from "react";
 import type { AgreementDetail } from "@/lib/agreements";
 import { inFlight } from "@/lib/agreements";
@@ -30,7 +31,7 @@ export function AnalysisView({
     ) ?? [];
   const stages = [
     { name: "Documents received", state: "uploaded" },
-    { name: "Noolog extraction & critique", state: "extracting" },
+    { name: "Document structure extraction", state: "extracting" },
     { name: "AST / source validation", state: "verified" },
     { name: "Compile & equivalence", state: "compiled" },
   ] as const;
@@ -52,11 +53,15 @@ export function AnalysisView({
         <span className="wb-verifier-mode is-demo">
           {sample
             ? "Exported sample"
-            : report?.mock
-              ? "Simulated Noolog analysis"
-              : report?.mock === false
-                ? "Live Noolog report"
-                : "Awaiting analysis report"}
+            : record.extraction?.provider === "openai"
+              ? "OpenAI AST · source quotes checked"
+              : record.extraction?.provider === "demo"
+                ? "Demo AST · deterministic fixture"
+                : report?.mock
+                  ? "Historical simulated analysis"
+                  : report?.mock === false
+                    ? "Historical extraction report"
+                    : "Awaiting analysis report"}
         </span>
         <span>{sample ? "No live job history" : record.status}</span>
       </div>
@@ -83,6 +88,52 @@ export function AnalysisView({
         </Notice>
       )}
       {record.error && <Notice error>{record.error}</Notice>}
+      {isLegalAst(record.ast) && (
+        <section className="wb-surface">
+          <h3>{record.ast.title}</h3>
+          <p>
+            {record.ast.nodes.length} source-linked nodes · {record.ast.relations.length} clause relationships
+            · {record.ast.issues.length} open questions
+          </p>
+          <p>
+            Source quotations and structural references passed validation. This document AST is ready to
+            explore; deployment requires a separate executable policy.
+          </p>
+          <button className="wb-primary" onClick={() => onAst()}>
+            Explore Contract-AST
+          </button>
+          {record.ast.issues.map((issue, index) => (
+            <p key={index}>{issue.description}</p>
+          ))}
+        </section>
+      )}
+      {!policy && record.ast && !isLegalAst(record.ast) && (
+        <section className="wb-surface">
+          <h3>{record.ast.title} · generated AST</h3>
+          <p>
+            The AST was generated and its source quotes validated. Compilation needs attention before
+            deployment.
+          </p>
+          {record.ast.rules.map((rule) => (
+            <article className="wb-claim" key={rule.id}>
+              <strong>
+                {rule.source.clause} · {rule.action}
+              </strong>
+              <blockquote>{rule.source.quote}</blockquote>
+              <p>{rule.rationale}</p>
+            </article>
+          ))}
+          {record.ast.unresolved.map((item, index) => (
+            <p key={index}>
+              {item.clause}: {item.description}
+            </p>
+          ))}
+          <details>
+            <summary>Generated AST JSON</summary>
+            <pre className="wb-json">{JSON.stringify(record.ast, null, 2)}</pre>
+          </details>
+        </section>
+      )}
       {policy && (
         <>
           <section className="wb-analysis-metrics">
@@ -114,7 +165,7 @@ export function AnalysisView({
           {report ? (
             <section className="wb-analysis-claims">
               <div className="wb-section-heading">
-                <h3>Noolog claim review</h3>
+                <h3>Historical claim review</h3>
                 <p>
                   {report.agents.join(" + ")} · {report.rounds} rounds · job <code>{report.jobId}</code>.{" "}
                   {report.mock
@@ -186,8 +237,9 @@ export function AnalysisView({
             </section>
           ) : (
             <Notice>
-              No deliberation report was returned for this export. The AST and compiler artifacts do not
-              establish a model review.
+              {record.extraction?.provider === "openai"
+                ? "OpenAI generated this AST. Source quotes and compiler equivalence were checked locally; no independent model review was performed."
+                : "This demo uses a deterministic fixture. No live model review was performed."}
             </Notice>
           )}
           <section className="wb-surface">

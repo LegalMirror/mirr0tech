@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { readDocuments, documentFrom } from '../src/policy/document.js';
 import { compilePolicy, verifyPolicy } from '../src/policy/compile.js';
-import { cashierFixture, readCashierTerms, cashierConfigurationHash } from '../src/policy/cashier.js';
+import { cashierFixture, readCashierTerms, cashierConfigurationHash } from '../src/onchain/cashier.js';
 import { sampleFixture } from '../src/policy/fixture.js';
-import { deployFund } from '../src/deploy.js';
+import { deployFund } from '../src/onchain/deploy.js';
 
 const document = await readDocuments(['test/human_contracts/ea026411904ex10-9.htm', 'test/human_contracts/nav-cashier-addendum.md']);
 const config = JSON.parse(await readFile('examples/rwa-cashier-config.json', 'utf8'));

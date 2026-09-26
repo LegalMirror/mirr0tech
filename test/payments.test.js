@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/routes.js';
 import { paymentFrom, sign, verifySignature, SIGNATURE_HEADER } from '../src/payments.js';
 
 const SECRET = 'whsec_test_secret';

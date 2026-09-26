@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/routes.js';
 import { setup, compliant } from './helpers.js';
 
 test('REST API enforces operator auth, validation, policy and a full mint/redemption flow', async (t) => {

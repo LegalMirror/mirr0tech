@@ -5,7 +5,7 @@ import { readDocument } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { Store } from '../src/store.js';
-import { MockChain } from '../src/chain.js';
+import { MockChain } from '../src/onchain/chain.js';
 import { MirrorService, COMPLIANCE_FIELDS } from '../src/service.js';
 
 export const document = await readDocument('test/human_contracts/ea026411904ex10-9.htm');

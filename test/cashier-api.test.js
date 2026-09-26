@@ -1,11 +1,12 @@
+import { extractDemo } from '../src/openai-extract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Interface, id } from 'ethers';
 import { Agreements } from '../src/agreements.js';
-import { VenueService } from '../src/venues.js';
-import { venueRoutes } from '../src/venues-api.js';
-import { decodeCashierRefusal } from '../src/policy/cashier-refusal.js';
+import { VenueService } from '../src/onchain/venues.js';
+import { venueRoutes } from '../src/routes.js';
+import { decodeCashierRefusal } from '../src/onchain/cashier-refusal.js';
 
 const config = JSON.parse(await readFile('examples/rwa-cashier-config.json', 'utf8'));
 const documents = await Promise.all(['ea026411904ex10-9.htm', 'nav-cashier-addendum.md'].map(async (name) => ({ name, text: await readFile(`test/human_contracts/${name}`, 'utf8') })));
@@ -13,6 +14,7 @@ const documents = await Promise.all(['ea026411904ex10-9.htm', 'nav-cashier-adden
 test('uploaded cashier addendum compiles through agreement export and hands bound terms to deployer', async () => {
   let sources;
   const agreements = new Agreements({
+    extract: extractDemo,
     extract: async ({ document, draft }) => ({ envelope: { source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256 }, ast: draft },
       verification: { confidence: { overall: 1, verified: 1, total: 1, counts: {}, byRef: {} }, contested: [] } }),
     deployer: async (request) => { sources = request.sources; return { localTestOnly: true }; },

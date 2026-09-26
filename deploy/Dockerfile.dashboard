@@ -6,25 +6,26 @@ ARG NODE_VERSION=22-bookworm-slim
 FROM node:${NODE_VERSION} AS build
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates python3 && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci --no-audit --no-fund
-COPY dashboard/package.json dashboard/package-lock.json dashboard/
-RUN npm --prefix dashboard ci --no-audit --no-fund
+RUN corepack enable
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY dashboard/package.json dashboard/
+RUN pnpm install --frozen-lockfile
 COPY . .
 # The export reads the vendored SwapVM opcode table to decode the buyback program.
 RUN sh scripts/vendor.sh
 ARG SOURCE_COMMIT
 ARG NEXT_PUBLIC_GATEWAY_URL
 ENV SOURCE_COMMIT=$SOURCE_COMMIT NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
-RUN npm --prefix dashboard run build
+RUN pnpm --dir dashboard run build
 
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /site
 ENV PORT=3100
-RUN npm install -g serve@14 --no-audit --no-fund
+COPY --from=build --chown=node:node /app/node_modules /app/node_modules
+COPY --from=build --chown=node:node /app/dashboard/node_modules /app/dashboard/node_modules
 COPY --from=build --chown=node:node /app/dashboard/out /site/out
 USER node
 EXPOSE 3100
 HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=6 \
   CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3100)+'/').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["sh", "-c", "serve out -l ${PORT:-3100} -s"]
+CMD ["sh", "-c", "node /app/dashboard/node_modules/serve/build/main.js out -l ${PORT:-3100} -s"]

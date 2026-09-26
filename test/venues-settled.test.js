@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VenueService } from '../src/venues.js';
+import { VenueService } from '../src/onchain/venues.js';
 
 test('after a receipt the service waits until the RPC has reached that block', async () => {
   let head = 10;

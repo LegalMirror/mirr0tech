@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { mkdir, writeFile, copyFile } from 'node:fs/promises';
-import { compileBundle } from '../src/solc.js';
+import { compileBundle } from '../src/onchain/solc.js';
 
 const policy = JSON.parse(readFileSync('generated/policy.json', 'utf8'));
 // Keep optional cashier artifacts separate from the default secondary stack.

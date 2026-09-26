@@ -25,7 +25,7 @@ Only a handful of incumbent platforms can do this work today, because each deal 
 
 mirr0tech replaces that manual translation:
 
-1. **AI reads the agreement.** A [Noolog](docs/NOOLOG.md) deliberation between several models (Astra, Fable and GPT-OSS-Safeguard) proposes the rules. Each rule must quote the document verbatim, and the models cross-check each other's claims.
+1. **AGI reads the agreement.** Using collective intellect of [Noolog](docs/NOOLOG.md) between several models (Astra, Fable and GPT-OSS-Safeguard) proposes the rules that are mapped in to AST and eventually in to SMT/Z3. Each rule must quote the document verbatim, and the models cross-check each other's claims.
 2. **The rules become an abstract syntax tree (AST).** The AST is the backend's source of truth: the API, the dashboard and the compiler all read it.
 3. **The AST compiles to Solidity** and deploys on chain as a permissioned token and a Uniswap v4 hook.
 4. **Formal verification stops hallucinations reaching the chain.** The compiler checks that the on-chain logic matches the reference interpreter on every possible input, and refuses to emit contracts otherwise. A quote that isn't in the document is rejected, and a human approves the policy before it's frozen and hashed on chain.

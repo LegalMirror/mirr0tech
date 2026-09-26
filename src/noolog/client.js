@@ -30,16 +30,29 @@ export class NoologClient {
     if (!jobId) throw new NoologError(502, 'The completion named no deliberation job (x-nsed-session-id)');
     return { completion, jobId };
   }
+  /// GET /v1/models → the deliberating models this token may name (OpenAI shape).
+  async models() { return (await this.call('GET', '/v1/models')).data?.map((model) => model.id) ?? []; }
   /// GET /deliberation/{id}/result → { job_id, status, result }
   status(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/result`); }
   details(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/details`); }
   references(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/references`); }
   /// Polls until the job leaves pending/running.
-  async waitForResult(jobId, { pollMs = 500, timeoutMs = 120_000 } = {}) {
+  /// GET /policies → the registered seat lists; `policyFor(tag)` names one by tag or name.
+  policies() { return this.call('GET', '/policies'); }
+  async policyFor(tag) {
+    const policy = (await this.policies()).find((entry) => entry.name === tag || (entry.tags ?? []).includes(tag));
+    if (!policy) throw new NoologError(404, `No policy tagged ${tag}`);
+    return policy;
+  }
+  /// Polls until the job leaves pending/running. The live status is a progress line
+  /// ("running: round 2 — Starting"); `onProgress` sees each change.
+  async waitForResult(jobId, { pollMs = 500, timeoutMs = 120_000, onProgress = null } = {}) {
     const started = Date.now();
+    let last = null;
     for (;;) {
       const state = await this.status(jobId);
-      if (!['pending', 'claimed', 'running', 'queued'].includes(String(state.status).toLowerCase())) return state;
+      if (state.status !== last) { last = state.status; await onProgress?.(state); }
+      if (!/^(pending|claimed|running|queued)/i.test(String(state.status))) return state;
       if (Date.now() - started > timeoutMs) throw new NoologError(504, `Job ${jobId} still ${state.status} after ${timeoutMs} ms`);
       await new Promise((resolve) => setTimeout(resolve, pollMs));
     }

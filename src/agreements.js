@@ -12,7 +12,7 @@ import { compilePolicy } from './policy/compile.js';
 import { cashierFixture } from './policy/cashier.js';
 import { ACTIONS, validateAst } from './policy/schema.js';
 import { CREDENTIALS, DEFAULT_ACTION } from './worldid.js';
-import { extractWithNoolog } from './noolog/extract.js';
+import { extractAgreement, extractorMode } from './noolog/extract.js';
 import { PROFILES, exportCompiled } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
 
@@ -66,7 +66,7 @@ export function astGraph({ title, rules, terms, unresolved, verification }) {
 export class Agreements {
   /// `extract` and `deployer` are injectable: the deliberation client and the chain deploy.
   /// `venueFactory` builds the operator service over one deployed agreement's token, oracle and hook.
-  constructor({ path = null, extract = extractWithNoolog, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
+  constructor({ path = null, extract = extractAgreement, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
     ensure(typeof worldIdAction === 'string' && worldIdAction.trim(), 500, 'CONFIG', 'WORLD_ACTION must not be empty');
     Object.assign(this, { path, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
     this.deployQueue = Promise.resolve();
@@ -131,7 +131,7 @@ export class Agreements {
       id: `agr_${randomBytes(6).toString('hex')}`, name, profile, status: 'uploaded', createdAt: now(), updatedAt: now(),
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
       documents, config: deploymentConfig,
-      extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, history: [],
+      extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, progress: null, history: [],
     };
     this.records.set(record.id, record);
     this.transition(record, 'uploaded');
@@ -151,13 +151,16 @@ export class Agreements {
       try {
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
-        if (!draft && !process.env.NOOLOG_API_KEY) throw new Error('Reading a new document needs the model: set NOOLOG_API_KEY. Without it only the demo agreements can be generated.');
-        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft });
+        if (!draft && extractorMode() === 'mock') throw new Error('Reading a new document needs a model: EXTRACTOR=noolog with NOOLOG_API_KEY, or EXTRACTOR=openai with OPENAI_API_KEY. The mock only generates the demo agreements.');
+        // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
+        const onProgress = (state) => { record.progress = { job: state.job_id, status: state.status, at: now() }; };
+        const { envelope, verification } = await this.extract({ profile: record.profile, document, draft, onProgress, config: record.config });
+        record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
         const exported = this.export(id);
         this.transition(record, 'compiled', { policyHash: exported.policyHash, clauseTableHash: exported.clauseTableHash, coverage: { total: exported.coverage.total, counts: exported.coverage.counts, rules: exported.coverage.rules, terms: exported.coverage.terms } });
       } catch (error) {
-        this.transition(record, 'failed', { error: error.message });
+        this.transition(record, 'failed', { error: error.message, progress: null });
       } finally {
         this.jobs.delete(id);
       }

@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AppShell } from "./AppShell";
 import { Providers } from "./providers";
+import { WorldSessionProvider } from "./WorldSessionProvider";
 
 const TAGLINE = "Legal documents compiled to executable policy";
 const PITCH =
@@ -32,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             __html: `(function(){try{var m=localStorage.getItem('mirrortech.theme');if(m==='light'||m==='dark')document.documentElement.dataset.theme=m;}catch(e){}})();`,
           }}
         />
-        <Providers>
-          <AppShell>{children}</AppShell>
-        </Providers>
+        <WorldSessionProvider>
+          <Providers>
+            <AppShell>{children}</AppShell>
+          </Providers>
+        </WorldSessionProvider>
       </body>
     </html>
   );

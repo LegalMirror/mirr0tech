@@ -91,6 +91,7 @@ describe("source-linked workbench", () => {
     const graph = renderToStaticMarkup(
       createElement(GraphPane, {
         graph: sampleGraph(policy),
+        ast: policy,
         policy,
         selected,
         sample: true,
@@ -115,7 +116,11 @@ describe("source-linked workbench", () => {
     expect(html).not.toContain("<script>");
   });
   it("only labels verified claims when a non-mock report has provenance", async () => {
-    const policy = { ...(await compiled("rwa-secondary")), verification: liveReport };
+    const policy = {
+      ...(await compiled("rwa-secondary")),
+      extraction: { provider: "legacy", model: "historical" },
+      verification: liveReport,
+    };
     expect(verificationLabel(policy, false)).toBe("Extraction: 1/1 claims verified");
     expect(verificationLabel(policy, true)).toBe("Sample · exported policy");
     expect(verificationLabel({ ...policy, verification: { ...liveReport, mock: true } }, false)).toBe(

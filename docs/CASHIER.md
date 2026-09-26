@@ -4,7 +4,7 @@ The cashier is **opt-in, local/testnet prototype code**, not part of the existin
 
 ## Start from the uploaded documents
 
-Run the gateway with `npm run dev:stack` after building the existing profiles (see README), then the dashboard with `npm --prefix dashboard run dev`. Connect with the local operator key. In **Upload Contracts**, select the supplied fund agreement and opt into the NAV cashier addendum. The chooser submits the actual documents and `examples/rwa-cashier-config.json` through `/v1/agreements`.
+Run the gateway with `pnpm run dev:stack` after building the existing profiles (see README), then the dashboard with `pnpm --dir dashboard run dev`. Connect with the local operator key. In **Upload Contracts**, select the supplied fund agreement and opt into the NAV cashier addendum. The chooser submits the actual documents and `examples/rwa-cashier-config.json` through `/v1/agreements`.
 
 The base transfer-agent agreement does **not** authorize the demo NAV/fees. `test/human_contracts/nav-cashier-addendum.md` is separately authored demo evidence. Without `NOOLOG_API_KEY`, analysis uses the existing deterministic mock adapter; quote validation, AST, compilation and equivalence checks still run. Inspect source quotes, contested/unresolved items and constructor parameters before deploying.
 
@@ -41,9 +41,9 @@ The legacy USD-payment webhook assumes one USD per share and is deliberately dis
 ## Verification and limitations
 
 ```sh
-npm run build:cashier
-npm run test:chain:cashier
-npm test
+pnpm run build:cashier
+pnpm run test:chain:cashier
+pnpm test
 ```
 
 Tests use the real v4 PoolManager on Anvil: both mint/burn directions, ordinary AMM fills, failed eligibility and World ID, reserves, cap, full-fill/slippage/deadline limits, fake-router rejection, transient settlement isolation, and alternative NAV/fees/pool settings.

@@ -7,7 +7,7 @@
 ## Stack API
 
 ```sh
-npm run dev:stack   # anvil + deployed stack + operator API at http://127.0.0.1:3000/v1/stack
+pnpm run dev:stack   # anvil + deployed stack + operator API at http://127.0.0.1:3000/v1/stack
 ```
 
 Bearer token `local-dev-stack-operator-key-only` (or `API_KEY`). Demo wallets (`Investor`, `Stranger`, `Lender A/B/C`, `Operator`) are the local chain's unlocked accounts. Every action lands in `GET /v1/stack/audit` with its tx hash or its decoded refusal.
@@ -23,9 +23,9 @@ Bearer token `local-dev-stack-operator-key-only` (or `API_KEY`). Demo wallets (`
 
 Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { name, clause: { clause, quote, ruleId } } } } }`.
 
-## Key custody
+## Deployment signing
 
-`GET /v1/settings/signing` says who signs for the operator (the file key, or a MultiBaas Cloud Wallet), its balance, and what the vault holds. `PUT /v1/settings/signing { provider: "multibaas", azure?, key?, wallet?, gas? }` moves signing into an HSM-backed key: `azure` registers the Key Vault account with MultiBaas, `key` adds an existing key (`keyVersion`) or creates one (`create: true`), `wallet` names the Cloud Wallet (the only one when omitted); the gateway then hands its roles (attestor, fund tokens) and `gas` ETH to that address and signs every attestation, mint and deploy through MultiBaas from then on. The choice persists in `${DATA_DIR}/signing-<chainId>.json`; `SIGNER=multibaas` at boot does the same; `{ provider: "key" }` returns to the file key. `src/signing.js`, `src/multibaas-signer.js`, `VenueService.handover`; tests `test/signing.test.js`, `test/chain/signing.test.js` (anvil's unlocked account stands in for the vault).
+`DEPLOYER_PRIVATE_KEY` or `PRIVATE_KEY` configures the deployment signer on the server; the former takes precedence. No wallet-settings API is exposed. See `src/onchain/signer.js`.
 
 ## Payment webhook
 
@@ -33,7 +33,7 @@ Refusals return `403 { error: { code: "POLICY_REFUSED", details: { refusal: { na
 
 ## Operator API (custodial issuance)
 
-The original MVP's REST gateway (`npm start`, bearer token, `Idempotency-Key`, restart recovery) still drives Act 1's issuance: `GET /v1/policy`, `POST /v1/investors`, `POST /v1/deposits`, `POST /v1/mints`, `POST /v1/redemptions`, `GET /v1/audit`, plus mock compliance/settlement endpoints. `npm run demo` exercises it on a mock chain; `CHAIN_MODE=evm` uses the deployed token (`.env.example`).
+The original MVP's REST gateway (`pnpm start`, bearer token, `Idempotency-Key`, restart recovery) still drives Act 1's issuance: `GET /v1/policy`, `POST /v1/investors`, `POST /v1/deposits`, `POST /v1/mints`, `POST /v1/redemptions`, `GET /v1/audit`, plus mock compliance/settlement endpoints. `pnpm run demo` exercises it on a mock chain; `CHAIN_MODE=evm` uses the deployed token (`.env.example`).
 
 ## Repository map
 
@@ -41,9 +41,9 @@ The original MVP's REST gateway (`npm start`, bearer token, `Idempotency-Key`, r
 | --- | --- |
 | `src/policy/` | `document.js` normalization + bundles · `schema.js` facts, actions, AST schema · `dnf.js` DNF + equivalence · `onchain.js` emits `CompiledPolicy.sol` · `compile.js` profiles, proof, hashes · `programs.js` SwapVM programs/orders · `fixture.js`, `mla-fixture.js` hand-authored ASTs · `extract.js` live LLM extraction · `hookAddress.js` CREATE2 mining |
 | `contracts/` | `PolicyEval`, `PolicyAttestor`, `PolicyOracle`, `MirrorToken`, `MirrortechRoleProvider`, `MirrorPolicyHook`, `swapvm/`, mocks (`MockSanctionsOracle`, `MockWildcatMarket`, `test/MockERC20`) |
-| `src/deploy.js`, `scripts/deploy-stack.js` | one call deploys both acts against any RPC (anvil default; canonical `POOL_MANAGER`/`AQUA`/`WETH` via env on a public chain) |
-| `src/refusal.js` | decodes a revert, through Uniswap's wrapper if needed, into the clause |
-| `src/venues.js`, `src/venues-api.js`, `scripts/dev-stack.js` | operator service and REST routes over the deployed stack; local runner |
+| `src/onchain/deploy.js`, `scripts/deploy-stack.js` | one call deploys both acts against any RPC (anvil default; canonical `POOL_MANAGER`/`AQUA`/`WETH` via env on a public chain) |
+| `src/onchain/refusal.js` | decodes a revert, through Uniswap's wrapper if needed, into the clause |
+| `src/onchain/venues.js`, `src/routes.js`, `scripts/dev-stack.js` | operator service and REST routes over the deployed stack; local runner |
 | `scripts/demo-golden.js`, `scripts/demo-credit.js`, `scripts/demo.js` | both acts · Act 2 lender lifecycle · the original custodial issuance demo (REST) |
 | `test/`, `test/chain/` | unit tests incl. the equivalence proof · anvil tests: `evm` (token + operator signer), `rwa-pool` (Act 1), `credit` (role provider), `swapvm` (Aqua strategy), `hook` (v4), `stack` |
 | `docs/` | `PRD.md`, `ARCHITECTURE.md`, `SWAPVM_INTEGRATION.md`, `MLA_CLAUSE_MAP.md` |

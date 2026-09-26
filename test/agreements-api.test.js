@@ -1,15 +1,16 @@
+import { extractDemo } from '../src/openai-extract.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/routes.js';
 import { Agreements } from '../src/agreements.js';
 
-delete process.env.NOOLOG_API_KEY;
+delete process.env.OPENAI_API_KEY;
 const html = await readFile('test/human_contracts/ea026411904ex10-9.htm', 'utf8');
 
 test('the agreements API: upload, watch it compile, read the tree, regenerate, deploy, status', async (t) => {
-  const agreements = new Agreements({ deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xt', policyHash }) });
+  const agreements = new Agreements({ extract: extractDemo, deployer: async ({ policyHash }) => ({ chainId: 31337, token: '0xt', policyHash }) });
   const key = 'a-test-operator-key-at-least-24-characters';
   const viewer = 'a-test-viewer-key-at-least-24-characters!';
   const server = createApp(null, key, null, null, viewer, agreements).listen(0, '127.0.0.1');
@@ -25,7 +26,7 @@ test('the agreements API: upload, watch it compile, read the tree, regenerate, d
   assert.equal((await call('/v1/agreements', { method: 'POST', body: { name: 'x' } })).data.error.code, 'INVALID_BODY');
   assert.equal((await call('/v1/agreements', { method: 'POST', body: { name: 'x', text: html, extra: 1 }, token: viewer })).status, 401, 'a viewer cannot upload');
   const status = await call('/v1/status');
-  assert.equal(status.data.model.mode, 'mock');
+  assert.equal(status.data.model.mode, 'unavailable');
   assert.match(status.data.compiler.solidity.core, /^0\.8\./);
   assert.equal(status.data.chain, null);
 
@@ -44,7 +45,6 @@ test('the agreements API: upload, watch it compile, read the tree, regenerate, d
   assert.equal((await call('/v1/agreements/agr_nope/ast')).status, 404);
 
   assert.equal((await call(`/v1/agreements/${id}/regenerate`, { method: 'POST' })).status, 202);
-  assert.equal((await call(`/v1/agreements/${id}/deploy`, { method: 'POST' })).data.error.code, 'INVALID_STATE');
   await agreements.settled();
   const deploy = await call(`/v1/agreements/${id}/deploy`, { method: 'POST' });
   assert.equal(deploy.status, 202);

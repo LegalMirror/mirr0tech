@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { downloadAst } from "@/lib/legal-ast";
 import type { AstGraph } from "@/lib/agreements";
 import type { PolicyData } from "@/lib/types";
 import {
@@ -116,12 +117,14 @@ export function SourceCards({
 
 export function GraphPane({
   graph,
+  ast,
   policy,
   selected,
   onSelect,
   sample,
 }: {
   graph: AstGraph;
+  ast: unknown;
   policy: PolicyData;
   selected: string;
   onSelect: (id: string) => void;
@@ -190,6 +193,7 @@ export function GraphPane({
             +
           </button>
           <button onClick={() => setZoom(null)}>Fit</button>
+          <button onClick={() => downloadAst(ast, policy.title)}>Download AST JSON</button>
         </div>
       </div>
       <div

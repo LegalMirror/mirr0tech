@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 # Fetches the 1inch SwapVM and Aqua sources the router is built against. They are source-available
-# (Degensoft licenses) and are not committed; run once after `npm ci`.
+# (Degensoft licenses) and are not committed; run once after `pnpm install --frozen-lockfile`.
 set -e
 mkdir -p vendor
 [ -d vendor/swap-vm ] || git clone -q --depth 1 --branch release/1.1 https://github.com/1inch/swap-vm vendor/swap-vm

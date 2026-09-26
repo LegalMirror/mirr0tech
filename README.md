@@ -6,7 +6,7 @@ A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed
 
 ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
 
-**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend connects automatically to a quota-limited, anonymous demo workspace—no manual operator/viewer keys. Wallet trading uses a separate verified-investor flow.
+**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend uses placeholder World ID login, then connects to a quota-limited demo workspace—no manual operator/viewer keys. Wallet trading uses a separate verified-investor flow.
 
 [![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
 
@@ -14,74 +14,69 @@ ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with
 
 ## Run it
 
-Use **Node.js 22**, npm and [Foundry](https://getfoundry.sh) (`anvil`). Node 22 matches CI and the Docker images. Run these from the repository root:
+Use **Node.js 22.13+** and **pnpm 10.29.2**. Both packages share `pnpm-lock.yaml`.
 
 ```sh
-npm ci
-npm run build
-npm run build:secondary
-npm run build:credit               # also installs the pinned vendor sources
-npm --prefix dashboard ci
+corepack enable
+pnpm install --frozen-lockfile
+pnpm run vendor
 ```
 
-### Local demo — two terminals
-
-For the local mock flow, do not export external `RPC_URL`, `DEPLOYMENT_PATH`, signing settings or `WORLD_*` credentials in your shell. `DOTENV_CONFIG_PATH=/dev/null` below prevents an existing remote `.env` from being loaded:
+Add `OPENAI_API_KEY` to the server's `.env` for file generation. `OPENAI_MODEL` is optional (default `gpt-6-astra`, with low reasoning effort / Astra light). Keys are never sent to the dashboard. The **Demo** flow works without a key and uses a deterministic fixture.
 
 ```sh
-# Terminal 1: Anvil + complete workbench API at http://127.0.0.1:3000
-NODE_ENV=development DOTENV_CONFIG_PATH=/dev/null EXPECTED_CHAIN_ID=31337 DATA_DIR=.data/local-demo npm run dev:stack
-```
+# Terminal 1: persistent workspace API at http://localhost:3000
+pnpm run start
 
-```sh
 # Terminal 2: dashboard at http://localhost:3100
-NEXT_PUBLIC_GATEWAY_URL=http://127.0.0.1:3000 npm --prefix dashboard run dev
+pnpm --dir dashboard run dev
 ```
 
-The workbench automatically creates its own scoped demo workspace; no operator/viewer key entry is needed. The local CLI/maintenance API still uses `local-dev-stack-operator-key-only`. Local World proofs and Noolog reports are synthetic; this is not the official World simulator. Anvil is ephemeral: after a chain reset, old local deployment records are not evidence of contracts still being deployed.
+Open **http://localhost:3100**, click **Sign in with World ID** to enter with a placeholder account, then choose **Upload a contract**. Mock login is the default (`WORLD_LOGIN_MODE=mock`); no QR code or World credentials are needed. Login sessions persist in SQLite; see [sandbox login setup and boundaries](docs/WORLD_LOGIN.md).
 
-**Use `npm run dev:stack` for the workbench API.** Root `npm start` runs the older custodial ledger service, not the complete agreements/venue gateway. `npm run deploy:stack` and `npm run deploy:sepolia` explicitly deploy contracts; they are not web-server launch commands.
+Once signed in:
 
-### Existing Sepolia stack + World Sandbox
+- **Demo** generates an AST from the bundled BUIDL document, optionally with the NAV addendum.
+- **Upload files** accepts `.txt`, `.md`, `.htm`, and `.html` (2 MB per file, 4 MB request). It saves the original files locally, sends normalized text to OpenAI's Responses API using [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs), validates a version 2.0 legal-document AST with verbatim citations, hierarchy and clause relationships. The completed record is `analyzed`; its graph and JSON download are available independently of the compiler. PDF is not supported.
 
-Set `RPC_URL`, an authorized `DEPLOYER_PRIVATE_KEY`, a private `API_KEY`, and the registered `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_ACTION`, `WORLD_ENVIRONMENT=sandbox`, `WORLD_CREDENTIAL=document` in the server's runtime environment or local `.env`. Keep secrets out of source control and frontend build variables. Then:
+Files live in `.data/workspace/uploads/<contract-id>/`; records and ASTs live in `.data/workspace/agreements.json`. Set `WORKSPACE_DIR` to change the directory. Reconnecting or restarting preserves the contracts. Failed generation keeps the files and can be retried with **Regenerate**. The local workspace listens only on loopback; remote public demo hosting remains a separate deployment.
 
-```sh
-EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json DATA_DIR=.data/sepolia SEED=false npm run dev:stack
+### Sepolia deployment
+
+Uploads and AST generation do not require a blockchain. Server startup never connects to an RPC, starts Anvil, or deploys contracts. Sepolia connects lazily when chain status or deployment is requested. For deployment, configure an existing Sepolia stack:
+
+```dotenv
+RPC_URL=https://your-sepolia-rpc
+EXPECTED_CHAIN_ID=11155111
+DEPLOYMENT_PATH=deployments/sepolia.json
+DEPLOYER_PRIVATE_KEY=your-testnet-signer-key
+# PRIVATE_KEY is also supported; DEPLOYER_PRIVATE_KEY takes precedence.
 ```
 
-This reuses existing contracts; startup does not deploy a new public-chain stack. The signer needs the applicable on-chain roles and Sepolia ETH for later writes. Sandbox requires the authorized World Sandbox app and a supported credential; Passport/NFC proof success has not yet been demonstrated by these setup commands.
-
-To run only a local frontend against the hosted API:
-
-```sh
-NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run dev
-```
-
-For Coolify's **Dockerfile-only** API deployment, use [deploy/README.md](deploy/README.md): `/deploy/Dockerfile.api`, port **3200**, volume **`/app/.data`**, `SEED=false`, and runtime-only secrets.
+The server checks that the RPC and deployment record target Sepolia. **Deploy** is enabled when a signer is configured and the contract compiles; it requires explicit confirmation. Without a working testnet connection, uploads and generation still work. World ID and investor operations on the full hosted stack are configured separately; see [deployment instructions](deploy/README.md).
 
 ### Validate
 
 ```sh
-npm test
-npm run check                     # all existing policy, venue, stack and cashier chain suites
-npm --prefix dashboard test
-npm --prefix dashboard run typecheck
-npm --prefix dashboard run lint
-NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz npm --prefix dashboard run build
+pnpm test
+pnpm run check                     # all existing policy, venue, stack and cashier chain suites
+pnpm --dir dashboard test
+pnpm --dir dashboard run typecheck
+pnpm --dir dashboard run lint
+NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz pnpm --dir dashboard run build
 ```
 
-The static build is written to `dashboard/out/`; serve it with `npm --prefix dashboard start` on port 3100. The browser URL is public configuration, never a place for `API_KEY` or signing keys.
+The static build is written to `dashboard/out/`; serve it with `pnpm --dir dashboard start` on port 3100. The browser URL is public configuration, never a place for `API_KEY` or signing keys.
 
 ## Workbench and NAV cashier
 
-The default dashboard is now the agreement workbench: upload → analysis → source-linked AST → World ID constraint → deploy. Start the gateway with `npm run dev:stack`, run `npm --prefix dashboard ci`, then `npm --prefix dashboard run dev`. Open port 3100; the frontend automatically obtains a scoped demo token from the configured gateway. No operator/viewer keys are requested. Tokens stay in browser memory, and each visitor sees only their own uploads. The bundled document chooser uploads actual files through the Agreements API. Without `NOOLOG_API_KEY`, the existing mock adapter supplies deterministic analysis; provenance remains in the report.
+The workbench follows upload → AST generation → source-linked analysis → optional Sepolia deployment. Start it with `pnpm start` and `pnpm --dir dashboard dev`. Demo generation runs locally; file generation uses `OPENAI_API_KEY`. Source validation and compiler checks do not imply independent model or legal review.
 
 Opt into **NAV cashier addendum** when uploading the bundled fund agreement. The separately authored demo document supplies NAV, subscription/redemption fees and cap; pool fee and tick spacing are deployment settings. The compiler commits typed constructor parameters to the policy, and the hook/router verify them at deployment. See [cashier setup, API and limitations](docs/CASHIER.md).
 
 ```sh
-npm run build:cashier          # optional standalone artifacts/rwa-cashier
-npm run test:chain:cashier     # real v4 custom-accounting tests on Anvil
+pnpm run build:cashier          # optional standalone artifacts/rwa-cashier
+pnpm run test:chain:cashier     # real v4 custom-accounting tests on Anvil
 ```
 
 The cashier is locally tested, **not part of the existing published Sepolia deployment**. It constrains eligible execution through issuance/redemption backed by available mockUSD reserves; it does not guarantee a pinned AMM price or zero LP losses.
@@ -121,30 +116,30 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 
 - **Official contracts.** Aqua unmodified (the canonical registry on Sepolia); `MirrortechRouter` is `SwapVM` + `LimitOpcodes` with two instructions appended, no opcode renumbered (`contracts/swapvm/MirrortechRouter.sol:31-49`).
 - **Instructions.** `PolicyGuard._policyGuard` (`PolicyGuard.sol:38-50`) reads `ctx.query.maker/taker` and calls `PolicyOracle.decide`; view-only, so `quote()` refuses before a transaction exists. `FixedRateBalances` (`FixedRateBalances.sol:27-45`) pins the addendum's rate over preloaded Aqua balances.
-- **Programs.** `src/policy/programs.js` derives opcodes from the vendored `LimitOpcodes.sol`, encodes `[opcode][len][args]`, builds hookless Aqua orders and taker traits. Two positions from one addendum: `BuybackFixedPrice` (A1.1) and `BuybackDutchAuction`, the official `DutchAuctionBalanceOut` between rate and curve, floor to the A1.5 ceiling over the window: a tender offer with the agreement as an opcode.
+- **Programs.** `src/onchain/programs.js` derives opcodes from the vendored `LimitOpcodes.sol`, encodes `[opcode][len][args]`, builds hookless Aqua orders and taker traits. Two positions from one addendum: `BuybackFixedPrice` (A1.1) and `BuybackDutchAuction`, the official `DutchAuctionBalanceOut` between rate and curve, floor to the A1.5 ceiling over the window: a tender offer with the agreement as an opcode.
 - **Executed.** `test/chain/swapvm.test.js`, `scripts/demo-golden.js`: `ship` → `quote` → `swap` (`pull`/`push`) → refusals → cap, deadline → `dock`; the auction quotes at open, midway and near close, fills, expires.
 
 Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
 
 ## How we used World ID
 
-The trust moment is access to issuance, transfer and the cashier—not login. The issuer selects the credential required by the agreement and binds that choice to its policy hash. IDKit requests that credential for the selected wallet; `src/worldid.js` requires a matching, server-validated v4 result before attesting `identityVerified`. A Passport/NFC credential is evidence for a document-based onboarding condition, **not a full KYC/AML, sanctions or accreditation decision**, and those facts remain separate. The workbench shows the exact clause, remaining requirements, cancellation/rejection and a fresh access decision after the receipt. Mock and live proof namespaces are separated. Real World verification still requires registered credentials and a user-completed proof; local demonstrations do not establish live-provider success. [Trust boundaries and integration debrief](docs/WORLD_ID.md).
+Sandbox World ID session proofs gate application login. The separate document-verification trust moment is access to issuance, transfer and the cashier. The issuer selects the credential required by the agreement and binds that choice to its policy hash. IDKit requests that credential for the selected wallet; `src/worldid.js` requires a matching, server-validated v4 result before attesting `identityVerified`. A Passport/NFC credential is evidence for a document-based onboarding condition, **not a full KYC/AML, sanctions or accreditation decision**, and those facts remain separate. The workbench shows the exact clause, remaining requirements, cancellation/rejection and a fresh access decision after the receipt. Mock and live proof namespaces are separated. Real World verification still requires registered credentials and a user-completed proof; local demonstrations do not establish live-provider success. [Trust boundaries and integration debrief](docs/WORLD_ID.md).
 
-## How we used Noolog
+## Legal document extraction
 
-New to Noolog? [docs/NOOLOG.md](docs/NOOLOG.md): what it is, the docs MCP server (`.mcp.json` wires it into this checkout), the API and SDK links.
+Uploaded documents now use Astra light through the OpenAI Responses API. `src/legal/ast.js` defines the document AST: sections and clauses, semantic child nodes, typed cross-references, and explicit open questions. The server validates all quote occurrences against the named source file, computes character offsets, and rejects duplicate IDs, missing link targets and cyclic hierarchy. Noolog extraction has been removed. Offline compiler demos still use explicitly labelled deterministic fixtures; existing saved compiler policies can still be read. A legal-document AST does not by itself authorize deployment.
 
-The extraction is generated by a Noolog deliberation, not by one model call. `src/noolog/extract.js` sends the document (and the hand-authored reading as a draft) to the OpenAI-compatible endpoint (`POST /v1/chat/completions`, model `nsed:deep`); the answer is the winning proposal, the `x-nsed-session-id` header names the job, and `GET /deliberation/{job}/details` + `/references` give every claim its verdicts (`verified | contested | unverified | wrong`), the evaluators' counter-positions on contested items, the winner, the convergence and a confidence per rule, term and open item. That report ships as `verification` in every policy export; the dashboard shows it on the Agreement screen (counts, contested items, every claim, the schema on real data) and under every sentence. With no `NOOLOG_API_KEY` the in-process mock (`src/noolog/mock.js`) serves the same routes, status codes and schemas (checked against `noolog-wire` and `quorum-rs`) with a mechanical critic: a quote that is not in the text is wrong, one that repeats or is too short is contested, an open item is unverified. `test/noolog.test.js` runs the loop over HTTP: a forged quote is refuted and dropped from the generated extraction; the MLA's repeated sentences come back contested.
+In **Contract-AST**, select a source clause or graph node to trace its relationships. **Focus selection** shows adjacent clauses and the structural ancestors; clear it for the full graph. **Human Language** highlights the selected quote in the normalized source. **Download AST JSON** exports the full AST (including all source documents, hashes, nodes, relationships and open questions), regardless of the current graph filter. Use **Regenerate** on an existing uploaded contract to replace its old extraction. See [the AST format](docs/LEGAL_AST.md).
 
-## How we used Curvegrid MultiBaas
+## Onchain modules
 
-`src/multibaas.js` uploads every contract's ABI and bytecode under a label and a policy-hash version (`policy-<hash8>`), aliases and links each address (`attestor`, `fund_hook`, `role_provider`, `swapvm_router`, …), so MultiBaas indexes `Attested`/`Revoked`/`Overridden`, `CredentialDecision`, `PolicyChecked`, Aqua's `Pushed`/`Pulled` and the router's `Swapped`. The stack API serves them at `GET /v1/stack/events` and the audit screen reads that. `node scripts/multibaas-sync.js deployments/sepolia.json` registered the Sepolia deployment (13 contracts; the dev plan links 10 and indexes from the link, `MULTIBAAS_STARTING_BLOCK`). `src/multibaas-signer.js` is the operator key in a vault: with `SIGNER=multibaas` the gateway signs attestations, mints and deploys through a MultiBaas Cloud Wallet (`/chains/ethereum/hsm/submit`); only the signature leaves the HSM. The issuer configures it in the platform: `PUT /v1/settings/signing` takes the Azure Key Vault account and key (or an existing Cloud Wallet), hands the operator roles and gas to it, and the gateway signs from the vault from then on (`docs/API.md`, Key custody). The dev deployment has no HSM wallet yet, so this is proven on anvil with an unlocked account standing in for the vault. `test/multibaas.test.js` and `test/multibaas-signer.test.js` cover both against a fake client.
+`src/onchain/` contains the blockchain implementation: deployment and RPC connections, venue operations, deployment-key selection, Solidity compilation, policy and cashier encoding, SwapVM programs, hook-address mining, revert decoding, and audit-event mapping. Application HTTP routes and middleware live in `src/routes.js`; document extraction and policy validation remain outside the chain runtime.
 
-Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right granularity for a compiler that emits versioned contracts; we missed a supported-chain check and an idempotent upsert for re-syncs.
+The gateway signs with `DEPLOYER_PRIVATE_KEY`, falling back to `PRIVATE_KEY`. There is no wallet-settings or key-handover API. `GET /v1/stack/events` returns the gateway's audit records, not a complete chain index. Sepolia initialization remains lazy and does not block workspace startup.
 
 ## Dashboard and API
 
-`npm --prefix dashboard run dev` serves http://localhost:3100. Connect the workbench to `npm run dev:stack` with session-memory credentials; do not put an operator key in `NEXT_PUBLIC_*`. The default view links clause cards to the AST graph and supports actual uploads, analysis, constraints and deployment. The previous overview and classic lender, exit and audit routes remain available. [Dashboard setup](dashboard/README.md) · [API](docs/API.md).
+`pnpm --dir dashboard run dev` serves http://localhost:3100. Connect the workbench to `pnpm start`; do not put an operator key in `NEXT_PUBLIC_*`. The default view links clause cards to the AST graph and supports actual uploads, analysis, constraints and deployment. The previous overview and classic lender, exit and audit routes remain available. [Dashboard setup](dashboard/README.md) · [API](docs/API.md).
 
 ## Deploy
 
@@ -217,4 +212,4 @@ Screening, countersignature, AML/KYC and solvency are attested, not proved; a po
 
 First-party code is unlicensed (`UNLICENSED`); no license is granted. Earlier releases remain under their original licenses, and previously granted rights are not retroactively withdrawn.
 
-Dependencies, vendored code, and reproduced interfaces retain their original licenses and notices. `vendor/` (git-ignored, fetched by `npm run vendor`) holds 1inch SwapVM and Aqua under their source-available Degensoft licenses; the router is a modified redeployment as the hackathon rules permit. `contracts/wildcat/IRoleProvider.sol` reproduces Wildcat's MIT-licensed interface.
+Dependencies, vendored code, and reproduced interfaces retain their original licenses and notices. `vendor/` (git-ignored, fetched by `pnpm run vendor`) holds 1inch SwapVM and Aqua under their source-available Degensoft licenses; the router is a modified redeployment as the hackathon rules permit. `contracts/wildcat/IRoleProvider.sol` reproduces Wildcat's MIT-licensed interface.

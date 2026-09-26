@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { ContractFactory, Interface, Wallet, id, keccak256, MaxUint256 } from 'ethers';
 import { startAnvil, warp, DEV_KEY } from './anvil.js';
-import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../../src/policy/programs.js';
+import { loadOpcodes, buildBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom } from '../../src/onchain/programs.js';
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));
@@ -167,7 +167,7 @@ test('the compiled agreement runs as an instruction inside a 1inch SwapVM progra
 });
 
 test('the tender-offer template improves the price from the floor to the ceiling and then expires', { timeout: 300_000 }, async (t) => {
-  const { buildDutchBuybackProgram } = await import('../../src/policy/programs.js');
+  const { buildDutchBuybackProgram } = await import('../../src/onchain/programs.js');
   const { provider } = await startAnvil(t);
   const admin = new Wallet(DEV_KEY, provider);
   const borrower = await provider.getSigner(1);

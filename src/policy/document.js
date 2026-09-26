@@ -43,6 +43,7 @@ export function bundleDocuments(parts) {
     sha256: sha256(canonical(parts.map((part) => part.sha256))),
     textSha256: sha256(text),
     text,
+    sourceDocuments: parts.map((part, index) => ({ id: `document-${index + 1}`, name: part.name, sha256: part.sha256, textSha256: part.textSha256, text: part.text })),
     parts: parts.map(({ name, sha256: raw, textSha256 }) => ({ name, sha256: raw, textSha256 })),
   };
 }

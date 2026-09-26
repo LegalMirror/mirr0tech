@@ -1,3 +1,4 @@
+import { worldSessionHeaders } from "./world-session";
 import { gatewayUrl, getSession, hasGatewaySession, setSession } from "./session";
 
 type Attempt = { url: string; pending: boolean; promise: Promise<void> };
@@ -6,6 +7,7 @@ let attempt: Attempt | null = null;
 export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void> {
   const url = gatewayUrl(rawUrl);
   if (!url) return Promise.resolve();
+  const local = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(url).hostname);
   if (!retry && hasGatewaySession(getSession()) && getSession().url === url) return Promise.resolve();
   if (attempt?.url === url && (attempt.pending || !retry)) return attempt.promise;
   setSession({
@@ -14,7 +16,7 @@ export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void>
     operatorKey: "",
     autoDemo: false,
     demoState: "starting",
-    demoNotice: "Creating your isolated demo workspace. No login or API key is required.",
+    demoNotice: "Connecting to your workspace…",
   });
   const revision = getSession().revision;
   const stillCurrent = () => getSession().url === url && getSession().revision === revision;
@@ -22,7 +24,50 @@ export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void>
   const timeout = setTimeout(() => controller.abort(), 20000);
   const run = async () => {
     try {
+      if (local) {
+        const configResponse = await fetch(`${url}/v1/workspace/config`, {
+          headers: worldSessionHeaders(url),
+          signal: controller.signal,
+          cache: "no-store",
+          credentials: "omit",
+          redirect: "error",
+        });
+        const config = await configResponse.json().catch(() => null);
+        if (!configResponse.ok || config?.mode !== "local")
+          throw new Error(
+            "Start the local workspace with pnpm start, then reconnect. The server on this URL does not provide the workspace API."
+          );
+        const response = await fetch(`${url}/v1/workspace/session`, {
+          method: "POST",
+          headers: worldSessionHeaders(url),
+          signal: controller.signal,
+          cache: "no-store",
+          credentials: "omit",
+          redirect: "error",
+        });
+        const value = await response.json().catch(() => null);
+        if (
+          !response.ok ||
+          value?.role !== "workspace" ||
+          typeof value.accessToken !== "string" ||
+          !value.accessToken
+        )
+          throw new Error("Could not connect to the local workspace. Retry the connection.");
+        if (stillCurrent())
+          setSession({
+            url,
+            viewerKey: "",
+            operatorKey: "",
+            workspaceToken: value.accessToken,
+            autoDemo: false,
+            demoState: "ready",
+            demoNotice:
+              "Local workspace connected. Contracts and source files are saved on this machine and remain available after reload.",
+          });
+        return;
+      }
       const configResponse = await fetch(`${url}/v1/demo/config`, {
+        headers: worldSessionHeaders(url),
         signal: controller.signal,
         cache: "no-store",
         credentials: "omit",
@@ -38,6 +83,7 @@ export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void>
       if (!stillCurrent()) return;
       const response = await fetch(`${url}/v1/demo/session`, {
         method: "POST",
+        headers: worldSessionHeaders(url),
         signal: controller.signal,
         cache: "no-store",
         credentials: "omit",
@@ -90,9 +136,13 @@ export function startDemoWorkspace(rawUrl: string, retry = false): Promise<void>
           autoDemo: false,
           demoState: "unavailable",
           demoNotice: controller.signal.aborted
-            ? "Demo connection timed out. Samples are still readable. Retry explicitly to create a new workspace."
+            ? local
+              ? "Workspace connection timed out. Check that pnpm start is running, then reconnect."
+              : "Demo connection timed out. Samples are still readable. Retry explicitly to create a new workspace."
             : error instanceof TypeError
-              ? "Could not reach the public demo API. Check the gateway URL/network/CORS or retry after its update. Samples remain available."
+              ? local
+                ? "Could not reach the local workspace. Run pnpm start and reconnect to http://localhost:3000."
+                : "Could not reach the public demo API. Check the gateway URL/network/CORS or retry after its update. Samples remain available."
               : (error as Error).message,
         });
     } finally {

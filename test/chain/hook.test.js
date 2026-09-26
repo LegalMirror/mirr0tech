@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { ContractFactory, Contract, Interface, Wallet, AbiCoder, concat, id, MaxUint256, ZeroAddress } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/policy/hookAddress.js';
+import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, MIRROR_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/onchain/hookAddress.js';
 
 const policy = JSON.parse(await readFile('generated/policy.json', 'utf8'));
 const clauseTable = JSON.parse(await readFile('generated/clause-table.json', 'utf8'));

@@ -2,14 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { readFile } from 'node:fs/promises';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/routes.js';
 import { Agreements } from '../src/agreements.js';
 import { DemoWorkspaces } from '../src/demo-workspaces.js';
 
 const key = 'test-maintenance-key-at-least-24-characters';
 
 test('public demo mounts before operator auth without granting operator authority', async (t) => {
-  delete process.env.NOOLOG_API_KEY;
   const agreements = await new Agreements({ deployer: async () => ({ testOnly: true }) }).init();
   const workspaces = await new DemoWorkspaces({ agreements, chainId: 31337 }).init();
   const app = createApp(null, key, null, null, null, agreements, { demoWorkspaces: workspaces });

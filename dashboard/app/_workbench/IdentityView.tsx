@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+// import Link from "next/link"; // Restore with the investor dashboard link.
 import type {
   AgreementDetail,
   AgreementsClient,
@@ -622,10 +622,11 @@ export function IdentityView({
       </div>
       {demoWorkspace && (
         <Notice>
-          Public demo scope covers your contracts only, not stack administration or wallet operations.{" "}
+          Public demo scope covers your contracts only, not stack administration or wallet operations.
+          {/* Investor dashboard temporarily disabled.
           <Link href="/investor">
             Open the investor dashboard for Passport login and wallet-signed swaps ↗
-          </Link>
+          </Link> */}
         </Notice>
       )}
       {identity && deployed ? (
@@ -641,7 +642,7 @@ export function IdentityView({
           <h3>Ready-to-demo path</h3>
           <p>
             {demoWorkspace
-              ? "Use the investor dashboard for publicly published funds. A demo workspace token never grants issuer or investor wallet privileges."
+              ? "A demo workspace token never grants issuer or investor wallet privileges."
               : sample
                 ? "This is an exported policy, not a wallet verification session."
                 : "Wallet proof and access checks become available after this policy is deployed. A stale deployment hash is not accepted."}

@@ -6,5 +6,5 @@ coverage/
 next-env.d.ts
 *.tsbuildinfo
 lib/build-info.json
-# Written by `npm run ui:export` from the repository root before every dev and build.
+# Written by `pnpm run ui:export` from the repository root before every dev and build.
 public/data/

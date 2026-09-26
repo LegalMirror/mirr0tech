@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { resolveComponents, COMPONENTS, PROFILES } from '../src/policy/components.js';
+import { resolveComponents, COMPONENTS, PROFILES } from '../src/onchain/components.js';
 import { readDocument, readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';

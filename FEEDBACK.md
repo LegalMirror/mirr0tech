@@ -1,6 +1,6 @@
 # Uniswap v4 developer feedback — mirr0tech (ETHGlobal Tokyo 2026)
 
-What we built on v4: `contracts/MirrorPolicyHook.sol` — a hook on `beforeAddLiquidity` / `beforeRemoveLiquidity` / `beforeSwap` that enforces a compiled legal agreement (a Securitize/BlackRock transfer-agent agreement) for a permissioned fund token, plus a transient-storage handshake that makes the hook the token's only door into any pool (`contracts/MirrorToken.sol:_update`, `MirrorPolicyHook.consumeApproval`). Tested against the real `PoolManager` on anvil in `test/chain/hook.test.js` and `test/chain/rwa-pool.test.js`; address mining in `src/policy/hookAddress.js`.
+What we built on v4: `contracts/MirrorPolicyHook.sol` — a hook on `beforeAddLiquidity` / `beforeRemoveLiquidity` / `beforeSwap` that enforces a compiled legal agreement (a Securitize/BlackRock transfer-agent agreement) for a permissioned fund token, plus a transient-storage handshake that makes the hook the token's only door into any pool (`contracts/MirrorToken.sol:_update`, `MirrorPolicyHook.consumeApproval`). Tested against the real `PoolManager` on anvil in `test/chain/hook.test.js` and `test/chain/rwa-pool.test.js`; address mining in `src/onchain/hookAddress.js`.
 
 ## What worked well
 - Permission bits in the address are a clean contract: a mis-deployed hook fails at construction, not at first use. Mining took ~140 attempts with the deterministic deployer.

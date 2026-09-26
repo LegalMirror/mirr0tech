@@ -2,11 +2,11 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
-import { cashierFixture } from '../src/policy/cashier.js';
-import { extractWithNoolog } from '../src/noolog/extract.js';
+import { cashierFixture } from '../src/onchain/cashier.js';
+import { extractDemo } from '../src/openai-extract.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { astSchema } from '../src/policy/schema.js';
-import { buybackTermsFrom } from '../src/policy/programs.js';
+import { buybackTermsFrom } from '../src/onchain/programs.js';
 
 const args = process.argv.slice(2);
 const demo = args.includes('--demo');
@@ -27,7 +27,7 @@ const defaults = args.includes('--cashier')
 
 // Several documents may be compiled as one bundle: pass them comma-separated.
 const document = await readDocuments((paths[1] ?? defaults.document).split(','));
-const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : (await extractWithNoolog({ profile: defaults.profile, document, draft: defaults.fixture(document).ast })).envelope;
+const envelope = paths[0] ? JSON.parse(await readFile(paths[0], 'utf8')) : (await extractDemo({ profile: defaults.profile, document, draft: defaults.fixture(document).ast })).envelope;
 const config = JSON.parse(await readFile(paths[2] ?? defaults.config, 'utf8'));
 const result = compilePolicy(envelope, config, document, { demo });
 

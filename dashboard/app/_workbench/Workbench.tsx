@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { canRegenerate, deployBlocked, inFlight, type Constraints } from "@/lib/agreements";
 import {
   getServerSession,
@@ -12,11 +12,12 @@ import {
   subscribeSession,
   type GatewaySession,
 } from "@/lib/session";
-import { verificationLabel } from "@/lib/workbench";
 import { startDemoWorkspace } from "@/lib/demo-session";
 import { short } from "@/lib/format";
 import { SettingsDialog, UploadDialog } from "./Forms";
-import { Evidence, GraphPane, HumanView, SourceCards } from "./PolicyPanes";
+import { isLegalAst } from "@/lib/legal-ast";
+import { LegalAstView } from "./LegalAstView";
+import { GraphPane, HumanView, SourceCards } from "./PolicyPanes";
 import { ApiView, DeployView } from "./ServiceViews";
 import { IdentityView } from "./IdentityView";
 import { AnalysisView } from "./AnalysisView";
@@ -54,7 +55,7 @@ export function Workbench() {
 }
 
 function SessionWorkbench({ session }: { session: GatewaySession }) {
-  const [sample, setSample] = useState(!hasGatewaySession(session));
+  const [sample, setSample] = useState(false);
   const state = useWorkbench(session, sample);
   const { data, client, status } = state;
   const [view, setView] = useState<View>("ast");
@@ -62,23 +63,23 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
   const [selection, setSelection] = useState<{ id: string; node: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<
     (Confirmation & { recordId: string; policyHash: string | null }) | null
   >(null);
   const [busy, setBusy] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const [navOpen, setNavOpen] = useState(false);
-  const [split, setSplit] = useState(44);
   const record = data?.record ?? null;
   const policy = record?.export ?? null;
   const writable = !sample && canMutateAgreements(session) && !state.detailError;
   const selected =
     selection?.id === record?.id
       ? (selection?.node ?? "agreement")
-      : policy?.rules[0]
-        ? `rule:${policy.rules[0].id}`
-        : "agreement";
+      : isLegalAst(record?.ast)
+        ? (record.ast.nodes.find((node) => node.kind === "clause") ?? record.ast.nodes[0]).id
+        : policy?.rules[0]
+          ? `rule:${policy.rules[0].id}`
+          : "agreement";
   const onSelect = (node: string) => record && setSelection({ id: record.id, node });
   const blocked = deployBlocked(record, status, writable);
   const filtered = state.agreements.filter((entry) =>
@@ -202,6 +203,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           )}
         </nav>
         <div className="wb-contracts-bottom">
+          {/* Investor dashboard temporarily disabled.
           <Link href="/investor" className="wb-primary wb-upload">
             <Icon name="shield" />
             <span>
@@ -209,7 +211,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <br />
               <small>Sign in with World ID</small>
             </span>
-          </Link>
+          </Link> */}
           <button className="wb-primary wb-upload" onClick={() => setUploadOpen(true)}>
             <Icon name="plus" />
             Upload Contracts
@@ -227,6 +229,12 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           {views.map((item) => (
             <button
               key={item.id}
+              disabled={item.id === "identity" && isLegalAst(record?.ast)}
+              title={
+                item.id === "identity" && isLegalAst(record?.ast)
+                  ? "Identity constraints require a compiled policy"
+                  : undefined
+              }
               aria-current={view === item.id ? "page" : undefined}
               onClick={() => setView(item.id)}
             >
@@ -254,9 +262,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           <div className="wb-top-actions">
             <button
               aria-label="Regenerate contract"
-              title={
-                !writable ? "An active demo workspace is required" : "Regenerate from the original documents"
-              }
+              title={!writable ? "Connect to the workspace first" : "Regenerate from the original documents"}
               disabled={!writable || busy || !canRegenerate(record?.status)}
               onClick={() => requestConfirmation({ kind: "regenerate" })}
             >
@@ -274,34 +280,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             </button>
           </div>
         </header>
-        <div className="wb-contextbar">
-          <div>
-            <button className="wb-evidence-badge" disabled={!policy} onClick={() => setEvidenceOpen(true)}>
-              <span className="wb-dot" />
-              {verificationLabel(policy, sample)}
-              {policy && <span>↗</span>}
-            </button>
-            {record && (
-              <span className="wb-record-state">{sample ? "Not a live contract" : record.status}</span>
-            )}
-          </div>
-          <div>
-            {view === "ast" && (
-              <label className="wb-split-control">
-                Split
-                <input
-                  type="range"
-                  min="32"
-                  max="62"
-                  value={split}
-                  onChange={(e) => setSplit(Number(e.target.value))}
-                  aria-label="Source pane width"
-                />
-              </label>
-            )}
-            <span className="wb-mode-label">{sample ? "SAMPLE" : "API"}</span>
-          </div>
-        </div>
         {sample && (
           <div className="wb-mode-banner">
             <span>
@@ -318,7 +296,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           <Notice>
             {session.demoNotice}
             {["unavailable", "expired"].includes(session.demoState ?? "") && (
-              <button onClick={() => setSettingsOpen(true)}>Start / retry demo workspace</button>
+              <button onClick={() => setSettingsOpen(true)}>Reconnect workspace</button>
             )}
           </Notice>
         )}
@@ -425,16 +403,25 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               onDeploy={() => requestConfirmation({ kind: "deploy" })}
               onConstrain={(body) => requestConfirmation({ kind: "constraints", body })}
             />
+          ) : isLegalAst(record.ast) ? (
+            <LegalAstView
+              key={record.id}
+              ast={record.ast}
+              selected={selected}
+              onSelect={onSelect}
+              human={view === "human"}
+            />
           ) : policy ? (
             view === "human" ? (
               <HumanView key={record.id} policy={policy} selected={selected} onSelect={onSelect} />
             ) : (
-              <div className="wb-split" style={{ "--source-width": `${split}%` } as CSSProperties}>
+              <div className="wb-split">
                 <SourceCards policy={policy} selected={selected} onSelect={onSelect} />
                 {data?.graph ? (
                   <GraphPane
                     key={record.id}
                     graph={data.graph}
+                    ast={record.ast ?? policy}
                     policy={policy}
                     selected={selected}
                     onSelect={onSelect}
@@ -508,6 +495,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
       )}
       {uploadOpen && (
         <UploadDialog
+          localWorkspace={!!session.workspaceToken}
           onClose={() => setUploadOpen(false)}
           writable={!sample && canMutateAgreements(session)}
           demoWorkspace={!!session.demoToken}
@@ -518,11 +506,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             setView("analysis");
           }}
         />
-      )}
-      {evidenceOpen && policy && (
-        <Modal title="Verification & provenance" onClose={() => setEvidenceOpen(false)}>
-          <Evidence policy={policy} sample={sample} />
-        </Modal>
       )}
       {confirmation && record && (
         <Modal

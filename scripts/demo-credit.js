@@ -1,5 +1,5 @@
 // Walks the lender lifecycle a borrower's compliance team runs by hand today, against a local
-// chain. No API key, no network, no real market. Run with: npm run demo:credit
+// chain. No API key, no network, no real market. Run with: pnpm run demo:credit
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -51,7 +51,7 @@ const sanctionsArtifact = await load('MockSanctionsOracle');
 const marketArtifact = await load('MockWildcatMarket');
 const tokenArtifact = await load('MockERC20');
 if (providerArtifact.policyHash !== compiled.policy.hash) {
-  console.error('Build the credit artifacts first: npm run build:credit');
+  console.error('Build the credit artifacts first: pnpm run build:credit');
   process.exit(1);
 }
 

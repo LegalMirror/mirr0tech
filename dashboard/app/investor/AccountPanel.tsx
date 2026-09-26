@@ -43,10 +43,7 @@ export function AccountPanel({
       try {
         if (history.status === "rejected") throw history.reason;
         assertScope(history.value, session, fund);
-        if (
-          !["multibaas", "rpc", "unavailable"].includes(history.value.source) ||
-          !Array.isArray(history.value.events)
-        )
+        if (!["rpc", "unavailable"].includes(history.value.source) || !Array.isArray(history.value.events))
           throw new Error("The activity endpoint returned an unsupported response.");
         for (const event of history.value.events) assertScope(event, session, fund);
         setActivity(history.value);
@@ -95,12 +92,7 @@ export function AccountPanel({
       op.finish();
     }
   }
-  const sourceLabel =
-    activity?.source === "multibaas"
-      ? "Curvegrid MultiBaas index"
-      : activity?.source === "rpc"
-        ? "RPC log fallback"
-        : "Activity unavailable";
+  const sourceLabel = activity?.source === "rpc" ? "RPC logs" : "Activity unavailable";
   return (
     <>
       <section className="iv-session">
@@ -334,11 +326,9 @@ export function AccountPanel({
         {activity && (
           <>
             <p className="iv-note">
-              {activity.source === "multibaas"
-                ? "Curvegrid indexes events separately from transaction execution. A confirmed receipt can precede an indexed event."
-                : activity.source === "rpc"
-                  ? "Recent RPC logs are shown because the indexer is not configured or unavailable. This is not a full history."
-                  : "No activity source is currently available; no empty-history claim is made."}{" "}
+              {activity.source === "rpc"
+                ? "Recent RPC logs are shown. This is not a full history."
+                : "No activity source is currently available; no empty-history claim is made."}{" "}
               Indexer: {activity.indexer.status}. {activity.notice}
             </p>
             {activity.events.length ? (

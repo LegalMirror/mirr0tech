@@ -3,17 +3,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { Contract, Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { deployStack, deployFund } from '../../src/deploy.js';
+import { deployStack, deployFund } from '../../src/onchain/deploy.js';
 import { Agreements } from '../../src/agreements.js';
-import { MIRROR_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/policy/hookAddress.js';
+import { MIRROR_HOOK_FLAGS, ALL_HOOK_MASK } from '../../src/onchain/hookAddress.js';
 
-delete process.env.NOOLOG_API_KEY;
+import { extractDemo } from '../../src/openai-extract.js';
 
 test('an uploaded agreement deploys its own token, oracle, hook and policy-managed pool on the running stack', { timeout: 300_000 }, async (t) => {
   const { provider } = await startAnvil(t);
   const signer = new Wallet(DEV_KEY, provider);
   const { record } = await deployStack(signer);
-  const agreements = new Agreements({ deployer: ({ sources }) => deployFund(signer, { record, sources }) });
+  const agreements = new Agreements({ extract: extractDemo, deployer: ({ sources }) => deployFund(signer, { record, sources }) });
   const html = await readFile('test/human_contracts/ea026411904ex10-9.htm', 'utf8');
   const { id } = await agreements.create({ name: 'BUIDL', documents: [{ name: 'ea026411904ex10-9.htm', text: html }] });
   await agreements.settled();

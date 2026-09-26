@@ -12,7 +12,7 @@ export async function loadDemoBundle(signal?: AbortSignal): Promise<Upload> {
     DEMO_FILES.map(async (file) => {
       const response = await fetch(demoUrl(file.name), { signal });
       if (!response.ok)
-        throw new Error(`Could not load ${file.name}. Run npm run demo:sync in dashboard and retry.`);
+        throw new Error(`Could not load ${file.name}. Run pnpm run demo:sync in dashboard and retry.`);
       return { ...file, text: await response.text() };
     })
   );

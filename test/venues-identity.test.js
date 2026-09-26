@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { VenueService } from '../src/venues.js';
+import { VenueService } from '../src/onchain/venues.js';
 
 function fixture() {
   const wallet = '0x0000000000000000000000000000000000000001';

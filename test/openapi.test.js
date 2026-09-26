@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { createApp } from '../src/app.js';
+import { createApp } from '../src/routes.js';
 import { openapiDocument } from '../src/openapi.js';
 
 test('the OpenAPI document describes every operation with a tag and responses, webhooks under their own tag', () => {

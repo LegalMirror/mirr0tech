@@ -20,7 +20,8 @@ services:
       RPC_URL: ${RPC_URL:?Set a Sepolia HTTPS RPC URL}
       API_KEY: ${API_KEY:?Set a unique operator key of at least 24 characters}
       VIEWER_KEY: ${VIEWER_KEY:-}
-      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:?Set the authorized testnet operator key as a runtime secret}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:-}
+      PRIVATE_KEY: ${PRIVATE_KEY:-}
       DEPLOYMENT_PATH: deployments/sepolia.json
       DATA_DIR: /app/.data
       AUDIT_PATH: /app/.data/audit-11155111.json
@@ -30,11 +31,13 @@ services:
       WORLD_RP_SIGNING_KEY: ${WORLD_RP_SIGNING_KEY:?Set the RP signing key as a runtime secret}
       WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
       WORLD_CREDENTIAL: document
-      WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
-      # Empty means the existing deterministic mock Noolog adapter; proof verification is NOT mocked.
-      NOOLOG_API_KEY: ${NOOLOG_API_KEY:-}
-      MULTIBAAS_URL: ${MULTIBAAS_URL:-}
-      MULTIBAAS_API_KEY: ${MULTIBAAS_API_KEY:-}
+      WORLD_ENVIRONMENT: sandbox
+      WORLD_LOGIN_MODE: ${WORLD_LOGIN_MODE:-mock}
+      WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
+      WORLD_SESSION_DB: /app/.data/world-sessions.sqlite
+      # Operator uploads use Astra; public demos remain explicit offline fixtures.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-6-astra}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3200/health').then(async r=>{const b=await r.json();process.exit(r.ok&&b.stack?.chainId===11155111?0:1)}).catch(()=>process.exit(1))"]
       interval: 15s

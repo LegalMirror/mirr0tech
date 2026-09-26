@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { evaluatePolicy } from '../src/policy/evaluate.js';
 import { validateAst } from '../src/policy/schema.js';
 import { compilePolicy, verifyPolicy } from '../src/policy/compile.js';
+import { legalAst } from './legal-ast-fixture.js';
+import { legalDocument } from './legal-ast-fixture.js';
 import { extractAst } from '../src/policy/extract.js';
 import { document, envelope, compiled, config, compliant } from './helpers.js';
 
@@ -47,13 +49,13 @@ test('unsupported transfer permission fails compilation explicitly', () => {
 });
 test('live extractor requests strict structured data and validates returned source citations', async () => {
   let body;
-  const result = await extractAst(document, { apiKey: 'test-only', model: 'test-model', fetchImpl: async (_url, request) => {
+  const result = await extractAst(legalDocument, { apiKey: 'test-only', model: 'test-model', fetchImpl: async (_url, request) => {
     body = JSON.parse(request.body);
-    return { ok: true, json: async () => ({ id: 'test', status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(envelope.ast) }] }] }) };
+    return { ok: true, json: async () => ({ id: 'test', status: 'completed', output: [{ content: [{ type: 'output_text', text: JSON.stringify(legalAst) }] }] }) };
   } });
   assert.equal(body.store, false);
   assert.equal(body.text.format.strict, true);
-  assert.equal(result.source.sha256, document.sha256);
+  assert.equal(result.source.sha256, legalDocument.sha256);
   assert.equal(result.extraction.provider, 'openai');
 });
 test('extractor fails on missing credentials, refusals, truncation and malformed output', async () => {

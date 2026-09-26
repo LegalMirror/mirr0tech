@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { Wallet } from 'ethers';
 import { startAnvil, DEV_KEY } from './anvil.js';
-import { deployStack } from '../../src/deploy.js';
-import { VenueService } from '../../src/venues.js';
-import { createApp } from '../../src/app.js';
+import { deployStack } from '../../src/onchain/deploy.js';
+import { VenueService } from '../../src/onchain/venues.js';
+import { createApp } from '../../src/routes.js';
 import { mockProof } from '../../src/worldid.js';
 import { sign, SIGNATURE_HEADER } from '../../src/payments.js';
-import { auditEvents } from '../../src/audit-events.js';
+import { auditEvents } from '../../src/onchain/audit-events.js';
 
 const SECRET = 'whsec_chain_test';
 const event = (id, wallet, cents) => JSON.stringify({ id, type: 'payment_intent.succeeded', data: { object: { id: `pi_${id}`, amount: cents, currency: 'usd', metadata: { wallet } } } });

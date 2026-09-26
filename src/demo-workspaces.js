@@ -2,10 +2,9 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { mkdir, open, readFile, rename } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { Router, json } from 'express';
 import { draftFor } from './agreements.js';
 import { AppError, ensure } from './errors.js';
-import { extractWithNoolog } from './noolog/extract.js';
+import { extractWorkspace, extractDemo } from './openai-extract.js';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
 import { PROFILES } from '../scripts/export-ui.js';
@@ -179,7 +178,7 @@ export class DemoWorkspaces {
   }
 
   mockOnly() {
-    unavailable(!process.env.NOOLOG_API_KEY && this.agreements.extract === extractWithNoolog, 'Public demo generation is unavailable with live or custom Noolog extraction; use the operator API. Public uploads only support the bundled mock documents.');
+    unavailable([extractWorkspace, extractDemo].includes(this.agreements.extract), 'Public demos only support the bundled deterministic fixtures; custom extractors require the operator API.');
   }
 
   validateConfig(profile, input) {
@@ -243,7 +242,7 @@ export class DemoWorkspaces {
       await this.reserve(session, ['uploads', 'jobs']);
       this.supported(input);
       this.mockOnly();
-      const created = await this.agreements.create(input);
+      const created = await this.agreements.create({ ...input, generation: 'demo' });
       session.ids.push(created.id);
       await this.persist();
       return safeRecord(created);
@@ -272,52 +271,4 @@ export class DemoWorkspaces {
       return safeRecord(await this.agreements[method](id, body));
     });
   }
-}
-
-function publicStatus(value, workspaces) {
-  const solidity = {};
-  for (const key of ['core', 'uniswap-v4', 'swapvm']) {
-    const version = value?.compiler?.solidity?.[key];
-    if (typeof version === 'string' && /^\d+\.\d+\.\d+(?:[+.-][A-Za-z0-9.+-]+)?$/.test(version) && version.length <= 100) solidity[key] = version;
-  }
-  return { model: { provider: 'noolog', mode: process.env.NOOLOG_API_KEY || workspaces.agreements.extract !== extractWithNoolog ? 'unavailable' : 'mock' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
-}
-
-// Mount at /v1 BEFORE operator auth/body parsers. Non-demo credentials always leave this router.
-export function demoWorkspaceRoutes(workspaces, status = async () => ({})) {
-  const router = Router();
-  const tokenOf = (req) => req.demoAccessToken;
-  const wrap = (code, handler) => async (req, res) => res.status(code).json(await handler(req));
-  router.use(async (req, res, next) => {
-    const authorization = req.headers.authorization;
-    const isDemo = typeof authorization === 'string' && /^Bearer\s+demo_/i.test(authorization);
-    if (authorization && !isDemo) return next('router');
-    const isPublic = (req.method === 'GET' && req.path === '/demo/config') || (req.method === 'POST' && req.path === '/demo/session');
-    if (!isDemo && !isPublic) return next('router');
-    res.set('Cache-Control', 'no-store');
-    // Never use X-Forwarded-For. Even a parent's broad trust-proxy setting cannot create free IPs.
-    req.demoIp = req.app.get('trust proxy') ? req.socket.remoteAddress : req.ip;
-    await workspaces.admit(req.demoIp ?? 'unknown');
-    if (isDemo) {
-      req.demoAccessToken = authorization.replace(/^Bearer\s+/i, '');
-      workspaces.authenticate(tokenOf(req));
-    }
-    next();
-  });
-  router.get('/demo/config', wrap(200, () => workspaces.config()));
-  router.post('/demo/session', json({ limit: 1024, inflate: false }), wrap(201, (req) => workspaces.session(req.demoIp)));
-  router.post('/demo/logout', wrap(200, (req) => workspaces.logout(tokenOf(req))));
-  router.get('/status', wrap(200, async () => publicStatus(await status(), workspaces)));
-  router.get('/agreements', wrap(200, (req) => workspaces.read(tokenOf(req), 'list')));
-  router.post('/agreements', json({ limit: workspaces.limits.maxRequestBytes, inflate: false }), wrap(201, (req) => workspaces.create(tokenOf(req), req.body)));
-  for (const method of ['get', 'ast', 'constraints']) router.get(`/agreements/:id${method === 'get' ? '' : `/${method}`}`, wrap(200, (req) => workspaces.read(tokenOf(req), method, req.params.id)));
-  router.put('/agreements/:id/constraints', json({ limit: '32kb', inflate: false }), wrap(200, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'constrain', req.body)));
-  for (const method of ['regenerate', 'deploy']) router.post(`/agreements/:id/${method}`, wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, method)));
-  // No fallthrough, even for unknown agreement suffixes/methods or newly added operator routes.
-  router.use((_req, _res, next) => next(new AppError(403, 'FORBIDDEN', 'This endpoint is not available to demo sessions')));
-  router.use((error, _req, res, _next) => {
-    const code = error.status >= 400 && error.status < 600 ? error.status : 500;
-    res.status(code).json({ error: { code: error.code ?? (code === 413 ? 'BODY_TOO_LARGE' : code === 400 ? 'INVALID_JSON' : 'INTERNAL_ERROR'), message: error instanceof AppError && code !== 500 ? error.message : 'Public demo request failed' } });
-  });
-  return router;
 }

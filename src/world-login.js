@@ -1,0 +1,168 @@
+import { createHash, randomBytes } from 'node:crypto';
+import { mkdirSync, chmodSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { signRequest } from '@worldcoin/idkit-core/signing';
+import { hashSignal } from '@worldcoin/idkit-core/hashing';
+import { ensure } from './errors.js';
+
+const hash = (value) => createHash('sha256').update(value).digest('hex');
+const secret = () => randomBytes(32).toString('hex');
+const hex = (value) => typeof value === 'string' && /^0x[\da-f]{1,64}$/i.test(value);
+const sameHex = (a, b) => hex(a) && hex(b) && BigInt(a) === BigInt(b);
+const sessionId = (value) => typeof value === 'string' && /^session_[\da-f]{128}$/i.test(value);
+const LOGIN_TTL = 24 * 3600;
+
+/** Application login is independent of wallet-bound document verification. */
+export class WorldLogin {
+  static async open(options = {}) {
+    const { DatabaseSync } = await import('node:sqlite');
+    return new WorldLogin({ ...options, DatabaseSync });
+  }
+
+  constructor({ DatabaseSync, path = process.env.WORLD_SESSION_DB || resolve(process.env.DATA_DIR || '.data', 'world-sessions.sqlite'),
+    appId = process.env.WORLD_APP_ID, rpId = process.env.WORLD_RP_ID, signingKey = process.env.WORLD_RP_SIGNING_KEY,
+    action = process.env.WORLD_LOGIN_ACTION || '',
+    fetchImpl = fetch, clock = Date.now, mode = process.env.WORLD_LOGIN_MODE || 'mock' } = {}) {
+    ensure(['mock', 'sandbox', 'v3'].includes(mode), 500, 'WORLD_LOGIN_CONFIG', 'WORLD_LOGIN_MODE must be mock, sandbox or v3.');
+    Object.assign(this, { appId, rpId, signingKey, action, fetchImpl, clock, mode });
+    if (path !== ':memory:') mkdirSync(dirname(resolve(path)), { recursive: true, mode: 0o700 });
+    this.db = new DatabaseSync(path);
+    if (path !== ':memory:') chmodSync(path, 0o600);
+    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+      CREATE TABLE IF NOT EXISTS login_challenges (hash TEXT PRIMARY KEY, nonce TEXT NOT NULL, signal TEXT NOT NULL, expires INTEGER NOT NULL, expected_session TEXT, used INTEGER NOT NULL DEFAULT 0);
+      CREATE TABLE IF NOT EXISTS world_accounts (id TEXT PRIMARY KEY, subject TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS world_login_proofs (hash TEXT PRIMARY KEY);
+      CREATE TABLE IF NOT EXISTS world_sessions (hash TEXT PRIMARY KEY, account TEXT NOT NULL REFERENCES world_accounts(id), expires INTEGER NOT NULL);
+      CREATE INDEX IF NOT EXISTS world_sessions_expiry ON world_sessions(expires);`);
+    // Existing accounts were created by the sandbox verifier.
+    if (!this.db.prepare('PRAGMA table_info(world_accounts)').all().some((column) => column.name === 'mode'))
+      this.db.exec("ALTER TABLE world_accounts ADD COLUMN mode TEXT NOT NULL DEFAULT 'sandbox'");
+  }
+  now() { return Math.floor(this.clock() / 1000); }
+  close() { this.db.close(); }
+  environment() { return this.mode === 'v3' ? 'staging' : this.mode; }
+  configured() { return (this.mode !== 'v3' || (typeof this.action === 'string' && this.action.trim().length > 0)) && /^app_[a-z0-9]+$/i.test(this.appId || '') && /^rp_[a-z0-9]+$/i.test(this.rpId || '') && /^(0x)?[\da-f]{64}$/i.test(this.signingKey || ''); }
+  config() { return { configured: this.mode === 'mock' || this.configured(), environment: this.environment(), mode: this.mode }; }
+
+  mockLogin() {
+    ensure(this.mode === 'mock', 403, 'MOCK_LOGIN_DISABLED', 'Placeholder login is disabled.');
+    const id = `mock_${secret().slice(0, 24)}`;
+    const accessToken = `world_${secret()}`;
+    const expiresAt = this.now() + LOGIN_TTL;
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.db.prepare('DELETE FROM world_sessions WHERE expires <= ?').run(this.now());
+      this.db.prepare('INSERT INTO world_accounts (id, subject, created, mode) VALUES (?, ?, ?, ?)').run(id, hash(id), this.now(), 'mock');
+      this.db.prepare('INSERT INTO world_sessions VALUES (?, ?, ?)').run(hash(accessToken), id, expiresAt);
+      this.db.exec('COMMIT');
+      return { accessToken, ...this.context(id, expiresAt, 'mock') };
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+
+  challenge({ existingSessionId } = {}) {
+    ensure(this.mode !== 'mock', 403, 'SANDBOX_LOGIN_DISABLED', 'Verified login is disabled.');
+    ensure(this.configured(), 503, 'WORLD_LOGIN_CONFIG', 'Set WORLD_APP_ID, WORLD_RP_ID and WORLD_RP_SIGNING_KEY on the backend; v3 also requires WORLD_LOGIN_ACTION.');
+    ensure(existingSessionId === undefined || (this.mode === 'sandbox' && sessionId(existingSessionId)), 400, 'LOGIN_SESSION', 'Invalid returning session.');
+    if (existingSessionId) ensure(this.db.prepare('SELECT id FROM world_accounts WHERE subject = ?').get(hash(`sandbox:${this.rpId}:${existingSessionId}`)), 400, 'LOGIN_SESSION', 'This saved World ID session is unknown. Choose Use a different World ID to start again.');
+    this.db.prepare('DELETE FROM login_challenges WHERE expires <= ?').run(this.now());
+    this.db.prepare('DELETE FROM world_sessions WHERE expires <= ?').run(this.now());
+    ensure(this.db.prepare('SELECT count(*) AS n FROM login_challenges').get().n < 100, 429, 'LOGIN_LIMIT', 'Too many login attempts. Try again in five minutes.');
+    // Only v3 uniqueness requests have an action; v4 session requests must omit it.
+    const signed = signRequest({ signingKeyHex: this.signingKey, ttl: 300, ...(this.mode === 'v3' ? { action: this.action } : {}) });
+    const challengeToken = secret();
+    const signal = secret();
+    this.db.prepare('INSERT INTO login_challenges (hash, nonce, signal, expires, expected_session) VALUES (?, ?, ?, ?, ?)').run(hash(challengeToken), signed.nonce, signal, signed.expiresAt, existingSessionId || null);
+    return { challengeToken, signal, app_id: this.appId, environment: this.environment(),
+      ...(this.mode === 'v3' ? { action: this.action } : {}),
+      rp_context: { rp_id: this.rpId, nonce: signed.nonce, created_at: signed.createdAt, expires_at: signed.expiresAt, signature: signed.sig } };
+  }
+
+  async login({ challengeToken, proof } = {}, { requestId } = {}) {
+    ensure(this.mode !== 'mock', 403, 'SANDBOX_LOGIN_DISABLED', 'Verified login is disabled.');
+    ensure(typeof challengeToken === 'string' && /^[\da-f]{64}$/.test(challengeToken), 400, 'LOGIN_CHALLENGE', 'Start a new login attempt.');
+    // Consume atomically before awaiting World. Failed attempts require a fresh challenge too.
+    const challenge = this.db.prepare('UPDATE login_challenges SET used = 1 WHERE hash = ? AND expires > ? AND used = 0 RETURNING *').get(hash(challengeToken), this.now());
+    ensure(challenge, 400, 'LOGIN_CHALLENGE', 'Login expired or was already used. Start again.');
+    const item = proof?.responses?.[0];
+    const legacy = this.mode === 'v3';
+    if (legacy) {
+      ensure(proof?.protocol_version === '3.0' && proof.environment === 'staging'
+        && proof.nonce === challenge.nonce && proof.action === this.action && !('session_id' in proof)
+        && Array.isArray(proof.responses) && proof.responses.length === 1
+        && item?.identifier === 'orb' && hex(item.nullifier) && hex(item.merkle_root)
+        && typeof item.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof)
+        && sameHex(item.signal_hash, hashSignal(challenge.signal)),
+      400, 'INVALID_LOGIN_PROOF', 'Expected a staging World ID v3 Orb proof bound to this login attempt.');
+    } else ensure(proof?.protocol_version === '4.0' && proof.environment === 'sandbox' && proof.nonce === challenge.nonce
+      && !('action' in proof) && sessionId(proof.session_id) && (!challenge.expected_session || proof.session_id === challenge.expected_session)
+      && Array.isArray(proof.responses) && proof.responses.length === 1
+      && item?.identifier === 'proof_of_human' && item.issuer_schema_id === 1
+      && Array.isArray(item.proof) && item.proof.length === 5 && item.proof.every(hex)
+      && Array.isArray(item.session_nullifier) && item.session_nullifier.length === 2 && item.session_nullifier.every(hex)
+      && Number.isSafeInteger(item.expires_at_min) && item.expires_at_min >= 0
+      && sameHex(item.signal_hash, hashSignal(challenge.signal)),
+    400, 'INVALID_LOGIN_PROOF', 'Expected a sandbox World ID session proof bound to this login attempt.');
+    let response, result;
+    const started = Date.now();
+    const diagnosticCode = (value) => typeof value === 'string' && /^[a-zA-Z_]{1,64}$/.test(value) ? value : undefined;
+    console.info('[World ID] verification started', { requestId, environment: this.environment(), provider: 'developer.world.org' });
+    try {
+      response = await this.fetchImpl(`https://developer.world.org/api/v4/verify/${this.rpId}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(proof),
+        signal: AbortSignal.timeout(10000), redirect: 'error',
+      });
+      result = await response.json();
+    } catch (error) {
+      console.error('[World ID] verification transport failed', {
+        requestId, durationMs: Date.now() - started, status: response?.status,
+        errorName: diagnosticCode(error?.name), causeCode: diagnosticCode(error?.cause?.code),
+      });
+      ensure(false, 503, 'WORLD_UNAVAILABLE', 'World ID verification is unavailable. Start a new login attempt.');
+    }
+    console.info('[World ID] verification response', {
+      requestId, durationMs: Date.now() - started, status: response.status, success: result?.success === true,
+      providerCode: diagnosticCode(result?.code), credentialCode: diagnosticCode(result?.results?.[0]?.code),
+      credentialAccepted: result?.results?.[0]?.success === true,
+      sessionMatches: result?.session_id === proof.session_id,
+      environmentMatches: !result?.environment || result.environment === this.environment(),
+      resultCount: Array.isArray(result?.results) ? result.results.length : null,
+    });
+    ensure(response.ok && result?.success === true && (legacy || result.session_id === proof.session_id)
+      && (!result.environment || result.environment === this.environment()) && !result.code
+      && Array.isArray(result.results) && result.results.length === 1
+      && result.results[0]?.identifier === item.identifier && result.results[0].success === true && !result.results[0].code,
+    400, 'WORLD_LOGIN_REJECTED', 'World ID did not verify this login proof. Start again.');
+    ensure(challenge.expires > this.now(), 400, 'LOGIN_CHALLENGE', 'Login expired. Start again.');
+    const proofHash = legacy ? hash(`v3:${this.rpId}:${this.action}:${item.proof.toLowerCase()}`) : hash(`${this.rpId}:${item.session_nullifier.map((value) => BigInt(value).toString(16)).join(':')}`);
+    // A v3 nullifier identifies the account and legitimately repeats on each fresh login.
+    const subject = legacy
+      ? hash(JSON.stringify(['staging', 'v3', this.appId, this.rpId, this.action, BigInt(item.nullifier).toString(16)]))
+      : hash(`sandbox:${this.rpId}:${proof.session_id}`);
+    const accessToken = `world_${secret()}`;
+    const expiresAt = this.now() + LOGIN_TTL;
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      ensure(!this.db.prepare('SELECT hash FROM world_login_proofs WHERE hash = ?').get(proofHash), 400, 'LOGIN_REPLAY', 'This World ID proof was already used.');
+      this.db.prepare('INSERT INTO world_login_proofs VALUES (?)').run(proofHash);
+      this.db.prepare('INSERT OR IGNORE INTO world_accounts (id, subject, created, mode) VALUES (?, ?, ?, ?)').run(`world_${secret().slice(0, 24)}`, subject, this.now(), this.mode);
+      const account = this.db.prepare('SELECT id FROM world_accounts WHERE subject = ?').get(subject);
+      this.db.prepare('INSERT INTO world_sessions VALUES (?, ?, ?)').run(hash(accessToken), account.id, expiresAt);
+      this.db.exec('COMMIT');
+      return { accessToken, ...this.context(account.id, expiresAt, this.mode), ...(legacy ? {} : { worldSessionId: proof.session_id }) };
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  context(id, expiresAt, mode = 'sandbox') {
+    const mock = mode === 'mock';
+    return { account: { id, provider: mock ? 'world-id-mock' : 'world-id', environment: mode === 'v3' ? 'staging' : mode, mock, credential: mock ? null : mode === 'v3' ? 'orb' : 'proof_of_human', passportVerified: false }, expiresAt };
+  }
+  authenticate(token) {
+    const row = typeof token === 'string' && /^world_[\da-f]{64}$/.test(token)
+      ? this.db.prepare('SELECT s.account, s.expires, a.mode FROM world_sessions s JOIN world_accounts a ON a.id = s.account WHERE s.hash = ? AND s.expires > ? AND a.mode = ?').get(hash(token), this.now(), this.mode) : null;
+    ensure(row, 401, 'WORLD_SESSION_REQUIRED', 'Sign in with World ID to continue.');
+    return this.context(row.account, row.expires, row.mode);
+  }
+  logout(token) { this.authenticate(token); this.db.prepare('DELETE FROM world_sessions WHERE hash = ?').run(hash(token)); }
+  requireSession = (req, _res, next) => {
+    try { req.worldAccount = this.authenticate(req.get('X-World-Session')).account; next(); } catch (error) { next(error); }
+  };
+}

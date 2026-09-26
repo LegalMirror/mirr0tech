@@ -1,75 +1,46 @@
 # Mirr0rtech dashboard
 
-Next.js 15 App Router, React 19, TypeScript and plain CSS. Static-exportable. The default route stays the contract workbench; `/investor` is the separate World Passport / wallet-signed Sepolia flow. `ethers@6.17.0` is used for exact-unit conversion, EIP-191 signature verification and calldata validation—not a backend or custodial wallet. The existing palette and classic dashboard routes remain unchanged.
+Next.js 15 App Router, React 19, TypeScript and plain CSS. Static-exportable. Logged-out visitors see the sandbox World ID landing page; after login the default route opens the contract workbench; `/investor` is the separate World Passport / wallet-signed Sepolia flow. `ethers@6.17.0` is used for exact-unit conversion, EIP-191 signature verification and calldata validation—not a backend or custodial wallet. The existing palette and classic dashboard routes remain unchanged.
 
 ## Launch commands
 
-Run dependency/setup commands from the repository root:
+From the repository root:
 
 ```sh
-npm ci
-npm run vendor
-npm --prefix dashboard ci
-npm --prefix dashboard run export
+pnpm install --frozen-lockfile
+pnpm run vendor
+pnpm start
+# Another terminal:
+pnpm --dir dashboard dev
 ```
 
-### Local frontend → hosted Sandbox/Sepolia API
+Open **http://localhost:3100** and click **Sign in with World ID**. The default mock mode creates a placeholder session without a QR code or World credentials. See [World ID login](../docs/WORLD_LOGIN.md) for session persistence and configuration. The gateway defaults to `http://localhost:3000`; `NEXT_PUBLIC_GATEWAY_URL` overrides it. The local workspace reconnects automatically and retains contracts across reloads.
+
+## Upload flow
+
+**Demo** loads the bundled BUIDL document and optional NAV cashier addendum and generates a deterministic AST without an API key. **Upload files** reads text, Markdown or HTML files and requests OpenAI AST generation with the server's `OPENAI_API_KEY` and optional `OPENAI_MODEL`. No paste mode or operator-key prompt is needed. Files are limited to 2 MB each and a 4 MB JSON request; PDFs are not supported.
+
+The button explains when the workspace needs a connection, files need selecting, or demo files are loading. Source files are saved in `.data/workspace/uploads/<id>/` before generation; records and ASTs persist in `.data/workspace/agreements.json`. A generation failure keeps the upload for retry. Source quotes and AST structure are validated locally. Model output is not labeled as independently verified. An AST that cannot compile remains visible in Analysis with its error.
+
+The workspace starts with no sample contracts. **Explore sample exports** remains an explicit read-only option. The historical hosted public demo gateway retains its separate scoped-token restrictions; the local workspace accepts your own documents.
+
+## Deployment and validation
+
+Server startup is independent of Sepolia. RPC connection happens only when chain status or deployment is requested; no local Anvil deployment is required. Configure a Sepolia RPC, the existing `deployments/sepolia.json` record, and a server-side testnet signer to enable confirmed deployment. Uploads and AST generation also work without a chain connection.
 
 ```sh
-cd dashboard
-NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz ./node_modules/.bin/next dev -p 3100
+pnpm --dir dashboard test
+pnpm --dir dashboard typecheck
+pnpm --dir dashboard build
+pnpm --dir dashboard start
 ```
 
-Open **http://localhost:3100/** for anonymous demo contract creation and **http://localhost:3100/investor** for investor sign-in. The investor API defaults to `https://mir-api.peeramid.xyz` when the build variable is absent. The backend must allow the dashboard origin for investor challenges; a working CORS response alone is not investor authorization.
-
-### Local frontend → local API
-
-Run the gateway from a separate terminal at the repository root. To reuse the existing Sepolia deployment with server credentials already configured in its runtime environment:
-
-```sh
-EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json DATA_DIR=.data/sepolia SEED=false WORLD_ENVIRONMENT=sandbox WORLD_CREDENTIAL=document npm run dev:stack
-```
-
-Then run the frontend from `dashboard/`:
-
-```sh
-NEXT_PUBLIC_GATEWAY_URL=http://127.0.0.1:3000 ./node_modules/.bin/next dev -p 3100
-```
-
-Server-only prerequisites: `RPC_URL`, an authorized/funded testnet signer, the backend's internal operator configuration, matching registered `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, and the app's actual registered `WORLD_ACTION`. Do not put any of those secrets in frontend variables. For public investor trading, the backend must publish a cashier-enabled agreement via its investor service. The existing legacy stack is read-only. **The investor UI signs on Sepolia only**; local Anvil can exercise the anonymous agreement demo but is not presented as a Sandbox Passport success. See [root launch instructions](../README.md#run-it) and [API/Coolify setup](../deploy/README.md) for backend startup, publishing and persistence.
-
-### Static build and validation (from `dashboard/`)
-
-```sh
-npm run export
-NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz ./node_modules/.bin/next build
-./node_modules/.bin/tsc --noEmit
-npm test
-npm run lint
-npm start
-```
-
-`npm start` serves `out/` at port 3100. GitHub Pages needs only the static export and the public API URL; use the deployment's existing base-path settings. The normal `npm run dev`, `npm run build`, and `npm run typecheck` wrappers stamp build metadata first. **This working tree has a user-owned `zimport` typo in `scripts/build-info.mjs`; those wrappers are currently blocked.** The direct commands above deliberately bypass that file and reuse the existing generated `lib/build-info.json`; they do not fix or overwrite the user edit. A clean checkout without that local typo can use the normal wrappers.
-
-`npm run ui:export` at the repository root writes `dashboard/public/data/{index,custodial-rwa,rwa-secondary,wildcat-credit}.json`. It compiles the fixtures with `{ demo: true }`; these exports are real compiler artifacts, **not evidence of a live extraction or deployment**. The sample library needs these generated files. Build and dev generate them automatically. Export failures are shown in the UI with the command needed to produce them. No fallback silently turns a failed live connection into a sample.
-
-## Workbench flow
-
-1. Open `/`. The workbench makes one bounded attempt to read public `GET /v1/demo/config` and create `POST /v1/demo/session`. Anyone can create contracts in this isolated anonymous demo workspace; no World login, operator key or viewer key is requested. If the demo API is missing, disabled or unreachable, the **Sample** library remains explicitly read-only. A failed attempt does not loop.
-2. **Connection** contains only gateway URL, start/retry and disconnect controls. Demo tokens stay in memory and authorize only the agreed agreement/status paths. Reloading creates a new workspace; expiration requires an explicit new-workspace action and never replays an upload/deploy. Previous/private agreement records are not fetched. Remote gateways require HTTPS; local HTTP is allowed on loopback. Samples support clause/AST selection, graph filtering/zoom, source reading and paragraph coverage.
-3. **Upload Contracts** defaults to downloadable **Demo documents**: the real BUIDL source. Explicitly check the NAV option to include the separately authored `nav-cashier-addendum.md` and `rwa-cashier-config.json` with `cashier.enabled=true`. Inspect the selected source files and JSON before submitting the real `POST /v1/agreements`. These assets are copied from the backend fixtures by `npm run demo:sync` (also run by dev/build); they are not pre-baked upload responses. The dialog also accepts pasted text/Markdown/HTML or a bundle of `.txt`, `.md`, `.htm`, `.html` files. No PDF support. Limits match the server: 2 MB per document, 4 MB for the JSON request. Files go to the gateway and, when configured, its extraction provider. The public demo backend accepts only the bundled BUIDL source (optionally the authored NAV addendum with its matching config), and only the two RWA profiles. Paste/file controls can submit the same base source; use Demo documents for the complete NAV bundle/config. Arbitrary documents and live/custom Noolog extraction are not allowed in anonymous scope.
-4. Generation is automatic after upload. The detail and list views poll every 2 seconds while jobs are in flight; settled details poll every 10 seconds, list/status every 15 seconds. Polls are serial and cancellable; obsolete responses are discarded. Read failures retry after 5 seconds. Writes are never automatically retried. Requests time out after 30 seconds; a timed-out write may still be running on the server, so refresh before retrying.
-5. In **Deploy**, review policy coverage and configure the issuer's **World ID constraint**: credential, actions and verbatim source quote. Saving uses `PUT /constraints`, recompiles the policy and clears the current deployment record. Existing chain contracts remain unchanged. Constraint edits are not a new extraction deliberation.
-6. **Regenerate** and **Deploy** require confirmation and a valid scoped demo workspace for the selected, owned agreement. Deployment also requires `compiled`, a reported signer and a supported token profile. The credit profile uses its existing stack venue and cannot be deployed per agreement. Confirmation is rejected if the selected policy changes while it is open. The backend remains the authority on state and authorization.
-7. The **Analysis** view opens after upload. It shows recorded lifecycle transitions (not invented streaming progress), Noolog claim verdicts with their quotes, filters for contested/unverified claims, evaluator counter-positions, unresolved interpretations, and exhaustive compiler checks. The existing backend mock Noolog adapter produces the report when no live model is configured. Its report is labeled **Simulated Noolog analysis**; no frontend-generated verdicts or false live claim are used. Trace any source-backed claim directly into the AST.
-8. **World ID** explains the contract's credential choice, clause and privacy boundary. Anonymous demo tokens cannot access agreement `/stack` or classic admin methods. Use the separate **Investor dashboard** for a publicly published fund's Passport login and wallet operations. Configuring a demo identity rule or deploying a demo contract grants no investor or operator privileges.
-
-The **API** view shows the current agreement response and documented routes, supports manual refresh and downloads the compiled policy export. The **Deploy** view also retains the browser policy evaluator, explicitly labeled as a local simulation. It does not transact or attest facts.
+`build` writes the static site to `dashboard/out/`. `start` in the dashboard package serves it on port 3100; root `pnpm start` runs the workspace API.
 
 ### Security and provenance
 
-- The public UI has no operator/viewer secret inputs. Demo and investor tokens are held in **separate memory stores**, never localStorage, sessionStorage, cookies, URLs or generated files. Neither token is copied into `operatorKey` or `viewerKey`.
-- **Never put operator, World RP, wallet or MultiBaas secrets in `NEXT_PUBLIC_*`.** Only the gateway URL is public configuration. The internal adapter's key injection remains a test/operator seam, not a login option in the public UI.
+- The public UI has no operator/viewer secret inputs. Local workspace tokens are held only in memory; local files persist on the server. Demo and investor tokens are held in **separate memory stores**, never localStorage, sessionStorage, cookies, URLs or generated files. Neither token is copied into `operatorKey` or `viewerKey`.
+- **Never put operator, World RP, wallet secrets in `NEXT_PUBLIC_*`.** Only the gateway URL is public configuration. The internal adapter's key injection remains a test/operator seam, not a login option in the public UI.
 - Demo requests are allowlisted to own agreement list/read/upload/AST/constraints/regenerate/deploy and status paths. `/stack`, classic admin routes, private policy reads and investor endpoints are rejected before fetch with a demo token. Classic screens retain sample reads, but public sessions cannot mutate their admin data. Investor auth calls only `/v1/investor/*` and uses no issuer credentials. All requests omit cookies, disable caching and refuse redirects; the backend remains authoritative.
 - The gateway must allow this dashboard's exact origin and authorization/content-type/idempotency-key headers through CORS, including **PUT** for constraints. Backend CORS configuration is outside `dashboard/**`.
 - **Sample**, **mock extraction**, and **live extraction evidence** are distinct. A verified-claims badge requires a non-mock report with a job ID, evaluators, claims and source/extraction provenance. It is not a blanket “Verified” claim. The evidence dialog exposes hashes, claim verdicts, contested counts and the original report.

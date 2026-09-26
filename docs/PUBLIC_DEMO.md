@@ -1,6 +1,6 @@
 # Anonymous demo workspaces
 
-`src/demo-workspaces.js` exports `DemoWorkspaces` and `demoWorkspaceRoutes`. Visitors get a short-lived, randomly generated bearer capability without entering operator/viewer keys. This is **not anonymous operator access**: a capability owns only agreements created through that session.
+`src/demo-workspaces.js` exports the `DemoWorkspaces` service; `src/routes.js` exports `demoWorkspaceRoutes`. Visitors get a short-lived, randomly generated bearer capability without entering operator/viewer keys. This is **not anonymous operator access**: a capability owns only agreements created through that session.
 
 This module does not enable itself or modify application wiring, the dashboard, investor authentication, deployment scripts, or environment files. The parent application must mount it explicitly.
 
@@ -8,8 +8,8 @@ This module does not enable itself or modify application wiring, the dashboard, 
 
 ```js
 import { dirname, join } from 'node:path';
-import { DemoWorkspaces, demoWorkspaceRoutes } from './demo-workspaces.js';
-import { stackStatus } from './agreements-api.js';
+import { DemoWorkspaces } from './demo-workspaces.js';
+import { demoWorkspaceRoutes, stackStatus } from './routes.js';
 
 // The parent has already initialized its ONE shared Agreements instance and
 // checked that the connected RPC/signer chain equals venues.record.chainId.

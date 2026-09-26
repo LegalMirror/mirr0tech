@@ -426,19 +426,11 @@ export default function ExitPage() {
         ) : (
           <HookCard policy={policy.data} parties={parties.data} />
         ))}
-      {profile === "custodial-rwa" && (
-        <p className="small muted">
-          <button className="linkish" onClick={() => setProfile("rwa-secondary")}>
-            Switch to Trade on v4
-          </button>{" "}
-          to see the hook admit an onboarded investor and quote Exhibit A to a stranger.
-        </p>
-      )}
       {!credit && (
         <p className="small muted">
           The lender exit lives in Act 2.{" "}
           <button className="linkish" onClick={() => setProfile("wildcat-credit")}>
-            Switch to the Wildcat MLA
+            Switch to the loan
           </button>
         </p>
       )}

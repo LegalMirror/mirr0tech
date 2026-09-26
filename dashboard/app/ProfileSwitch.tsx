@@ -1,30 +1,14 @@
 "use client";
 
-import type { ProfileId } from "@/lib/types";
+import { ACTS } from "@/lib/acts";
 import { useProfile } from "./providers";
 
-const OPTIONS: { profile: ProfileId; act: string; label: string; doc: string }[] = [
-  { profile: "custodial-rwa", act: "Act 1", label: "Tokenize", doc: "Securitize transfer-agent agreement" },
-  {
-    profile: "rwa-secondary",
-    act: "Act 1",
-    label: "Trade on v4",
-    doc: "Securitize agreement + the transfer rules the Uniswap v4 hook enforces",
-  },
-  {
-    profile: "wildcat-credit",
-    act: "Act 2",
-    label: "Lend",
-    doc: "Wildcat MLA + Lender Check Policy + addendum",
-  },
-];
-
-/** One compiler, several documents: the switch every screen reads. */
+/** The act every screen reads: the fund (Act 1) or the loan (Act 2). */
 export function ProfileSwitch() {
   const { profile, setProfile } = useProfile();
   return (
-    <div className="pf-switch" role="radiogroup" aria-label="Policy">
-      {OPTIONS.map((o) => (
+    <div className="pf-switch" role="radiogroup" aria-label="Act">
+      {ACTS.map((o) => (
         <button
           key={o.profile}
           type="button"
@@ -34,7 +18,7 @@ export function ProfileSwitch() {
           onClick={() => setProfile(o.profile)}
           title={o.doc}
         >
-          <span className="pf-act">{o.act}</span>
+          <span className="pf-act">Act {o.act}</span>
           <span className="pf-label">{o.label}</span>
         </button>
       ))}

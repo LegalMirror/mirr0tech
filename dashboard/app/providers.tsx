@@ -6,7 +6,9 @@ import { useResource, type Resource } from "@/lib/hooks";
 import type { PolicyData, ProfileId } from "@/lib/types";
 
 const KEY = "mirrortech.profile";
-const PROFILES: ProfileId[] = ["custodial-rwa", "rwa-secondary", "wildcat-credit"];
+import { VISIBLE_PROFILES, visibleProfile } from "@/lib/acts";
+
+const PROFILES: ProfileId[] = VISIBLE_PROFILES;
 
 type ProfileState = { profile: ProfileId; setProfile: (profile: ProfileId) => void };
 const ProfileContext = createContext<ProfileState | null>(null);
@@ -28,11 +30,12 @@ export function Providers({ children }: { children: ReactNode }) {
   const [profile, set] = useState<ProfileId>("wildcat-credit");
   useEffect(() => {
     // A link can name the profile (?profile=rwa-secondary); otherwise the last choice is remembered.
-    const linked = new URLSearchParams(window.location.search).get("profile") as ProfileId | null;
+    const raw = new URLSearchParams(window.location.search).get("profile") as ProfileId | null;
+    const linked = raw ? visibleProfile(raw) : null;
     if (linked && PROFILES.includes(linked)) return set(linked);
     try {
       const saved = localStorage.getItem(KEY) as ProfileId | null;
-      if (saved && PROFILES.includes(saved)) set(saved);
+      if (saved && PROFILES.includes(visibleProfile(saved))) set(visibleProfile(saved));
     } catch {
       /* storage refused — keep the default */
     }

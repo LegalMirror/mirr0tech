@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { ACTS, VISIBLE_PROFILES } from "@/lib/acts";
 import { source } from "@/lib/adapter";
 import { KIND_LABEL, plainSummary, VERDICT_LABEL } from "@/lib/labels";
 import { proofLinks, standings } from "@/lib/overview";
@@ -14,7 +15,7 @@ const sentence = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 type ActData = { summary: ProfileSummary; policy: PolicyData; parties: Party[]; events: AuditEvent[] };
 
 async function loadActs(): Promise<ActData[]> {
-  const summaries = await source.profiles();
+  const summaries = (await source.profiles()).filter((summary) => VISIBLE_PROFILES.includes(summary.profile));
   return Promise.all(
     summaries.map(async (summary) => {
       const [policy, parties, events] = await Promise.all([
@@ -41,7 +42,7 @@ function ActCard({ act }: { act: ActData }) {
   return (
     <section className="card act-card">
       <div className="eyebrow">
-        Act {summary.act} · {summary.label}
+        Act {summary.act} · {ACTS.find((entry) => entry.profile === summary.profile)?.label ?? summary.label}
       </div>
       <h2>{policy.title.replace(" — executable subset", "")}</h2>
       <p className="meta">{summary.venue}</p>

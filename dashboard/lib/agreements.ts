@@ -1,6 +1,7 @@
 import type { LegalAst, LegalNode, LegalSource } from "./legal-ast";
 import type { Coverage, PolicyData, ProfileId, Verification, WorldIdContext } from "./types";
 import { gatewayRequest, type GatewaySession } from "./session";
+import type { SwapQuote, SwapApprovals, SwapTransaction, SwapState } from "./swap";
 
 export type AgreementStatus =
   "uploaded" | "extracting" | "verified" | "analyzed" | "compiled" | "deploying" | "deployed" | "failed";
@@ -9,12 +10,19 @@ export type AgreementDeployment = {
   policyHash: string;
   oracle: string;
   token: string;
+  asset?: string;
+  cashier?: { enabled: boolean; [key: string]: unknown };
   hook?: string;
   poolManager?: string;
   poolId?: string;
+  poolKey?: { currency0: string; currency1: string; fee: number; tickSpacing: number; hooks: string };
   roleProvider?: string;
   market?: string;
   router?: string;
+  routing?: "uniswap-api";
+  positionManager?: string;
+  permit2?: string;
+  quoter?: string;
   mockMarket?: boolean;
   deployedAt: string;
   txs: Record<string, string>;
@@ -45,6 +53,8 @@ export type Agreement = {
   history: { status: AgreementStatus; at: string; policyHash?: string }[];
 };
 export type AgreementDetail = Agreement & {
+  mintOperations?: MintOperation[];
+  seedOperations?: SeedOperation[];
   export: PolicyData | null;
   documentAst?: LegalAst | null;
   ast?:
@@ -55,6 +65,54 @@ export type AgreementDetail = Agreement & {
         unresolved: { clause: string; description: string }[];
       }
     | null;
+};
+export type LiquidityState = {
+  backend: string;
+  token: string;
+  asset: string;
+  poolId: string;
+  liquidity: string;
+  rwaBalance: string;
+  usdBalance: string;
+};
+export type SeedOperation = {
+  requestId: string;
+  rwaAmount: string;
+  usdAmount: string;
+  poolId: string;
+  backend?: string;
+  status: "pending" | "confirmed" | "failed";
+  stage: string;
+  approvalTxHash?: string;
+  approvalTxHashes?: string[];
+  seedTxHash?: string;
+  error?: string | null;
+};
+export type MintOperation = {
+  bypassSubscription?: boolean;
+  simulateDeposit?: boolean;
+  testAttestations?: Record<string, boolean>;
+  subscriptionTxHash?: string | null;
+  depositTxHash?: string | null;
+  issuerAuthorizedTxHash?: string | null;
+  offeringCompliantTxHash?: string | null;
+  identityVerifiedTxHash?: string | null;
+  kycApprovedTxHash?: string | null;
+  amlApprovedTxHash?: string | null;
+  sanctionsClearTxHash?: string | null;
+  requestId: string;
+  recipient: string;
+  amount: string;
+  units: string;
+  token: string;
+  chainId: number;
+  backend?: string;
+  status: "pending" | "confirmed" | "failed";
+  stage: "mint" | "release" | "complete";
+  minted?: boolean;
+  mintTxHash?: string | null;
+  releaseTxHash?: string | null;
+  error?: string | null;
 };
 export type StackStatus = {
   model: { provider: string; mode: "mock" | "live" | "unavailable"; url?: string; model?: string };
@@ -132,6 +190,42 @@ export function agreementsClient(session: GatewaySession) {
       call<Agreement>(`${path(id)}/constraints`, { method: "PUT", body: JSON.stringify(body) }),
     regenerate: (id: string) => call<Agreement>(`${path(id)}/regenerate`, { method: "POST" }),
     deploy: (id: string) => call<Agreement>(`${path(id)}/deploy`, { method: "POST" }),
+    liquidity: (id: string, signal?: AbortSignal) =>
+      call<LiquidityState>(`${path(id)}/liquidity`, { signal }),
+    seed: (id: string, body: { rwaAmount: string; usdAmount: string; requestId: string }) =>
+      call<SeedOperation>(`${path(id)}/liquidity/seeds`, { method: "POST", body: JSON.stringify(body) }),
+    seedOperation: (id: string, requestId: string, signal?: AbortSignal) =>
+      call<SeedOperation>(`${path(id)}/liquidity/seeds/${encodeURIComponent(requestId)}`, { signal }),
+    mint: (
+      id: string,
+      body: {
+        recipient: string;
+        amount: string;
+        requestId: string;
+        bypassSubscription?: boolean;
+        simulateDeposit?: boolean;
+        testAttestations?: Record<string, boolean>;
+      }
+    ) => call<MintOperation>(`${path(id)}/mint`, { method: "POST", body: JSON.stringify(body) }),
+    mintOperation: (id: string, requestId: string, signal?: AbortSignal) =>
+      call<MintOperation>(`${path(id)}/mints/${encodeURIComponent(requestId)}`, { signal }),
+    swapState: (id: string, wallet: string, signal?: AbortSignal) =>
+      call<SwapState>(`${path(id)}/swap/state?wallet=${encodeURIComponent(wallet)}`, { signal }),
+    swapReceipt: (id: string, hash: string) =>
+      call<{ hash: string; status: number; blockNumber: number } | null>(
+        `${path(id)}/swap/receipts/${encodeURIComponent(hash)}`
+      ),
+    swapQuote: (
+      id: string,
+      body: { wallet: string; direction: "buy" | "sell"; amount: string; slippageBps: number }
+    ) => call<SwapQuote>(`${path(id)}/swap/quote`, { method: "POST", body: JSON.stringify(body) }),
+    swapApproval: (id: string, body: { wallet: string; quoteId: string }) =>
+      call<SwapApprovals>(`${path(id)}/swap/approval`, { method: "POST", body: JSON.stringify(body) }),
+    swapTransaction: (id: string, body: { wallet: string; quoteId: string; signature?: string }) =>
+      call<{ transaction: SwapTransaction; expiresAt: number }>(`${path(id)}/swap/transaction`, {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
     wallets: (id: string, signal?: AbortSignal) =>
       call<AgreementWallet[]>(`${path(id)}/stack/wallets`, { signal }),
     wallet: (id: string, wallet: string, signal?: AbortSignal) =>

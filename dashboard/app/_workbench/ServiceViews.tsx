@@ -38,13 +38,20 @@ export function ApiView({
     ["PUT", `${path}/constraints`, "Recompile identity constraints"],
     ["POST", `${path}/regenerate`, "Regenerate from original documents"],
     ["POST", `${path}/deploy`, "Deploy the compiled policy"],
+    ["GET", `${path}/liquidity`, "Backend balances and pool liquidity"],
+    ["POST", `${path}/liquidity/seeds`, "Seed pool from backend"],
+    ["GET", `${path}/liquidity/seeds/:requestId`, "Seed status and transaction hashes"],
+    ["POST", `${path}/mint`, "Mint RWA through the backend and release to a recipient"],
+    ["GET", `${path}/mints/:requestId`, "Mint/release status and transaction hashes"],
+    ["POST", `${path}/swap/quote`, "Quote a swap through the deployed Uniswap pool"],
+    ["POST", `${path}/swap/approval`, "Prepare an unsigned token approval"],
+    ["POST", `${path}/swap/transaction`, "Simulate and prepare a wallet-signed swap"],
   ];
   return (
     <div className="wb-scroll-page">
       <div className="wb-section-heading">
-        <span className="wb-eyebrow">DEVELOPER VIEW</span>
-        <h2>The same contract, over HTTP.</h2>
-        <p>Bearer authentication · JSON responses · asynchronous generation and deployment</p>
+        <h2>REST API.</h2>
+        <p>Integrate with banking providers.</p>
       </div>
       {sample ? (
         <Notice>
@@ -119,8 +126,7 @@ export function DeployView({
   return (
     <div className="wb-scroll-page">
       <div className="wb-section-heading">
-        <span className="wb-eyebrow">POLICY → ON-CHAIN ENFORCEMENT</span>
-        <h2>{deployment ? "Deployment record" : "Prepare for deployment"}</h2>
+        <h2>{deployment ? "Deployment" : "Prepare for deployment"}</h2>
         <p>The policy hash binds the source, extracted rules and issuer configuration.</p>
       </div>
       <div className="wb-deploy-grid">

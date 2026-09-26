@@ -21,17 +21,21 @@ import { GraphPane, HumanView, SourceCards } from "./PolicyPanes";
 import { ApiView, DeployView } from "./ServiceViews";
 import { IdentityView } from "./IdentityView";
 import { AnalysisView } from "./AnalysisView";
+import { SwapView } from "./SwapView";
+import { MintView } from "./MintView";
 import { useWorkbench } from "./useWorkbench";
 import { Brand, Icon, Modal, Notice } from "./ui";
 
-type View = "human" | "analysis" | "ast" | "identity" | "api" | "deploy";
+type View = "human" | "analysis" | "ast" | "identity" | "api" | "deploy" | "mint" | "swap";
 const views = [
-  { id: "human", label: "Human Language", icon: "file" },
-  { id: "analysis", label: "Analysis", icon: "search" },
+  { id: "analysis", label: "Summary", icon: "search" },
+  { id: "human", label: "Legalese", icon: "file" },
   { id: "ast", label: "Contract-AST", icon: "tree" },
   { id: "identity", label: "World ID", icon: "shield" },
   { id: "api", label: "API", icon: "code" },
   { id: "deploy", label: "Deploy", icon: "rocket" },
+  { id: "mint", label: "Liquidity management", icon: "plus" },
+  { id: "swap", label: "Swap", icon: "refresh" },
 ] as const;
 type Confirmation = { kind: "regenerate" } | { kind: "deploy" } | { kind: "constraints"; body: Constraints };
 
@@ -58,7 +62,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
   const [sample, setSample] = useState(false);
   const state = useWorkbench(session, sample);
   const { data, client, status } = state;
-  const [view, setView] = useState<View>("ast");
+  const [view, setView] = useState<View>("analysis");
   const [search, setSearch] = useState("");
   const [selection, setSelection] = useState<{ id: string; node: string } | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -402,6 +406,22 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               blocked={blocked}
               onDeploy={() => requestConfirmation({ kind: "deploy" })}
               onConstrain={(body) => requestConfirmation({ kind: "constraints", body })}
+            />
+          ) : view === "mint" ? (
+            <MintView
+              key={`${record.id}:${record.deployment?.token}`}
+              record={record}
+              client={client}
+              sample={sample}
+              writable={writable && !session.demoToken}
+              status={status}
+            />
+          ) : view === "swap" ? (
+            <SwapView
+              key={`${record.id}:${record.policyHash}:${record.deployment?.poolId}`}
+              record={record}
+              sample={sample}
+              client={client}
             />
           ) : isLegalAst(record.ast) ? (
             <LegalAstView

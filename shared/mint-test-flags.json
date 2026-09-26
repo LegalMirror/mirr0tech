@@ -1,0 +1,8 @@
+[
+  { "fact": "issuerAuthorized", "label": "Simulate issuer authorization", "clauses": "Mint clause 1", "description": "Simulates the issuer’s authority to issue tokens." },
+  { "fact": "offeringCompliant", "label": "Simulate offering compliance", "clauses": "Mint clause 1", "description": "Simulates the offering compliance approval." },
+  { "fact": "identityVerified", "label": "Simulate World ID verification", "clauses": "Mint clause 5; transfer clause 6", "description": "Writes a test identity fact without a World ID proof. This is not a real identity verification." },
+  { "fact": "kycApproved", "label": "Simulate KYC approval", "clauses": "Mint clause 9; transfer clause 7", "description": "Writes a test KYC approval without performing an identity review." },
+  { "fact": "amlApproved", "label": "Simulate AML approval", "clauses": "Mint clause 9; transfer clause 7", "description": "Writes a test AML approval without performing an AML review." },
+  { "fact": "sanctionsClear", "label": "Simulate sanctions clearance", "clauses": "Mint clause 10; transfer clause 8", "description": "Clears this recipient on the configured mock sanctions oracle using its administrator. This mock-oracle setting also applies to other agreements using that oracle." }
+]

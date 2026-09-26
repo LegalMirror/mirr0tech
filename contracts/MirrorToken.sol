@@ -12,6 +12,7 @@ interface IPolicyOracleTransfer {
 interface IVenueHook {
     function poolManager() external view returns (address);
     function consumeApproval() external returns (address);
+    function isSettlementRouter(address account) external view returns (bool);
 }
 
 /// @notice Custodial by default: the signer authorizes policy decisions and all supply stays in
@@ -103,6 +104,12 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
         processed[operationId] = true;
     }
 
+    function _settlementRouter(address account) private view returns (bool) {
+        // Other venues (cashier) do not use Uniswap's intermediate custody.
+        try venueHook.isSettlementRouter(account) returns (bool trusted) { return trusted; }
+        catch { return false; }
+    }
+
     function _update(address from, address to, uint256 value) internal override {
         if (from != address(0) && to != address(0)) {
             if (address(venueHook) == address(0)) revert TransfersDisabled();
@@ -111,11 +118,13 @@ contract MirrorToken is ERC20, AccessControl, Pausable {
                 // The only door into Uniswap: a pool that ran the policy hook in this transaction,
                 // and each admitted operation opens it for exactly one settlement leg.
                 address subject = from == poolManager ? to : from;
-                if (venueHook.consumeApproval() != subject) revert NoPolicyDoor(subject);
+                address approved = venueHook.consumeApproval();
+                if (approved == address(0)) revert NoPolicyDoor(subject);
+                if (approved != subject && !_settlementRouter(subject)) revert NoPolicyDoor(subject);
             } else {
                 // Shares move neither to nor from a wallet the agreement refuses; custody is the issuer.
-                _admitted(to);
-                if (from != custodian) _admitted(from);
+                if (!_settlementRouter(to)) _admitted(to);
+                if (from != custodian && !_settlementRouter(from)) _admitted(from);
             }
         }
         super._update(from, to, value);

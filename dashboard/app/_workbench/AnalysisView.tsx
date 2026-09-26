@@ -40,15 +40,6 @@ export function AnalysisView({
   if (record.history.some((item) => item.status === "uploaded")) seen.add("uploaded");
   return (
     <div className="wb-scroll-page wb-analysis-page">
-      <div className="wb-section-heading">
-        <span className="wb-eyebrow">ANALYSIS / SOURCE TO POLICY</span>
-        <h2>
-          Every claim has a source.
-          <br />
-          Every open question stays visible.
-        </h2>
-        <p>Review the extraction before making issuer decisions or deploying.</p>
-      </div>
       <div className="wb-analysis-status">
         <span className="wb-verifier-mode is-demo">
           {sample

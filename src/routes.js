@@ -9,6 +9,7 @@ import { compilerVersions } from './onchain/solc.js';
 import { extractWorkspace, extractDemo, OPENAI_MODEL } from './openai-extract.js';
 import { PROFILES, exportProfile } from '../scripts/export-ui.js';
 import { auditEvents } from './onchain/audit-events.js';
+import { PoolSwaps } from './onchain/pool-swaps.js';
 
 // Hosted/operator application
 function bodyFields(body, required, optional = []) {
@@ -17,6 +18,7 @@ function bodyFields(body, required, optional = []) {
 // `service` is the custodial issuance ledger (optional); `venues` is the deployed two-act stack (optional).
 // POST routes that only read the chain (a quote is a static call), so a viewer may use them.
 const VIEWER_POSTS = new Set(['/stack/credit/buyback/quote']);
+const isSwapRead = (req) => req.method === 'POST' && /^\/agreements\/[^/]+\/swap\/(quote|approval|transaction)$/.test(req.path);
 
 /// `viewerKey`, when set, opens the GET routes and quotes only: a dashboard build can carry it without carrying the operator key.
 export function createApp(service, apiKey, venues = null, policyData = null, viewerKey = null, agreements = null, { paymentSecret = process.env.PAYMENT_WEBHOOK_SECRET ?? null, demoWorkspaces = null, worldLogin = null } = {}) {
@@ -53,7 +55,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
   app.use('/v1', (req, _res, next) => {
     const actual = Buffer.from(req.headers.authorization ?? '');
     const presents = (key) => { const expected = Buffer.from(`Bearer ${key}`); return actual.length === expected.length && timingSafeEqual(actual, expected); };
-    const readOnly = req.method === 'GET' || VIEWER_POSTS.has(req.path);
+    const readOnly = req.method === 'GET' || VIEWER_POSTS.has(req.path) || isSwapRead(req);
     if (presents(apiKey) || (viewerKey && readOnly && presents(viewerKey))) return next();
     next(new AppError(401, 'UNAUTHORIZED', 'A valid operator bearer token is required'));
   });
@@ -208,6 +210,7 @@ function publicStatus(value, workspaces) {
 // Mount at /v1 BEFORE operator auth/body parsers. Non-demo credentials always leave this router.
 export function demoWorkspaceRoutes(workspaces, status = async () => ({})) {
   const router = Router();
+  const swaps = new PoolSwaps();
   const tokenOf = (req) => req.demoAccessToken;
   const wrap = (code, handler) => async (req, res) => res.status(code).json(await handler(req));
   router.use(async (req, res, next) => {
@@ -235,6 +238,16 @@ export function demoWorkspaceRoutes(workspaces, status = async () => ({})) {
   for (const method of ['get', 'ast', 'constraints']) router.get(`/agreements/:id${method === 'get' ? '' : `/${method}`}`, wrap(200, (req) => workspaces.read(tokenOf(req), method, req.params.id)));
   router.put('/agreements/:id/constraints', json({ limit: '32kb', inflate: false }), wrap(200, (req) => workspaces.mutate(tokenOf(req), req.params.id, 'constrain', req.body)));
   for (const method of ['regenerate', 'deploy']) router.post(`/agreements/:id/${method}`, wrap(202, (req) => workspaces.mutate(tokenOf(req), req.params.id, method)));
+  router.get('/agreements/:id/swap/state', wrap(200, async req => swaps.state(await workspaces.read(tokenOf(req), 'get', req.params.id), req.query.wallet)));
+  router.get('/agreements/:id/swap/receipts/:hash', wrap(200, async req => { await workspaces.read(tokenOf(req), 'get', req.params.id); return swaps.receipt(req.params.hash); }));
+  for (const [path, method] of [['quote', 'quote'], ['approval', 'approval'], ['transaction', 'swap']]) {
+    router.post(`/agreements/:id/swap/${path}`, json({ limit: '2kb', inflate: false }), wrap(200, async (req) => {
+      const record = await workspaces.read(tokenOf(req), 'get', req.params.id);
+      const result = await swaps[method](record, req.body);
+      swaps.current(await workspaces.read(tokenOf(req), 'get', req.params.id), method === 'quote' ? { quoteId: result.id, wallet: result.wallet } : req.body);
+      return result;
+    }));
+  }
   // No fallthrough, even for unknown agreement suffixes/methods or newly added operator routes.
   router.use((_req, _res, next) => next(new AppError(403, 'FORBIDDEN', 'This endpoint is not available to demo sessions')));
   router.use((error, _req, res, _next) => {
@@ -280,7 +293,7 @@ export async function stackStatus(venues) {
 
 const isPart = (part) => part && typeof part === 'object' && typeof part.name === 'string' && typeof part.text === 'string' && part.text.length > 0;
 
-export function agreementRoutes(agreements, status) {
+export function agreementRoutes(agreements, status, swaps = new PoolSwaps()) {
   const router = Router();
   const wrap = (code, handler) => (req, res, next) => Promise.resolve().then(() => handler(req)).then((value) => res.status(code).json(value)).catch(next);
   router.get('/status', wrap(200, () => status()));
@@ -294,6 +307,20 @@ export function agreementRoutes(agreements, status) {
     return agreements.create({ name: body.name.trim(), documents, profile: body.profile, config: body.config ?? null, generation: body.generation });
   }));
   router.get('/agreements/:id', wrap(200, (req) => agreements.get(req.params.id)));
+  router.get('/agreements/:id/liquidity', wrap(200, (req) => agreements.liquidityState(req.params.id)));
+  router.post('/agreements/:id/liquidity/seeds', wrap(202, (req) => agreements.seed(req.params.id, req.body)));
+  router.get('/agreements/:id/liquidity/seeds/:requestId', wrap(200, (req) => agreements.seedOperation(req.params.id, req.params.requestId)));
+  router.post('/agreements/:id/mint', wrap(202, (req) => agreements.mint(req.params.id, req.body)));
+  router.get('/agreements/:id/mints/:requestId', wrap(200, (req) => agreements.mintOperation(req.params.id, req.params.requestId)));
+  router.get('/agreements/:id/swap/state', wrap(200, req => swaps.state(agreements.get(req.params.id), req.query.wallet)));
+  router.get('/agreements/:id/swap/receipts/:hash', wrap(200, req => { agreements.get(req.params.id); return swaps.receipt(req.params.hash); }));
+  for (const [path, method] of [['quote', 'quote'], ['approval', 'approval'], ['transaction', 'swap']]) {
+    router.post(`/agreements/:id/swap/${path}`, wrap(200, async (req) => {
+      const result = await swaps[method](agreements.get(req.params.id), req.body);
+      swaps.current(agreements.get(req.params.id), method === 'quote' ? { quoteId: result.id, wallet: result.wallet } : req.body);
+      return result;
+    }));
+  }
   router.get('/agreements/:id/ast', wrap(200, (req) => agreements.ast(req.params.id)));
   router.get('/agreements/:id/constraints', wrap(200, (req) => agreements.constraints(req.params.id)));
   router.put('/agreements/:id/constraints', wrap(200, (req) => {

@@ -7,6 +7,8 @@ import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from 'ethers';
 import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/onchain/deploy.js';
+import { createPoolSeeder } from '../src/onchain/liquidity.js';
+import { createRwaMinter } from '../src/onchain/mint.js';
 import { Agreements } from '../src/agreements.js';
 import { DemoWorkspaces } from '../src/demo-workspaces.js';
 import { VenueService } from '../src/onchain/venues.js';
@@ -57,6 +59,8 @@ const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
 const agreements = await new Agreements({
   path: `${dataDir}/agreements-${record.chainId}.json`, log: (line) => console.log(`agreement ${line}`),
+  minter: createRwaMinter(venues.signer, { mockSanctionsAddress: record.sanctions, sanctionsAdmin: process.env.PRIVATE_KEY ? new Wallet(process.env.PRIVATE_KEY.trim(), provider) : venues.signer }),
+  seeder: createPoolSeeder(venues.signer),
   deployer: ({ sources }) => deployFund(venues.signer, { record, sources, log: console.log }),
   // One venue per deployed agreement: its token, oracle and hook; the stack's attestor, sanctions oracle and pool manager.
   venueFactory: ({ id, deployment, policy, clauseTable, credential, action }) => new VenueService({

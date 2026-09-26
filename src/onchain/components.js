@@ -39,17 +39,17 @@ export const COMPONENTS = [
     contracts: [[CORE, 'contracts/PolicyOracle.sol', 'PolicyOracle'], [CORE, 'contracts/MockSanctionsOracle.sol', 'MockSanctionsOracle'], [CORE, 'contracts/test/MockERC20.sol', 'MockERC20']],
   },
   {
-    id: 'custodial-token', version: '1.0.0', kind: 'venue', venue: 'token',
+    id: 'custodial-token', version: '1.1.0', kind: 'venue', venue: 'token',
     description: 'Permissioned ERC-20 under custody: mint and burn under the agreement, transfers off until a venue is configured.',
     coversRule: byAction('mint', 'burn'), coversTerm: () => false,
     contracts: [[CORE, 'contracts/MirrorToken.sol', 'MirrorToken'], [CORE, 'generated/CompiledMirrorToken.sol', 'CompiledMirrorToken']],
     clauseTemplate: 'Shares shall be issued and redeemed only for investors who have completed the onboarding described in {{onboardingClause}}.',
   },
   {
-    id: 'v4-transfer-gate', version: '1.0.0', kind: 'venue', venue: 'uniswap-v4',
+    id: 'v4-transfer-gate', version: '2.0.0', kind: 'venue', venue: 'uniswap-v4',
     description: 'Uniswap v4 hook enforcing the transfer rules on add/remove liquidity and swap; the token\'s only door into a pool.',
     coversRule: byAction('transfer'), coversTerm: () => false,
-    contracts: [[V4, 'contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook'], [V4, 'contracts/test/MirrorLiquidityRouter.sol', 'MirrorLiquidityRouter'], [V4, 'contracts/test/MockERC20.sol', 'MockERC20'], [V4, 'node_modules/@uniswap/v4-core/src/PoolManager.sol', 'PoolManager']],
+    contracts: [[V4, 'contracts/MirrorUniswapHook.sol', 'MirrorUniswapHook'], [V4, 'contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook'], [V4, 'contracts/test/MirrorLiquidityRouter.sol', 'MirrorLiquidityRouter'], [V4, 'contracts/test/MockERC20.sol', 'MockERC20'], [V4, 'node_modules/@uniswap/v4-core/src/PoolManager.sol', 'PoolManager']],
     clauseTemplate: 'Shares may be pooled or exchanged only at a venue that admits each counterparty under {{transferClause}} at the time of the transfer.',
   },
   {

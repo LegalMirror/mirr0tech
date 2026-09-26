@@ -1,0 +1,20 @@
+{
+  "chainId": 11155111,
+  "address": "0xfa6738D1b4Cd4Cd212909B5c5C555F464219f0AB",
+  "transactionHash": "0x0bd09c7128cec1ed9a00fc63d19004e8bc1e74efed841e5b71fee28684b117ec",
+  "deployer": "0x8583AD4a0F59Ba45C7E201318C6F774F31f7bbC8",
+  "compiler": "0.8.37+commit.f401782d.Emscripten.clang",
+  "name": "Mock USD Coin",
+  "symbol": "mUSDC",
+  "decimals": 6,
+  "blockNumber": 11787623,
+  "runtimeCodeHash": "0xd30085c5422b7fedcebd9bda8dfe4505a64755487637ffebadb27ab35bba48bc",
+  "deployedAt": "2026-09-26T17:20:27.251Z",
+  "verification": {
+    "status": "verified",
+    "guid": "23suif7f2wchdlvvldg6cgwi2nncii7cn4qqjryfujud1smzkb",
+    "submittedAt": "2026-09-26T17:26:12.521Z",
+    "url": "https://sepolia.etherscan.io/address/0xfa6738D1b4Cd4Cd212909B5c5C555F464219f0AB#code",
+    "verifiedAt": "2026-09-26T17:26:18.281Z"
+  }
+}

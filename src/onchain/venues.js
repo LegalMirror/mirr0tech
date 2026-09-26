@@ -55,6 +55,7 @@ export class VenueService {
     const { rwa, credit } = this.artifacts;
     this.c = {
       attestor: at(r.attestor, rwa.PolicyAttestor), sanctions: at(r.sanctions, rwa.MockSanctionsOracle), usdc: at(r.usdc, rwa.MockERC20),
+      rwaAsset: at(r.rwa.cashier?.asset ?? r.rwa.asset ?? r.usdc, rwa.MockERC20),
       token: at(r.rwa.token, rwa.CompiledMirrorToken), hook: at(r.rwa.hook, r.rwa.cashier ? { abi: r.rwa.cashier.hookAbi } : rwa.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.PolicyOracle),
       poolManager: at(r.rwa.poolManager, rwa.PoolManager), v4Router: at(r.rwa.router, r.rwa.cashier ? { abi: r.rwa.cashier.routerAbi } : rwa.MirrorLiquidityRouter),
       ...(r.rwa.cashier ? { cashierAsset: at(r.rwa.cashier.asset, rwa.MockERC20) } : {}),
@@ -254,9 +255,9 @@ export class VenueService {
     for (const spender of [this.record.rwa.router, this.record.credit.market, this.record.credit.router, this.record.credit.aqua]) {
       await (await this.c.usdc.connect(signer).approve(spender, MaxUint256)).wait();
     }
-    if (this.c.cashierAsset) {
-      await (await this.c.cashierAsset.mint(address, parseUnits(amount, 6))).wait();
-      await (await this.c.cashierAsset.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
+    if ((await this.c.rwaAsset.getAddress()).toLowerCase() !== this.record.usdc.toLowerCase()) {
+      await (await this.c.rwaAsset.mint(address, parseUnits(amount, 6))).wait();
+      await (await this.c.rwaAsset.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
     }
     await (await this.c.token.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
     await (await this.c.market.connect(signer).approve(this.record.credit.router, MaxUint256)).wait();
@@ -296,11 +297,11 @@ export class VenueService {
     return this.run('rwa.release', { policy: 'rwa', wallet: this.name(address), amount }, () => this.c.token.release(id(`release:${Date.now()}`), address, parseUnits(amount, 6)));
   }
   poolKey(hooked) {
-    if (this.record.rwa.cashier) {
+    if (this.record.rwa.poolKey || this.record.rwa.cashier) {
       ensure(this.record.rwa.poolKey, 503, 'CASHIER_BINDING_MISMATCH', 'Cashier venue requires the deployed pool key');
       return { ...this.record.rwa.poolKey, hooks: hooked ? this.record.rwa.hook : '0x0000000000000000000000000000000000000000' };
     }
-    const asset = this.record.rwa.cashier?.asset ?? this.record.usdc;
+    const asset = this.record.rwa.asset ?? this.record.usdc;
     const [currency0, currency1] = BigInt(this.record.rwa.token) < BigInt(asset) ? [this.record.rwa.token, asset] : [asset, this.record.rwa.token];
     return { currency0, currency1, fee: 3000, tickSpacing: TICK_SPACING, hooks: hooked ? this.record.rwa.hook : '0x0000000000000000000000000000000000000000' };
   }

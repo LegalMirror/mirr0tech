@@ -14,6 +14,7 @@ import {
 } from "@/lib/agreements";
 import type { PolicyData, ProfileId } from "@/lib/types";
 import { Icon, Modal, Notice } from "./ui";
+import { MockUsdFaucet } from "./MockUsdFaucet";
 
 export function SettingsDialog({
   session,
@@ -29,9 +30,11 @@ export function SettingsDialog({
   onClose: () => void;
 }) {
   const [url, setUrl] = useState(session.url || "http://localhost:3000");
+  const [faucetBusy, setFaucetBusy] = useState(false);
   const [error, setError] = useState("");
   function connect(event: FormEvent) {
     event.preventDefault();
+    if (faucetBusy) return;
     try {
       const next = gatewayUrl(url);
       if (!(hasGatewaySession(session) && next === session.url)) void startDemoWorkspace(next, true);
@@ -41,7 +44,8 @@ export function SettingsDialog({
     }
   }
   return (
-    <Modal title="Settings" onClose={onClose}>
+    <Modal title="Settings" onClose={onClose} busy={faucetBusy}>
+      <MockUsdFaucet onBusyChange={setFaucetBusy} />
       <form className="wb-form" onSubmit={connect}>
         <section className="wb-services" aria-label="Actual gateway status">
           <span className="wb-eyebrow">ENVIRONMENT</span>
@@ -134,6 +138,7 @@ export function SettingsDialog({
         <footer>
           <button
             type="button"
+            disabled={faucetBusy}
             onClick={() => {
               setSession({ url: "", viewerKey: "", operatorKey: "", autoDemo: false });
               onClose();
@@ -141,7 +146,11 @@ export function SettingsDialog({
           >
             Disconnect
           </button>
-          <button className="wb-primary" type="submit" disabled={session.demoState === "starting"}>
+          <button
+            className="wb-primary"
+            type="submit"
+            disabled={faucetBusy || session.demoState === "starting"}
+          >
             {hasGatewaySession(session) && url === session.url ? "Keep this workspace" : "Connect workspace"}
             <Icon name="arrow" />
           </button>
@@ -268,7 +277,8 @@ export function UploadDialog({
         </label>
         {mode !== "demo" && profile === "wildcat-credit" && (
           <p className="wb-muted">
-            For the executable credit demo, upload the Wildcat MLA, lender-check policy and buyback addendum together.
+            For the executable credit demo, upload the Wildcat MLA, lender-check policy and buyback addendum
+            together.
           </p>
         )}
         <div className="wb-segmented" aria-label="Document input">

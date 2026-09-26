@@ -21,8 +21,14 @@ export default function LedgerPage() {
         <>
           <p className="meta">
             Agreement {ledger.data.agreement} · policy {short(ledger.data.policyHash, 10, 6)} · indexed{" "}
-            {ledger.data.contracts.map((c) => c.alias).join(", ")} · {ledger.data.cached ? "cached" : "fresh"} at {ledger.data.fetchedAt}
+            {ledger.data.contracts.map((c) => c.alias).join(", ")} · {ledger.data.snapshot ? "committed snapshot" : ledger.data.cached ? "cached" : "fresh"} at {ledger.data.fetchedAt}
           </p>
+          {ledger.data.quota && (
+            <p className="meta">
+              MultiBaas budget: {ledger.data.quota.perRefresh} calls per refresh · cached {Math.round(ledger.data.quota.cacheMs / 60000)} min ·{" "}
+              {ledger.data.quota.calls} calls and {ledger.data.quota.cacheHits} cache hits since {ledger.data.quota.since}
+            </p>
+          )}
           <Boundaries ledger={ledger.data} />
           <Decisions ledger={ledger.data} />
           <Supply ledger={ledger.data} />

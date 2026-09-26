@@ -89,20 +89,51 @@ export function hookBoundaries(agreement) {
 
 const rowsOf = (response) => response?.data?.result?.rows ?? [];
 const short = (value) => (typeof value === 'string' ? value : String(value ?? ''));
+// MultiBaas returns "2026-09-26 19:38:12+00"; the dashboard wants one ISO format for both sources.
+const iso = (value) => { const date = new Date(String(value ?? '').replace(' ', 'T').replace(/\+00$/, 'Z')); return Number.isNaN(date.getTime()) ? String(value ?? '') : date.toISOString(); };
+const VENUE = { 'rwa.pool.swap': 'swap', 'rwa.pool.addLiquidity': 'add liquidity', 'rwa.pool.removeLiquidity': 'remove liquidity', 'rwa.release': 'release' };
+
+/// Refusals never reach the chain: the hook reverts before a transaction exists. The gateway's audit
+/// records each one with its clause, so the ledger merges them in, marked as off-chain.
+export function refusalsFrom(entries, clauseOf) {
+  return (entries ?? []).filter((entry) => entry.status === 'refused' && VENUE[entry.type]).map((entry) => {
+    const clauseId = Number(entry.refusal?.clause?.clauseId ?? entry.refusal?.clauseId ?? 0);
+    return { at: iso(entry.at), tx: null, subject: short(entry.wallet), action: 'transfer', venue: VENUE[entry.type], allowed: false, clauseId, clause: clauseOf.get(clauseId) ?? null, source: 'gateway' };
+  });
+}
 
 /// The ledger the dashboard reads. `cacheMs` keeps a busy page from spending the monthly API budget.
-export function ledgerService({ client, record, agreement, cacheMs = 120_000, clock = Date.now } = {}) {
+/// The ledger the dashboard reads. `cacheMs` keeps a busy page from spending the monthly API budget;
+/// `refusals` supplies the gateway's audit entries; every read is logged with its cost.
+export function ledgerService({ client, record, agreement, cacheMs = 120_000, clock = Date.now, refusals = async () => [], log = (line) => console.info(line) } = {}) {
   const boundaries = hookBoundaries(agreement);
   const clauseOf = new Map(boundaries.clauses.map((clause) => [clause.clauseId, clause]));
+  const queries = ledgerQueries();
+  const quota = { calls: 0, reads: 0, cacheHits: 0, since: new Date(clock()).toISOString() };
   let cached = null;
   return async function ledger() {
-    if (cached && clock() - cached.at < cacheMs) return { ...cached.value, cached: true };
-    const queries = ledgerQueries();
-    const [checks, attestations, supply] = await Promise.all(Object.values(queries).map((query) => client.queries.executeArbitraryEventQuery(query, 0, 50)));
-    const decisions = rowsOf(checks).map((row) => ({
-      at: row.at, tx: row.tx, subject: short(row.subject), action: ACTIONS[Number(row.action)] ?? String(row.action),
-      allowed: row.allowed === true || row.allowed === 'true', clauseId: Number(row.clauseid ?? row.clauseId ?? 0),
+    quota.reads++;
+    if (cached && clock() - cached.at < cacheMs) {
+      quota.cacheHits++;
+      return { ...cached.value, cached: true, quota: { ...quota, perRefresh: Object.keys(queries).length, cacheMs } };
+    }
+    const started = clock();
+    let results;
+    try {
+      results = await Promise.all(Object.values(queries).map((query) => client.queries.executeArbitraryEventQuery(query, 0, 50)));
+    } catch (error) {
+      log(`[ledger] multibaas query failed status=${error.response?.status ?? 'none'} message=${JSON.stringify(error.response?.data?.message ?? error.message)}`);
+      throw error;
+    } finally {
+      quota.calls += Object.keys(queries).length;
+    }
+    const [checks, attestations, supply] = results;
+    const onchain = rowsOf(checks).map((row) => ({
+      at: iso(row.at), tx: row.tx, subject: short(row.subject), action: ACTIONS[Number(row.action)] ?? String(row.action), venue: 'hook',
+      allowed: row.allowed === true || row.allowed === 'true', clauseId: Number(row.clauseid ?? row.clauseId ?? 0), source: 'multibaas',
     })).map((decision) => ({ ...decision, clause: clauseOf.get(decision.clauseId) ?? null }));
+    const offchain = refusalsFrom(await refusals().catch(() => []), clauseOf);
+    const decisions = [...onchain, ...offchain].sort((a, b) => b.at.localeCompare(a.at));
     const byClause = {};
     for (const decision of decisions) {
       const key = decision.clauseId || 'none';
@@ -115,10 +146,12 @@ export function ledgerService({ client, record, agreement, cacheMs = 120_000, cl
       source: 'multibaas', url: client.url, chainId: record.chainId, agreement: agreement.id, policyHash: agreement.policyHash, fetchedAt: new Date(clock()).toISOString(),
       contracts: indexedContracts(record, agreement).map(({ alias, label, address }) => ({ alias, label, address })),
       boundaries, decisions, byClause: Object.values(byClause),
-      attestations: rowsOf(attestations).map((row) => ({ at: row.at, tx: row.tx, subject: short(row.subject), known: short(row.known), value: short(row.value), expiresAt: Number(row.expiresat ?? row.expiresAt ?? 0) })),
+      attestations: rowsOf(attestations).map((row) => ({ at: iso(row.at), tx: row.tx, subject: short(row.subject), known: short(row.known), value: short(row.value), expiresAt: Number(row.expiresat ?? row.expiresAt ?? 0) })),
       supply: totals,
+      quota: { ...quota, perRefresh: Object.keys(queries).length, cacheMs },
     };
     cached = { at: clock(), value };
+    log(`[ledger] refreshed ms=${clock() - started} calls=${Object.keys(queries).length} total_calls=${quota.calls} onchain=${onchain.length} refused_offchain=${offchain.length} attestations=${value.attestations.length}`);
     return value;
   };
 }

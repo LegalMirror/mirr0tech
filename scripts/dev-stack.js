@@ -79,7 +79,14 @@ const demoWorkspaces = process.env.PUBLIC_DEMO === 'false' ? null : await new De
 const worldLogin = await WorldLogin.open();
 // The policy ledger: MultiBaas indexes the Sepolia agreement's attestor, token and hook (scripts/multibaas-index.js).
 const indexed = record.chainId === 11155111 ? JSON.parse(await readFile('deployments/sepolia-agreements.json', 'utf8').catch(() => '[]')).find((entry) => entry.deployment?.hook) : null;
-const multibaasLedger = indexed && multibaasClient() ? ledgerService({ client: multibaasClient(), record, agreement: indexed }) : null;
+// Refusals come from the agreement venue's audit (live), or the committed Sepolia snapshot before the first one.
+const refusalAudit = async () => {
+  for (const path of [`${dataDir}/audit-${record.chainId}-${indexed.id}.json`, 'deployments/sepolia-agreement-audit.json']) {
+    try { return JSON.parse(await readFile(path, 'utf8')); } catch {}
+  }
+  return [];
+};
+const multibaasLedger = indexed && multibaasClient() ? ledgerService({ client: multibaasClient(), record, agreement: indexed, refusals: refusalAudit }) : null;
 const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { demoWorkspaces, worldLogin, ledger: multibaasLedger }).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

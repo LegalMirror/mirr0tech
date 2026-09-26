@@ -1,5 +1,6 @@
 import { shares, type Ledger } from "@/lib/ledger";
-import { short } from "@/lib/format";
+import { fmtTime, short } from "@/lib/format";
+import { BoundaryDiagram, ClauseBars, DecisionTimeline } from "./LedgerVisuals";
 import { Glyph } from "../_components/common";
 
 const ETHERSCAN = "https://sepolia.etherscan.io";
@@ -14,6 +15,7 @@ export function Boundaries({ ledger }: { ledger: Ledger }) {
   return (
     <section className="card">
       <h2>What the hook guards</h2>
+      <BoundaryDiagram ledger={ledger} />
       <p className="meta">
         Pool <code>{short(b.poolId, 10, 6)}</code> · fee {b.poolKey.fee / 10000}% · tick spacing {b.poolKey.tickSpacing} · hook{" "}
         <a href={`${ETHERSCAN}/address/${b.hook}`} target="_blank" rel="noreferrer">
@@ -46,7 +48,7 @@ export function Boundaries({ ledger }: { ledger: Ledger }) {
 export function Decisions({ ledger }: { ledger: Ledger }) {
   return (
     <section className="card">
-      <h2>Decisions indexed on chain</h2>
+      <h2>Decisions: admitted on chain, refused before a transaction</h2>
       <p className="meta">
         {ledger.byClause.map((entry) => (
           <span key={String(entry.clauseId)} style={{ marginRight: 12 }}>
@@ -54,6 +56,8 @@ export function Decisions({ ledger }: { ledger: Ledger }) {
           </span>
         ))}
       </p>
+      <ClauseBars ledger={ledger} />
+      <DecisionTimeline ledger={ledger} />
       {ledger.decisions.length === 0 ? (
         <p className="small">No hook decisions indexed yet. Indexing starts when a contract is linked.</p>
       ) : (
@@ -63,24 +67,28 @@ export function Decisions({ ledger }: { ledger: Ledger }) {
               <tr>
                 <th>When</th>
                 <th>Wallet</th>
-                <th>Action</th>
+                <th>Venue</th>
                 <th>Decision</th>
-                <th>Tx</th>
+                <th>Where recorded</th>
               </tr>
             </thead>
             <tbody>
-              {ledger.decisions.map((d) => (
-                <tr key={d.tx + d.subject}>
-                  <td className="small">{d.at}</td>
-                  <td className="small">{short(d.subject)}</td>
-                  <td className="small">{d.action}</td>
+              {ledger.decisions.map((d, index) => (
+                <tr key={`${d.at}-${d.subject}-${index}`}>
+                  <td className="small">{fmtTime(d.at)}</td>
+                  <td className="small">{d.subject.startsWith("0x") ? short(d.subject) : d.subject}</td>
+                  <td className="small">{d.venue ?? d.action}</td>
                   <td className="small">
                     <Glyph state={d.allowed ? "true" : "false"} /> {d.allowed ? "allowed" : `refused · ${d.clause?.ruleId ?? `§${d.clauseId}`}`}
                   </td>
                   <td className="small">
-                    <a href={`${ETHERSCAN}/tx/${d.tx}`} target="_blank" rel="noreferrer">
-                      {short(d.tx)} ↗
-                    </a>
+                    {d.tx ? (
+                      <a href={`${ETHERSCAN}/tx/${d.tx}`} target="_blank" rel="noreferrer">
+                        on chain · {short(d.tx)} ↗
+                      </a>
+                    ) : (
+                      <span className="meta">no transaction · gateway audit</span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -88,7 +96,10 @@ export function Decisions({ ledger }: { ledger: Ledger }) {
           </table>
         </div>
       )}
-      <p className="meta">A refused swap reverts before a transaction exists, so refusals appear here only when a decision is recorded; the gateway's history has the rest.</p>
+      <p className="meta">
+        A refused swap reverts before a transaction exists, so MultiBaas never sees it. Those rows come from the gateway&apos;s
+        audit, which records the clause that refused.
+      </p>
     </section>
   );
 }
@@ -104,7 +115,7 @@ export function Supply({ ledger }: { ledger: Ledger }) {
       <ul className="plain-list">
         {ledger.attestations.slice(0, 8).map((a) => (
           <li key={a.tx + a.subject} className="small">
-            {a.at} · facts attested for {short(a.subject)} · valid until {new Date(a.expiresAt * 1000).toISOString().slice(0, 10)} ·{" "}
+            {fmtTime(a.at)} · facts attested for {short(a.subject)} · valid until {new Date(a.expiresAt * 1000).toISOString().slice(0, 10)} ·{" "}
             <a href={`${ETHERSCAN}/tx/${a.tx}`} target="_blank" rel="noreferrer">
               tx ↗
             </a>

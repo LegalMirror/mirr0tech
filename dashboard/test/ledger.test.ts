@@ -4,6 +4,7 @@ import { afterEach, expect, it, vi } from "vitest";
 import live from "./fixtures-live-ledger.json";
 import { fetchLedger, shares, type Ledger } from "@/lib/ledger";
 import { Boundaries, Decisions, Supply } from "@/app/ledger/LedgerCards";
+import { BoundaryDiagram, ClauseBars, DecisionTimeline } from "@/app/ledger/LedgerVisuals";
 
 const ledger = live as unknown as Ledger;
 const text = (element: ReturnType<typeof createElement>) =>
@@ -34,8 +35,10 @@ it("the decisions card lists each indexed decision with an explorer link and the
   const html = renderToStaticMarkup(createElement(Decisions, { ledger }));
   const shown = text(createElement(Decisions, { ledger }));
   expect(shown).toContain(`admitted: ${ledger.decisions.filter((d) => d.allowed).length} allowed`);
-  for (const decision of ledger.decisions) expect(html).toContain(`https://sepolia.etherscan.io/tx/${decision.tx}`);
+  for (const decision of ledger.decisions.filter((d) => d.tx)) expect(html).toContain(`https://sepolia.etherscan.io/tx/${decision.tx}`);
   expect(shown).toContain("A refused swap reverts before a transaction exists");
+  expect(shown).toContain("no transaction · gateway audit");
+  expect(shown).toContain("refused · transfer-identity-verified");
 });
 
 it("a refused decision names its rule, and an empty ledger says indexing starts at the link", () => {
@@ -62,8 +65,36 @@ it("fetchLedger reads the gateway's public route and explains a gateway without 
   }));
   expect((await fetchLedger()).agreement).toBe(ledger.agreement);
   expect(seen[0]).toMatch(/\/v1\/indexed\/ledger$/);
+  // No ledger on the gateway: the committed snapshot answers, marked as such.
+  vi.stubGlobal("fetch", vi.fn(async (url: string) => (url.endsWith("/ledger.json") ? new Response(JSON.stringify(ledger)) : new Response("{}", { status: 404 }))));
+  expect((await fetchLedger()).snapshot).toBe(true);
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
   await expect(fetchLedger()).rejects.toThrow("no MultiBaas ledger configured");
   vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 502 })));
   await expect(fetchLedger()).rejects.toThrow("Ledger unavailable (502)");
+  vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("network"); }));
+  await expect(fetchLedger()).rejects.toThrow("The gateway did not answer.");
+});
+
+it("the boundary diagram counts admitted and refused attempts and marks the clause that refused", () => {
+  const admitted = ledger.decisions.filter((d) => d.allowed).length;
+  const refused = ledger.decisions.filter((d) => !d.allowed).length;
+  expect(refused).toBeGreaterThan(0);
+  const html = renderToStaticMarkup(createElement(BoundaryDiagram, { ledger }));
+  expect(html).toContain(`aria-label="Hook boundary: ${admitted} admitted, ${refused} refused"`);
+  const shown = text(createElement(BoundaryDiagram, { ledger }));
+  expect(shown).toContain(`${admitted} admitted`);
+  expect(shown).toContain("gated · swap");
+  expect(shown).toContain("§12 identity-verified");
+  expect(shown).toContain(`${refused} refused`);
+});
+
+it("the clause bars and the timeline plot every decision, refusals in their own lane", () => {
+  const bars = text(createElement(ClauseBars, { ledger }));
+  expect(bars).toContain("admitted (no clause refused)");
+  expect(bars).toContain("transfer-identity-verified");
+  const timeline = renderToStaticMarkup(createElement(DecisionTimeline, { ledger }));
+  expect((timeline.match(/<circle/g) ?? []).length).toBe(ledger.decisions.length);
+  expect(timeline).toContain("refused · transfer-identity-verified");
+  expect(renderToStaticMarkup(createElement(DecisionTimeline, { ledger: { ...ledger, decisions: [] } }))).toBe("");
 });

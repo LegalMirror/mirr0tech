@@ -9,10 +9,10 @@ const record = JSON.parse(readFileSync('deployments/sepolia.json', 'utf8'));
 const agreement = JSON.parse(readFileSync('deployments/sepolia-agreements.json', 'utf8')).find((entry) => entry.deployment?.hook);
 const rows = {
   [SIGNATURES.checked]: [
-    { action: '2', allowed: 'true', at: 't2', clauseid: '0', subject: '0xinvestor', tx: '0xa' },
-    { action: '2', allowed: 'false', at: 't1', clauseid: '12', subject: '0xstranger', tx: '0xb' },
+    { action: '2', allowed: 'true', at: '2026-09-26 19:38:12+00', clauseid: '0', subject: '0xinvestor', tx: '0xa' },
+    { action: '2', allowed: 'false', at: '2026-09-26 19:37:48+00', clauseid: '12', subject: '0xstranger', tx: '0xb' },
   ],
-  [SIGNATURES.attested]: [{ at: 't0', expiresat: '1792992504', known: '131135', subject: '0xinvestor', tx: '0xc', value: '131135' }],
+  [SIGNATURES.attested]: [{ at: '2026-09-26 18:59:48+00', expiresat: '1792992504', known: '131135', subject: '0xinvestor', tx: '0xc', value: '131135' }],
   [SIGNATURES.operation]: [{ amount: '8500000000', ismint: 'true' }, { amount: '100', ismint: 'false' }],
 };
 const fakeClient = (calls) => ({ url: 'https://mb.test', queries: { executeArbitraryEventQuery: async (query, offset, limit) => { calls.push({ query, limit }); return { data: { result: { rows: rows[query.events[0].eventName] } } }; } } });
@@ -81,4 +81,39 @@ test('GET /v1/indexed/ledger is public and read-only', async (t) => {
   assert.equal(response.status, 200);
   assert.equal((await response.json()).source, 'multibaas');
   assert.equal((await fetch(`http://127.0.0.1:${server.address().port}/v1/indexed/ledger`, { method: 'POST' })).status, 401, 'nothing to write');
+});
+
+test('refusals from the gateway audit merge into the ledger, off-chain and named by clause, newest first', async () => {
+  const { refusalsFrom } = await import('../src/onchain/indexer.js');
+  const lines = [];
+  const audit = [
+    { type: 'rwa.pool.swap', status: 'refused', at: '2026-09-26T19:40:00.000Z', wallet: 'Stranger', refusal: { clause: { clauseId: 12, ruleId: 'transfer-identity-verified' } } },
+    { type: 'rwa.pool.swap', status: 'ok', at: '2026-09-26T19:39:00.000Z', wallet: 'Investor' },
+    { type: 'attest', status: 'refused', at: '2026-09-26T19:38:00.000Z', wallet: 'X' },
+  ];
+  const ledger = ledgerService({ client: fakeClient([]), record, agreement, refusals: async () => audit, log: (line) => lines.push(line) });
+  const value = await ledger();
+  const refused = value.decisions.filter((decision) => decision.source === 'gateway');
+  assert.equal(refused.length, 1, 'only venue refusals count; an ok entry and a non-venue entry do not');
+  assert.equal(refused[0].venue, 'swap');
+  assert.equal(refused[0].tx, null);
+  assert.equal(refused[0].clause.ruleId, 'transfer-identity-verified');
+  assert.ok(value.decisions.every((decision, index, all) => index === 0 || all[index - 1].at >= decision.at), 'newest first across both sources');
+  const tally = value.byClause.find((entry) => entry.ruleId === 'transfer-identity-verified');
+  assert.equal(tally.refused, 2, 'one on-chain refusal from the fake rows plus the audit refusal');
+  assert.match(value.decisions.find((d) => d.source === 'multibaas').at, /^\d{4}-\d\d-\d\dT/, 'MultiBaas times are ISO');
+  assert.deepEqual(refusalsFrom(undefined, new Map()), []);
+  assert.match(lines[0], /^\[ledger\] refreshed ms=\d+ calls=3 total_calls=3 onchain=2 refused_offchain=1 attestations=1$/);
+});
+
+test('the quota counter tracks MultiBaas calls and cache hits, and a failed query is logged, counted and thrown', async () => {
+  let now = 0;
+  const ledger = ledgerService({ client: fakeClient([]), record, agreement, cacheMs: 1000, clock: () => now, log: () => {} });
+  await ledger();
+  const hit = await ledger();
+  assert.deepEqual({ calls: hit.quota.calls, reads: hit.quota.reads, cacheHits: hit.quota.cacheHits, perRefresh: hit.quota.perRefresh }, { calls: 3, reads: 2, cacheHits: 1, perRefresh: 3 });
+  const lines = [];
+  const failing = ledgerService({ record, agreement, log: (line) => lines.push(line), client: { url: 'x', queries: { executeArbitraryEventQuery: async () => { const error = new Error('bad'); error.response = { status: 400, data: { message: 'invalid request' } }; throw error; } } } });
+  await assert.rejects(failing(), /bad/);
+  assert.match(lines[0], /\[ledger\] multibaas query failed status=400 message="invalid request"/);
 });

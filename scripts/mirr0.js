@@ -53,9 +53,12 @@ async function call(path, { method = 'GET', body } = {}) {
 }
 const line = (record) => `${record.id}  ${record.status.padEnd(10)}  ${record.name}${record.policyHash ? `  ${record.policyHash.slice(0, 10)}…` : ''}${record.deployment?.token ? `  token ${record.deployment.token}` : ''}${record.error ? `  ✗ ${record.error}` : ''}`;
 async function waitFor(id, state) {
+  let last = null;
   for (;;) {
     const record = await call(`/v1/agreements/${id}`);
     if (record.status === state || record.status === 'failed' || (state === 'deployed' && record.status === 'compiled' && record.error)) return record;
+    const progress = record.progress?.status ?? record.status;
+    if (progress !== last) { console.error(`  … ${progress}`); last = progress; }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 }

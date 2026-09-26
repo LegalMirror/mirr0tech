@@ -146,6 +146,8 @@ export function createMockNoolog({ apiKey = null } = {}) {
   app.post('/deliberation', (req, res) => {
     const body = req.body ?? {};
     if (!body.room_id || /[\s.*>]/.test(body.room_id)) return res.status(400).json({ error: 'room_id missing or NATS-incompatible' });
+    // A policy id resolves the seats on the orchestrator; the mock seats its two agents for any policy.
+    if (body.policy_id) body.agent_names = ['extractor', 'critic'];
     if (!Array.isArray(body.agent_names) || body.agent_names.length < 2) return res.status(400).json({ error: 'fewer than 2 agents' });
     if ([...jobs.values()].some((job) => job.roomId === body.room_id && statusOf(job) !== 'completed')) return res.status(409).json({ error: 'job already running for this room' });
     const jobId = randomUUID();
@@ -154,6 +156,7 @@ export function createMockNoolog({ apiKey = null } = {}) {
   });
   // OpenAI-compatible generation: the deliberation runs, the winner's content is the answer, the job id travels in the header.
   app.get('/v1/models', (_req, res) => res.json({ object: 'list', data: ['nsed:deep', 'nsed:legal_rwa_pro'].map((id) => ({ id, object: 'model', created: 0, owned_by: 'nsed' })) }));
+  app.get('/policies', (_req, res) => res.json([{ policy_id: 'b245634b52fa3e69f4447f4cd8b107095c157cf61378a54303b98ff808d20b84', name: 'legal_rwa_pro', tags: ['legal_rwa_pro', 'tokyoglobal'], max_rounds: 3 }]));
   app.post('/v1/chat/completions', (req, res) => {
     const body = req.body ?? {};
     const nsed = body.nsed ?? {};

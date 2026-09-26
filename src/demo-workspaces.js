@@ -5,7 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { Router, json } from 'express';
 import { draftFor } from './agreements.js';
 import { AppError, ensure } from './errors.js';
-import { extractWithNoolog } from './noolog/extract.js';
+import { extractAgreement, extractWithNoolog, extractorMode } from './noolog/extract.js';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
 import { PROFILES } from '../scripts/export-ui.js';
@@ -192,7 +192,7 @@ export class DemoWorkspaces {
   }
 
   mockOnly() {
-    unavailable(!process.env.NOOLOG_API_KEY && this.agreements.extract === extractWithNoolog, 'Public demo generation is unavailable with live or custom Noolog extraction; use the operator API. Public uploads only support the bundled mock documents.');
+    unavailable(extractorMode() === 'mock' && [extractAgreement, extractWithNoolog].includes(this.agreements.extract), 'Public demo generation is unavailable with live or custom extraction; use the operator API. Public uploads only support the bundled mock documents.');
   }
 
   validateConfig(profile, input) {
@@ -293,7 +293,8 @@ function publicStatus(value, workspaces) {
     const version = value?.compiler?.solidity?.[key];
     if (typeof version === 'string' && /^\d+\.\d+\.\d+(?:[+.-][A-Za-z0-9.+-]+)?$/.test(version) && version.length <= 100) solidity[key] = version;
   }
-  return { model: { provider: 'noolog', mode: process.env.NOOLOG_API_KEY || workspaces.agreements.extract !== extractWithNoolog ? 'unavailable' : 'mock' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
+  const mock = extractorMode() === 'mock' && [extractAgreement, extractWithNoolog].includes(workspaces.agreements.extract);
+  return { model: { provider: 'noolog', mode: mock ? 'mock' : 'unavailable' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
 }
 
 // Mount at /v1 BEFORE operator auth/body parsers. Non-demo credentials always leave this router.

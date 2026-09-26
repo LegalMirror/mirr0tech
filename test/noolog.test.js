@@ -114,10 +114,69 @@ test('a request names a fresh room each run, seats only the generic model, and a
   assert.equal(policy.model, 'nsed:legal_rwa_pro');
   assert.equal(policy.nsed.agent_names, undefined, 'the policy brings its own seats');
   assert.equal(policy.nsed.deliberation_rounds, 2);
-  const broke = { chatCompletion: async () => { throw new NoologError(429, 'POST /v1/chat/completions: 429 {"error":{"message":"Insufficient budget: 0.00 remaining, 50.00 estimated","type":"insufficient_quota"}}'); } };
+  const broke = { startDeliberation: async () => { throw new NoologError(429, 'POST /deliberation: 429 {"error":"Insufficient budget","credits_remaining":0.0,"estimated_cost":50.0}'); } };
   await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: broke }), /out of credits \(429\)/);
-  const down = { chatCompletion: async () => { throw new NoologError(500, 'boom'); } };
+  const down = { startDeliberation: async () => { throw new NoologError(500, 'boom'); } };
   await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: down }), /boom/);
+});
+
+test('the native submit carries the instructions in the user turn, the draft as the assistant turn, and the policy seats', async () => {
+  const { deliberationRequest, extractWithNoolog, extractorMode, MODES } = await import('../src/noolog/extract.js');
+  const request = deliberationRequest({ profile: 'rwa-secondary', document, draft: envelope.ast, policyId: 'b245' });
+  assert.equal(request.policy_id, 'b245');
+  assert.equal(request.agent_names, undefined);
+  assert.equal(request.deliberation_rounds, 2);
+  assert.match(request.messages[0].content, /^Read the agreement[\s\S]*AGREEMENT:/);
+  assert.ok(request.messages[0].content.endsWith(document.text));
+  assert.equal(request.messages[1].role, 'assistant');
+  const generic = deliberationRequest({ profile: 'rwa-secondary', document });
+  assert.deepEqual(generic.agent_names, ['extractor', 'critic']);
+  assert.equal(generic.messages.length, 1);
+
+  // Progress: the mock walks pending → running → completed and the caller sees every step.
+  const seen = [];
+  const { envelope: out, verification } = await extractWithNoolog({ profile: 'rwa-secondary', document, draft: envelope.ast, onProgress: (state) => seen.push(state.status) });
+  assert.deepEqual(seen, ['pending', 'running', 'completed']);
+  assert.equal(out.extraction.provider, 'noolog');
+  assert.equal(out.ast.rules.length, envelope.ast.rules.length);
+  assert.ok(verification.mock);
+
+  assert.deepEqual(MODES, ['mock', 'noolog', 'openai']);
+  assert.equal(extractorMode({}), 'mock');
+  assert.equal(extractorMode({ NOOLOG_API_KEY: 'k' }), 'noolog');
+  assert.equal(extractorMode({ OPENAI_API_KEY: 'k' }), 'openai');
+  assert.equal(extractorMode({ NOOLOG_API_KEY: 'k', EXTRACTOR: 'mock' }), 'mock', 'the switch wins over the keys');
+  assert.throws(() => extractorMode({ EXTRACTOR: 'llama' }), /EXTRACTOR must be one of/);
+});
+
+test('the OpenAI-compatible bypass returns the AST with no verdicts, on any base URL', async () => {
+  const { extractWithOpenAI, extractAgreement } = await import('../src/noolog/extract.js');
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, body: JSON.parse(init.body), auth: init.headers.Authorization });
+    return { ok: true, json: async () => ({ id: 'chatcmpl-1', model: 'astra-legal', choices: [{ message: { content: JSON.stringify(envelope.ast) } }] }) };
+  };
+  const env = { OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'astra-legal', OPENAI_BASE_URL: 'https://astra.example/v1/' };
+  const { envelope: out, verification } = await extractWithOpenAI({ document, draft: envelope.ast, fetchImpl, env });
+  assert.equal(verification, null, 'one model call, nobody checked it');
+  assert.deepEqual(out.extraction, { provider: 'openai', model: 'astra-legal', responseId: 'chatcmpl-1', baseUrl: 'https://astra.example/v1/' });
+  assert.equal(out.ast.rules.length, envelope.ast.rules.length);
+  assert.equal(calls[0].url, 'https://astra.example/v1/chat/completions');
+  assert.equal(calls[0].auth, 'Bearer sk-test');
+  assert.equal(calls[0].body.response_format.type, 'json_object');
+  assert.equal(calls[0].body.messages.length, 4, 'system, document, draft, ask');
+  await assert.rejects(extractWithOpenAI({ document, fetchImpl, env: {} }), /OPENAI_API_KEY/);
+  await assert.rejects(extractWithOpenAI({ document, env, fetchImpl: async () => ({ ok: false, status: 401, text: async () => 'nope' }) }), /HTTP 401/);
+  await assert.rejects(extractWithOpenAI({ document, env, fetchImpl: async () => ({ ok: true, json: async () => ({ choices: [{ message: { content: '{"rules":[]}' } }] }) }) }), /Invalid policy AST/);
+
+  const previous = { ...process.env };
+  Object.assign(process.env, { EXTRACTOR: 'openai', OPENAI_API_KEY: 'sk-test', OPENAI_MODEL: 'astra-legal', OPENAI_BASE_URL: 'https://astra.example/v1' });
+  try {
+    const routed = await extractAgreement({ profile: 'rwa-secondary', document, fetchImpl });
+    assert.equal(routed.envelope.extraction.provider, 'openai');
+  } finally {
+    for (const key of ['EXTRACTOR', 'OPENAI_API_KEY', 'OPENAI_MODEL', 'OPENAI_BASE_URL']) { if (previous[key] === undefined) delete process.env[key]; else process.env[key] = previous[key]; }
+  }
 });
 
 test('the models the token may name are listed, the mock included', async () => {

@@ -1,8 +1,29 @@
 // Credentials live only in this module's memory. Never put an operator key in a public env var,
 // URL, localStorage, sessionStorage, or a generated file.
-export type GatewaySession = { url: string; viewerKey: string; operatorKey: string; revision: number };
+export type DemoCapabilities = {
+  agreements: boolean;
+  mutateAgreements: boolean;
+  deploy: boolean;
+  stack: false;
+  admin: false;
+};
+export type GatewaySession = {
+  url: string;
+  viewerKey: string;
+  operatorKey: string;
+  revision: number;
+  demoToken?: string;
+  demoExpiresAt?: number;
+  demoChainId?: number;
+  demoCapabilities?: DemoCapabilities;
+  demoState?: "starting" | "ready" | "unavailable" | "expired";
+  demoNotice?: string;
+  demoLimits?: Record<string, unknown>;
+  autoDemo?: boolean;
+};
 const initial: GatewaySession = {
-  url: process.env.NEXT_PUBLIC_GATEWAY_URL?.replace(/\/$/, "") ?? "",
+  url: (process.env.NEXT_PUBLIC_GATEWAY_URL || "https://mir-api.peeramid.xyz").replace(/\/$/, ""),
+  autoDemo: true,
   viewerKey: "",
   operatorKey: "",
   revision: 0,
@@ -11,10 +32,43 @@ let session = initial;
 const listeners = new Set<() => void>();
 export const getSession = () => session;
 export const getServerSession = () => initial;
-// A public URL is configuration, not authentication. Keep visitors on readable samples until
-// they explicitly connect with a key instead of polling protected endpoints anonymously.
-export const hasGatewaySession = (value: GatewaySession) =>
+export const hasInternalSession = (value: GatewaySession) =>
   !!(value.url && (value.viewerKey.trim() || value.operatorKey.trim()));
+export const hasDemoSession = (value: GatewaySession, now = Date.now()) =>
+  !!(
+    value.url &&
+    value.demoToken &&
+    value.demoExpiresAt &&
+    value.demoExpiresAt * 1000 > now &&
+    value.demoCapabilities?.agreements
+  );
+export const hasGatewaySession = (value: GatewaySession) =>
+  hasInternalSession(value) || hasDemoSession(value);
+export const canMutateAgreements = (value: GatewaySession) =>
+  !!value.operatorKey || (hasDemoSession(value) && value.demoCapabilities?.mutateAgreements === true);
+export function demoPathAllowed(method: string, path: string): boolean {
+  if (method === "GET")
+    return (
+      path === "/v1/status" || /^\/v1\/agreements(?:\/[a-zA-Z0-9_-]+(?:\/(?:ast|constraints))?)?$/.test(path)
+    );
+  if (method === "POST")
+    return (
+      path === "/v1/agreements" || /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:regenerate|deploy)$/.test(path)
+    );
+  return method === "PUT" && /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/constraints$/.test(path);
+}
+export function expireDemoSession(token: string) {
+  if (session.demoToken !== token) return;
+  setSession({
+    url: session.url,
+    viewerKey: "",
+    operatorKey: "",
+    autoDemo: false,
+    demoState: "expired",
+    demoNotice:
+      "This demo workspace expired. Start a new workspace deliberately; previous documents will not be fetched and no write will be replayed.",
+  });
+}
 export function subscribeSession(listener: () => void) {
   listeners.add(listener);
   return () => {
@@ -57,9 +111,35 @@ export async function gatewayRequest<T>(
   const method = init.method ?? "GET";
   const write = !["GET", "HEAD"].includes(method);
   if (!connection.url) throw new Error("Connect a gateway first. Samples are read-only.");
-  if (write && !connection.operatorKey)
-    throw new Error("An operator key is required for this action. Add it in Connection; it stays in memory.");
-  const key = write ? connection.operatorKey : connection.viewerKey || connection.operatorKey;
+  const demo = !!connection.demoToken && !hasInternalSession(connection);
+  if (demo && !hasDemoSession(connection)) {
+    expireDemoSession(connection.demoToken!);
+    throw new GatewayError(
+      "Demo workspace expired. Start a new workspace explicitly; this write was not replayed.",
+      401,
+      "DEMO_EXPIRED"
+    );
+  }
+  if (
+    demo &&
+    (!demoPathAllowed(method, path) ||
+      (write && !connection.demoCapabilities?.mutateAgreements) ||
+      (path.endsWith("/deploy") && !connection.demoCapabilities?.deploy))
+  )
+    throw new GatewayError(
+      "This demo workspace cannot use private/admin or agreement stack operations. Use the separate investor dashboard for public fund login and wallet-signed swaps.",
+      403,
+      "DEMO_SCOPE"
+    );
+  if (write && !connection.operatorKey && !demo)
+    throw new Error(
+      "This action is unavailable without an authorized workspace or internal operator key. No operator key can be entered in the public demo UI."
+    );
+  const key = demo
+    ? connection.demoToken
+    : write
+      ? connection.operatorKey
+      : connection.viewerKey || connection.operatorKey;
   const controller = new AbortController();
   const abort = () => controller.abort();
   if (init.signal?.aborted) controller.abort();
@@ -80,6 +160,7 @@ export async function gatewayRequest<T>(
       redirect: "error",
     });
     const body = await response.json().catch(() => null);
+    if (demo && response.status === 401) expireDemoSession(connection.demoToken!);
     if (!response.ok)
       throw new GatewayError(
         body?.error?.message ?? `${method} ${path}: ${response.status}`,

@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from 'ethers';
 import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { Agreements } from '../src/agreements.js';
+import { DemoWorkspaces } from '../src/demo-workspaces.js';
 import { VenueService } from '../src/venues.js';
 import { multibaasClient } from '../src/multibaas.js';
 import { SigningSettings } from '../src/signing.js';
@@ -67,10 +68,14 @@ const agreements = await new Agreements({
     auditPath: `${dataDir}/audit-${record.chainId}-${id}.json`,
   }).init(),
 }).init();
+// Public testnet visitors receive isolated, quota-limited workspaces—not operator credentials.
+const demoWorkspaces = process.env.PUBLIC_DEMO === 'false' ? null : await new DemoWorkspaces({
+  agreements, chainId: record.chainId, path: `${dataDir}/demo-workspaces-${record.chainId}.json`,
+}).init();
 // Key custody: the saved choice wins; SIGNER=multibaas moves signing into the Cloud Wallet on this boot.
 const signing = await new SigningSettings({ venues, fileSigner: signer, multibaas, agreements, path: `${dataDir}/signing-${record.chainId}.json` }).init();
 if (process.env.SIGNER === 'multibaas' && signing.provider === 'key') await signing.configure({ provider: 'multibaas', wallet: process.env.MULTIBAAS_WALLET ?? null, gas: process.env.MULTIBAAS_WALLET_GAS ?? null });
 if (signing.provider === 'multibaas') console.log(`operator signs from the MultiBaas Cloud Wallet ${signing.wallet.address}`);
-const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { signing }).listen(Number(process.env.PORT ?? 3000), host, () =>
+const server = createApp(null, apiKey, venues, policyData, viewerKey, agreements, { signing, demoWorkspaces }).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));
 for (const signal of ['SIGINT', 'SIGTERM']) process.once(signal, () => { server.close(); provider.destroy(); anvil?.kill('SIGTERM'); });

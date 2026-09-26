@@ -155,7 +155,7 @@ describe("source-linked workbench", () => {
         busy: false,
         status: null,
         client: agreementsClient({ url: "", viewerKey: "", operatorKey: "", revision: 0 }),
-        blocked: "Connect with an operator key to deploy.",
+        blocked: "Start an active demo workspace to deploy your own agreement.",
         onDeploy: () => {},
         onConstrain: () => {},
       })

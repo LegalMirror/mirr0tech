@@ -6,7 +6,7 @@ A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed
 
 ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
 
-**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend prefills the API URL; issuer writes still require an operator session.
+**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend connects automatically to a quota-limited, anonymous demo workspace—no manual operator/viewer keys. Wallet trading uses a separate verified-investor flow.
 
 [![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
 
@@ -38,7 +38,7 @@ NODE_ENV=development DOTENV_CONFIG_PATH=/dev/null EXPECTED_CHAIN_ID=31337 DATA_D
 NEXT_PUBLIC_GATEWAY_URL=http://127.0.0.1:3000 npm --prefix dashboard run dev
 ```
 
-Open **Connection** and use `local-dev-stack-operator-key-only` for this local issuer demo. Local World proofs and Noolog reports are synthetic; this is not the official World simulator. Anvil is ephemeral: after a chain reset, old local deployment records are not evidence of contracts still being deployed.
+The workbench automatically creates its own scoped demo workspace; no operator/viewer key entry is needed. The local CLI/maintenance API still uses `local-dev-stack-operator-key-only`. Local World proofs and Noolog reports are synthetic; this is not the official World simulator. Anvil is ephemeral: after a chain reset, old local deployment records are not evidence of contracts still being deployed.
 
 **Use `npm run dev:stack` for the workbench API.** Root `npm start` runs the older custodial ledger service, not the complete agreements/venue gateway. `npm run deploy:stack` and `npm run deploy:sepolia` explicitly deploy contracts; they are not web-server launch commands.
 
@@ -75,7 +75,7 @@ The static build is written to `dashboard/out/`; serve it with `npm --prefix das
 
 ## Workbench and NAV cashier
 
-The default dashboard is now the agreement workbench: upload → analysis → source-linked AST → World ID constraint → deploy. Start the gateway with `npm run dev:stack`, run `npm --prefix dashboard ci`, then `npm --prefix dashboard run dev`. Open port 3100 and enter the gateway URL and operator/viewer key in **Connect**; credentials remain in browser memory, not public build variables. The bundled document chooser uploads actual files through the Agreements API. Without `NOOLOG_API_KEY`, the existing mock adapter supplies deterministic analysis; provenance remains in the report.
+The default dashboard is now the agreement workbench: upload → analysis → source-linked AST → World ID constraint → deploy. Start the gateway with `npm run dev:stack`, run `npm --prefix dashboard ci`, then `npm --prefix dashboard run dev`. Open port 3100; the frontend automatically obtains a scoped demo token from the configured gateway. No operator/viewer keys are requested. Tokens stay in browser memory, and each visitor sees only their own uploads. The bundled document chooser uploads actual files through the Agreements API. Without `NOOLOG_API_KEY`, the existing mock adapter supplies deterministic analysis; provenance remains in the report.
 
 Opt into **NAV cashier addendum** when uploading the bundled fund agreement. The separately authored demo document supplies NAV, subscription/redemption fees and cap; pool fee and tick spacing are deployment settings. The compiler commits typed constructor parameters to the policy, and the hook/router verify them at deployment. See [cashier setup, API and limitations](docs/CASHIER.md).
 

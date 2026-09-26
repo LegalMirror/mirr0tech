@@ -1,16 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useSyncExternalStore, type CSSProperties } from "react";
+import { useEffect, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { canRegenerate, deployBlocked, inFlight, type Constraints } from "@/lib/agreements";
 import {
   getServerSession,
   getSession,
   hasGatewaySession,
+  canMutateAgreements,
+  expireDemoSession,
   subscribeSession,
   type GatewaySession,
 } from "@/lib/session";
 import { verificationLabel } from "@/lib/workbench";
+import { startDemoWorkspace } from "@/lib/demo-session";
 import { short } from "@/lib/format";
 import { ConnectionDialog, UploadDialog } from "./Forms";
 import { Evidence, GraphPane, HumanView, SourceCards } from "./PolicyPanes";
@@ -33,6 +36,20 @@ type Confirmation = { kind: "regenerate" } | { kind: "deploy" } | { kind: "const
 
 export function Workbench() {
   const session = useSyncExternalStore(subscribeSession, getSession, getServerSession);
+  useEffect(() => {
+    if (session.autoDemo && session.url && !hasGatewaySession(session)) void startDemoWorkspace(session.url);
+  }, [session.url, session.autoDemo]);
+  useEffect(() => {
+    if (!session.demoToken || !session.demoExpiresAt) return;
+    const token = session.demoToken;
+    const wait = session.demoExpiresAt * 1000 - Date.now();
+    if (wait <= 0) {
+      expireDemoSession(token);
+      return;
+    }
+    const timer = setTimeout(() => expireDemoSession(token), Math.min(wait, 2147483647));
+    return () => clearTimeout(timer);
+  }, [session.demoToken, session.demoExpiresAt]);
   return <SessionWorkbench key={session.revision} session={session} />;
 }
 
@@ -55,7 +72,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
   const [split, setSplit] = useState(44);
   const record = data?.record ?? null;
   const policy = record?.export ?? null;
-  const writable = !sample && !!session.operatorKey && !state.detailError;
+  const writable = !sample && canMutateAgreements(session) && !state.detailError;
   const selected =
     selection?.id === record?.id
       ? (selection?.node ?? "agreement")
@@ -145,7 +162,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
         </label>
         <div className="wb-library-label">
           {sample ? "SAMPLE LIBRARY" : "YOUR AGREEMENTS"}
-          <span>{sample ? "READ ONLY" : session.operatorKey ? "OPERATOR" : "VIEWER"}</span>
+          <span>{sample ? "READ ONLY" : session.demoToken ? "YOUR DEMO" : "AUTHORIZED"}</span>
         </div>
         <nav className="wb-agreement-list" aria-label="Agreement selection">
           {state.listLoading && (
@@ -189,6 +206,14 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           )}
         </nav>
         <div className="wb-contracts-bottom">
+          <Link href="/investor" className="wb-primary wb-upload">
+            <Icon name="shield" />
+            <span>
+              Investor dashboard
+              <br />
+              <small>Sign in with World ID</small>
+            </span>
+          </Link>
           <button className="wb-primary wb-upload" onClick={() => setUploadOpen(true)}>
             <Icon name="plus" />
             Upload Contracts
@@ -202,10 +227,12 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                   ? sample
                     ? hasGatewaySession(session)
                       ? "Gateway set · viewing samples"
-                      : "API configured · add key"
-                    : session.operatorKey
-                      ? "Operator · session only"
-                      : "Viewer · read only"
+                      : session.demoState === "starting"
+                        ? "Creating demo workspace…"
+                        : "Demo API · retry connection"
+                    : session.demoToken
+                      ? "Your workspace · session only"
+                      : "Authorized session"
                   : "No gateway · sample mode"}
               </small>
             </span>
@@ -296,7 +323,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                 {sample
                   ? "Not connected"
                   : status?.chain
-                    ? `Chain ${status.chain.chainId} · signer configured`
+                    ? `Chain ${status.chain.chainId} · ${session.demoToken ? "demo gateway" : status.chain.deployer ? "signer configured" : "gateway target"}`
                     : "No signer reported"}
               </small>
             </span>
@@ -325,7 +352,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
           <div className="wb-top-actions">
             <button
               aria-label="Regenerate agreement"
-              title={!writable ? "An operator session is required" : "Regenerate from the original documents"}
+              title={
+                !writable ? "An active demo workspace is required" : "Regenerate from the original documents"
+              }
               disabled={!writable || busy || !canRegenerate(record?.status)}
               onClick={() => requestConfirmation({ kind: "regenerate" })}
             >
@@ -382,6 +411,14 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <Icon name="arrow" size={14} />
             </button>
           </div>
+        )}
+        {session.demoNotice && (
+          <Notice>
+            {session.demoNotice}
+            {["unavailable", "expired"].includes(session.demoState ?? "") && (
+              <button onClick={() => setConnectionOpen(true)}>Start / retry demo workspace</button>
+            )}
+          </Notice>
         )}
         {state.listError && (
           <Notice error>
@@ -452,7 +489,8 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               constraints={data!.constraints}
               constraintError={data!.constraintError}
               sample={sample}
-              writable={writable}
+              demoWorkspace={!!session.demoToken}
+              writable={writable && !session.demoToken}
               client={client}
               onConfigure={() => setView("deploy")}
               onConnect={() => setConnectionOpen(true)}
@@ -570,9 +608,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               ? "Polling every 2s"
               : sample
                 ? "Read only"
-                : session.operatorKey
-                  ? "Operator session"
-                  : "Viewer session"}
+                : session.demoToken
+                  ? "Scoped demo workspace"
+                  : "Authorized session"}
           </span>
         </footer>
       </main>
@@ -580,7 +618,8 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
       {uploadOpen && (
         <UploadDialog
           onClose={() => setUploadOpen(false)}
-          writable={!sample && !!session.operatorKey}
+          writable={!sample && canMutateAgreements(session)}
+          demoWorkspace={!!session.demoToken}
           status={status}
           onUpload={async (upload) => {
             const result = await client.upload(upload);

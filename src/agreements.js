@@ -69,6 +69,7 @@ export class Agreements {
   constructor({ path = null, extract = extractWithNoolog, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
     ensure(typeof worldIdAction === 'string' && worldIdAction.trim(), 500, 'CONFIG', 'WORLD_ACTION must not be empty');
     Object.assign(this, { path, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
+    this.deployQueue = Promise.resolve();
   }
 
   async init() {
@@ -247,7 +248,8 @@ export class Agreements {
     ensure(compiled.solidity, 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no token of its own to deploy; it is served by the stack's credit venue`);
     this.venues.delete(id);
     this.transition(record, 'deploying');
-    const job = (async () => {
+    // All agreements share the signer, including operator and anonymous demo requests.
+    const job = this.deployQueue.then(async () => {
       try {
         const deployment = await this.deployer({ policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
         this.transition(record, 'deployed', { deployment });
@@ -257,7 +259,8 @@ export class Agreements {
         this.jobs.delete(id);
       }
       await this.persist();
-    })();
+    });
+    this.deployQueue = job.catch(() => {});
     this.jobs.set(id, job);
     return summary(record);
   }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import type {
   AgreementDetail,
   AgreementsClient,
@@ -567,6 +568,7 @@ export function IdentityView({
   constraints,
   constraintError,
   sample,
+  demoWorkspace = false,
   writable,
   client,
   onConfigure,
@@ -578,6 +580,7 @@ export function IdentityView({
   constraints: Constraints | null;
   constraintError: string;
   sample: boolean;
+  demoWorkspace?: boolean;
   writable: boolean;
   client: AgreementsClient;
   onConfigure: () => void;
@@ -587,6 +590,7 @@ export function IdentityView({
   const identity = sample ? sampleIdentity(policy) : (constraints?.identity ?? null);
   const deployed =
     !sample &&
+    !demoWorkspace &&
     record.status === "deployed" &&
     !!record.deployment &&
     record.deployment.policyHash === record.policyHash;
@@ -641,6 +645,14 @@ export function IdentityView({
           <p className="wb-privacy">{IDENTITY_PRIVACY}</p>
         </section>
       </div>
+      {demoWorkspace && (
+        <Notice>
+          Public demo scope covers your contracts only, not stack administration or wallet operations.{" "}
+          <Link href="/investor">
+            Open the investor dashboard for Passport login and wallet-signed swaps ↗
+          </Link>
+        </Notice>
+      )}
       {identity && deployed ? (
         <DeploymentIdentity
           client={client}
@@ -653,9 +665,11 @@ export function IdentityView({
         <section className="wb-surface wb-demo-path">
           <h3>Ready-to-demo path</h3>
           <p>
-            {sample
-              ? "This is an exported policy, not a wallet verification session."
-              : "Wallet proof and access checks become available after this policy is deployed. A stale deployment hash is not accepted."}
+            {demoWorkspace
+              ? "Use the investor dashboard for publicly published funds. A demo workspace token never grants issuer or investor wallet privileges."
+              : sample
+                ? "This is an exported policy, not a wallet verification session."
+                : "Wallet proof and access checks become available after this policy is deployed. A stale deployment hash is not accepted."}
           </p>
           <ol>
             <li>Upload the bundled agreement through the gateway; inspect Analysis and the AST.</li>

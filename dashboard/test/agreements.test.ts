@@ -133,11 +133,11 @@ describe("upload validation", () => {
 });
 
 describe("lifecycle gates and serial polling", () => {
-  it("requires operator, compiled token profile and reported signer to deploy", () => {
+  it("requires an authorized workspace, compiled token profile and reported signer to deploy", () => {
     const record = { status: "compiled", profile: "rwa-secondary" } as Agreement;
     const status = { chain: { chainId: 11155111 } } as StackStatus;
     expect(deployBlocked(record, status, true)).toBeNull();
-    expect(deployBlocked(record, status, false)).toMatch(/operator/);
+    expect(deployBlocked(record, status, false)).toMatch(/demo workspace/);
     expect(deployBlocked(record, null, true)).toMatch(/signer/);
     expect(deployBlocked({ ...record, profile: "wildcat-credit" }, status, true)).toMatch(/not supported/);
     for (const state of ["extracting", "failed", "deploying", "deployed"] as const)

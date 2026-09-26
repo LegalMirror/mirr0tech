@@ -17,6 +17,7 @@ import { useModalEscape } from "./useModalEscape";
 function nav(profile: ProfileId) {
   return [
     { href: "/", label: "Workbench", hint: "contracts & deployment" },
+    { href: "/investor", label: "Investor dashboard", hint: "World ID & wallet swaps" },
     { href: "/overview", label: "Overview", hint: "the story" },
     { href: "/agreement", label: "Agreement", hint: "what runs on-chain" },
     {
@@ -80,7 +81,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const close = () => setNavOpen(false);
 
-  if (path === "/") return <>{children}</>;
+  if (path === "/" || path === "/investor") return <>{children}</>;
 
   return (
     <div className="sh-root">

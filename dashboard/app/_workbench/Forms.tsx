@@ -3,7 +3,8 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { demoUrl, loadDemoBundle } from "@/lib/demo";
 import { CREDENTIAL_COPY } from "@/lib/identity";
-import { setSession, type GatewaySession } from "@/lib/session";
+import { gatewayUrl, hasDemoSession, setSession, type GatewaySession } from "@/lib/session";
+import { startDemoWorkspace } from "@/lib/demo-session";
 import {
   validateUpload,
   type Constraints,
@@ -15,73 +16,63 @@ import type { PolicyData, ProfileId } from "@/lib/types";
 import { Icon, Modal, Notice } from "./ui";
 
 export function ConnectionDialog({ session, onClose }: { session: GatewaySession; onClose: () => void }) {
-  const [url, setUrl] = useState(session.url);
-  const [viewerKey, setViewer] = useState(session.viewerKey);
-  const [operatorKey, setOperator] = useState(session.operatorKey);
+  const [url, setUrl] = useState(session.url || "https://mir-api.peeramid.xyz");
   const [error, setError] = useState("");
   function connect(event: FormEvent) {
     event.preventDefault();
     try {
-      setSession({ url, viewerKey: viewerKey.trim(), operatorKey: operatorKey.trim() });
+      const next = gatewayUrl(url);
+      if (!(hasDemoSession(session) && next === session.url)) void startDemoWorkspace(next, true);
       onClose();
     } catch (error) {
       setError((error as Error).message);
     }
   }
   return (
-    <Modal title="Gateway connection" onClose={onClose}>
-      <form className="wb-form" onSubmit={connect} autoComplete="off">
+    <Modal title="Demo workspace connection" onClose={onClose}>
+      <form className="wb-form" onSubmit={connect}>
         <p>
-          Connect to your agreements API. A viewer key can read contracts; only an operator key can upload,
-          change policy, or deploy.
+          Anyone can create demo contracts—no API key or World login is needed. The gateway issues an
+          anonymous, isolated workspace for your own uploads.
         </p>
         <label>
           Gateway URL
-          <input
-            type="url"
-            placeholder="http://localhost:3000"
-            required
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            autoFocus
-          />
-        </label>
-        <label>
-          Viewer key <span className="wb-muted">optional if using an operator key</span>
-          <input
-            type="password"
-            autoComplete="off"
-            value={viewerKey}
-            onChange={(e) => setViewer(e.target.value)}
-          />
-        </label>
-        <label>
-          Operator key <span className="wb-muted">optional · enables writes</span>
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={operatorKey}
-            onChange={(e) => setOperator(e.target.value)}
-          />
+          <input type="url" required value={url} onChange={(event) => setUrl(event.target.value)} autoFocus />
         </label>
         <Notice>
-          Keys stay in this tab’s memory, including when navigating dashboard routes. Reloading or
-          disconnecting clears them. They are sent only to the gateway above; never embedded in the build or
-          saved by this app.
+          {session.demoNotice ??
+            "Connect to create your scoped demo workspace. Exported samples remain available if the public demo API is not deployed yet."}
         </Notice>
+        <p className="wb-muted">
+          The opaque demo token stays only in memory. Reloading, disconnecting, changing gateways or starting
+          a new workspace loses access to this workspace in the browser. No private existing agreements, admin
+          methods or wallet funds are exposed. Investor login is separate.
+        </p>
+        {session.demoExpiresAt && (
+          <p>Workspace expires {new Date(session.demoExpiresAt * 1000).toLocaleString()}.</p>
+        )}
+        {session.demoLimits && (
+          <details>
+            <summary>Gateway demo limits</summary>
+            <pre className="wb-json">{JSON.stringify(session.demoLimits, null, 2)}</pre>
+          </details>
+        )}
         {error && <Notice error>{error}</Notice>}
         <footer>
           <button
             type="button"
             onClick={() => {
-              setSession({ url: "", viewerKey: "", operatorKey: "" });
+              setSession({ url: "", viewerKey: "", operatorKey: "", autoDemo: false });
               onClose();
             }}
           >
             Disconnect · use samples
           </button>
-          <button className="wb-primary" type="submit">
-            Connect <Icon name="arrow" />
+          <button className="wb-primary" type="submit" disabled={session.demoState === "starting"}>
+            {hasDemoSession(session) && url === session.url
+              ? "Keep this workspace"
+              : "Start new demo workspace"}
+            <Icon name="arrow" />
           </button>
         </footer>
       </form>
@@ -94,11 +85,13 @@ export function UploadDialog({
   onUpload,
   writable,
   status,
+  demoWorkspace = false,
 }: {
   onClose: () => void;
   onUpload: (upload: Upload) => Promise<void>;
   writable: boolean;
   status: StackStatus | null;
+  demoWorkspace?: boolean;
 }) {
   const [name, setName] = useState("BUIDL demo");
   const [profile, setProfile] = useState<ProfileId>("rwa-secondary");
@@ -164,11 +157,24 @@ export function UploadDialog({
         </p>
         {!writable && (
           <Notice>
-            Read-only mode. Close this dialog and add an operator key in Connection to upload. Samples cannot
-            be mutated.
+            The demo workspace is not ready. Use Connection to retry or start a new workspace. No API key is
+            needed; exported samples cannot be mutated.
           </Notice>
         )}
-        {status?.model.mode === "mock" && (
+        {demoWorkspace && (
+          <Notice>
+            Public workspaces accept only the bundled BUIDL document, optionally followed by its separately
+            authored NAV demo addendum with the provided config. Paste/file mode can submit those same
+            sources; arbitrary documents and credit profiles are not supported by the public mock reader.
+          </Notice>
+        )}
+        {status?.model.mode === "unavailable" && (
+          <Notice>
+            Public demo generation is currently unavailable. This workspace does not fall back to paid live
+            Noolog calls. Retry after the gateway's demo configuration is restored.
+          </Notice>
+        )}
+        {status?.model.mode === "mock" && !demoWorkspace && (
           <Notice>
             The gateway reports a mock model. Only recognized demo documents can generate; new documents need
             a live model configured on the server.
@@ -178,7 +184,7 @@ export function UploadDialog({
           Agreement name
           <input
             required
-            maxLength={200}
+            maxLength={demoWorkspace ? 120 : 200}
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. Fund subscription agreement"
@@ -194,7 +200,9 @@ export function UploadDialog({
           >
             <option value="rwa-secondary">RWA · token + secondary trading</option>
             <option value="custodial-rwa">RWA · custodial mint / burn</option>
-            <option value="wildcat-credit">Credit · existing stack venue (no per-agreement deploy)</option>
+            <option value="wildcat-credit" disabled={demoWorkspace}>
+              Credit · existing stack venue (no per-agreement deploy)
+            </option>
           </select>
         </label>
         <div className="wb-segmented" aria-label="Document input">

@@ -32,6 +32,7 @@ DEPLOYMENT_PATH=deployments/sepolia.json
 DATA_DIR=/app/.data
 AUDIT_PATH=/app/.data/audit-11155111.json
 SEED=false
+PUBLIC_DEMO=true
 WORLD_ENVIRONMENT=sandbox
 WORLD_CREDENTIAL=document
 WORLD_ACTION=humanity
@@ -63,7 +64,7 @@ The Dockerfile probe uses Node and requires no curl/wget. If configuring an HTTP
 
 ## Frontend
 
-GitHub Pages already builds the static dashboard with `NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz`. No frontend server is needed for that deployment. Issuer credentials are entered through Connection and stay in browser memory; they are not baked into the website.
+GitHub Pages already builds the static dashboard with `NEXT_PUBLIC_GATEWAY_URL=https://mir-api.peeramid.xyz`. No frontend server is needed for that deployment. With `PUBLIC_DEMO=true` (the API image default), the workbench automatically obtains an anonymous workspace token, with no operator/viewer key prompt. Tokens are confined to that visitor's agreement lifecycle; source isolation and durable deployment quotas remain enforced. The backend's `API_KEY` is for maintenance only and is never sent to public visitors. Set `PUBLIC_DEMO=false` to disable public contract creation. [Limits and isolation](../docs/PUBLIC_DEMO.md).
 
 To serve the frontend locally against the hosted backend:
 

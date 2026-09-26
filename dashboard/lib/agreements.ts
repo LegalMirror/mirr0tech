@@ -33,9 +33,9 @@ export type Agreement = {
 };
 export type AgreementDetail = Agreement & { export: PolicyData | null };
 export type StackStatus = {
-  model: { provider: string; mode: "mock" | "live"; url: string; model: string };
+  model: { provider: string; mode: "mock" | "live" | "unavailable"; url?: string; model?: string };
   compiler: { solidity: Record<string, string> };
-  chain: { chainId: number; deployer: string; attestor: string; poolManager: string } | null;
+  chain: { chainId: number; deployer?: string; attestor?: string; poolManager?: string } | null;
 };
 export type AstNode = {
   id: string;
@@ -131,7 +131,7 @@ export function deployBlocked(
   status: StackStatus | null,
   writable: boolean
 ): string | null {
-  if (!writable) return "Connect with an operator key to deploy.";
+  if (!writable) return "Start an active demo workspace to deploy your own agreement.";
   if (!record || record.status !== "compiled") return "Deployment requires a compiled agreement.";
   if (record.profile === "wildcat-credit")
     return "This credit profile uses the existing stack venue; per-agreement deployment is not supported.";

@@ -1,6 +1,6 @@
 import { gatewaySource } from "./gateway";
 import { staticSource } from "./static";
-import { getSession, hasGatewaySession, subscribeSession } from "../session";
+import { getSession, hasInternalSession, subscribeSession } from "../session";
 import type { DataSource } from "./types";
 
 export type { DataSource } from "./types";
@@ -10,7 +10,14 @@ export function selectSource(env: { gatewayUrl?: string } = {}): DataSource {
 }
 
 const gateway = gatewaySource(() => getSession().url);
-const current = () => (hasGatewaySession(getSession()) ? gateway : staticSource);
+const current = () => (hasInternalSession(getSession()) ? gateway : staticSource);
+function writable() {
+  if (!getSession().operatorKey)
+    throw new Error(
+      "Classic admin mutations are unavailable in public demo/investor sessions. Use the investor dashboard for permitted wallet actions."
+    );
+  return gateway;
+}
 // The older dashboard routes share the workbench's in-memory connection, without persisting keys.
 export const source: DataSource = {
   get kind() {
@@ -21,11 +28,11 @@ export const source: DataSource = {
   parties: (...args) => current().parties(...args),
   audit: (...args) => current().audit(...args),
   deployment: () => current().deployment(),
-  attest: (...args) => current().attest(...args),
-  resolve: (...args) => current().resolve(...args),
-  revoke: (...args) => current().revoke(...args),
+  attest: async (...args) => writable().attest(...args),
+  resolve: async (...args) => writable().resolve(...args),
+  revoke: async (...args) => writable().revoke(...args),
   worldIdContext: () => current().worldIdContext(),
-  verifyHuman: (...args) => current().verifyHuman(...args),
+  verifyHuman: async (...args) => writable().verifyHuman(...args),
   subscribe(listener) {
     const stops = [gateway.subscribe(listener), staticSource.subscribe(listener), subscribeSession(listener)];
     return () => stops.forEach((stop) => stop());

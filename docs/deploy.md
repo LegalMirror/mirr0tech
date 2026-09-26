@@ -27,6 +27,7 @@ If using the existing GitHub Pages dashboard, a separate dashboard container is 
 | `WORLD_RP_ID` | API runtime | Matching registered `rp_...` |
 | `WORLD_RP_SIGNING_KEY` | API runtime secret | Signs RP requests; not an Ethereum wallet key |
 | `NEXT_PUBLIC_GATEWAY_URL` | Dashboard build argument | Public **HTTPS API origin**, no credentials, query or fragment |
+| `DEMO_LIMITS` | API runtime, optional | Public demo quotas as JSON, e.g. `{"deploysPerWorkspace":10,"deploysPerInterval":50}`; defaults: 3 uploads and 2 deploys per workspace, 5 deploys per hour overall, reservations never refunded. Keep `intervalSeconds` unchanged unless the demo state file is removed |
 
 The committed deployment's original operator is `0xF0121f93b1a1bAd73AdDC316B57684bD93D3254e`. An arbitrary funded key is not sufficient: it must hold the required roles. Do not paste keys into chat, source control, build logs, or a public frontend configuration.
 
@@ -102,3 +103,4 @@ Its API uses port 3200. Never deploy that development override on a public serve
 ## Troubleshooting
 
 - **`503 UNAVAILABLE: Demo state persistence failed; operator intervention required`** — the API could not write `DATA_DIR` (`/app/.data`) and closed public work; the log line `demo workspaces: cannot persist … EACCES` names the cause. It happens when the `api-data` volume was created by an older image and is root-owned. The image's entrypoint now starts as root, `chown`s the volume to `node`, and drops privileges, so a redeploy repairs it; the API also refuses to start when `DATA_DIR` is not writable (`DATA_DIR … is not writable (uid …)`), so the problem shows in the logs at boot instead of on the first upload. A one-off repair without redeploying: `docker run --rm -v <stack>_api-data:/d alpine chown -R 1000:1000 /d`. `GET /health` reports `demo: ok | broken`.
+- **`429 DEMO_LIMIT: Public demo quota exhausted`** — a demo workspace (anonymous `demo_…` token) spent its budget: 2 deploys per workspace, 5 per hour across all workspaces, every attempt counted, failed ones too. Raise `DEMO_LIMITS` or connect with the operator `API_KEY`, which has no demo quota.

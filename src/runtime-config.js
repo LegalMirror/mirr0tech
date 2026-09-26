@@ -50,3 +50,17 @@ export async function assertWritableDataDir(dataDir) {
     throw new Error(`DATA_DIR ${dataDir} is not writable${who}: ${error.code ?? error.message}. On Docker the mounted volume must be owned by the runtime user; the API image's entrypoint chowns it when it starts as root.`);
   }
 }
+
+/// Public demo quotas from DEMO_LIMITS (a JSON object of the DemoWorkspaces limit names, e.g.
+/// {"deploysPerWorkspace":10,"deploysPerInterval":50}); the defaults apply for anything absent.
+export function demoLimits(env = process.env) {
+  const raw = env.DEMO_LIMITS;
+  if (!raw || !raw.trim()) return {};
+  let limits;
+  try { limits = JSON.parse(raw); } catch { throw new Error('DEMO_LIMITS must be a JSON object'); }
+  if (!limits || typeof limits !== 'object' || Array.isArray(limits)) throw new Error('DEMO_LIMITS must be a JSON object');
+  for (const [key, value] of Object.entries(limits)) {
+    if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`DEMO_LIMITS.${key} must be a positive integer`);
+  }
+  return limits;
+}

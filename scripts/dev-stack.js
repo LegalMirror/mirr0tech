@@ -14,7 +14,7 @@ import { SigningSettings } from '../src/signing.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp } from '../src/app.js';
 import { loadPolicyData } from '../src/dashboard-api.js';
-import { stackRuntime, assertExpectedChain, reuseDeployment, assertWritableDataDir } from '../src/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment, assertWritableDataDir, demoLimits } from '../src/runtime-config.js';
 
 const { apiKey, viewerKey, expectedChainId } = stackRuntime();
 const verifier = new WorldIdVerifier();
@@ -71,8 +71,9 @@ const agreements = await new Agreements({
 }).init();
 // Public testnet visitors receive isolated, quota-limited workspaces—not operator credentials.
 const demoWorkspaces = process.env.PUBLIC_DEMO === 'false' ? null : await new DemoWorkspaces({
-  agreements, chainId: record.chainId, path: `${dataDir}/demo-workspaces-${record.chainId}.json`,
+  agreements, chainId: record.chainId, path: `${dataDir}/demo-workspaces-${record.chainId}.json`, ...demoLimits(),
 }).init();
+if (demoWorkspaces) console.log(`public demo quotas: ${['deploysPerWorkspace', 'deploysPerInterval', 'uploadsPerWorkspace', 'jobsPerWorkspace'].map((key) => `${key}=${demoWorkspaces.limits[key]}`).join(' ')}`);
 // Key custody: the saved choice wins; SIGNER=multibaas moves signing into the Cloud Wallet on this boot.
 const signing = await new SigningSettings({ venues, fileSigner: signer, multibaas, agreements, path: `${dataDir}/signing-${record.chainId}.json` }).init();
 if (process.env.SIGNER === 'multibaas' && signing.provider === 'key') await signing.configure({ provider: 'multibaas', wallet: process.env.MULTIBAAS_WALLET ?? null, gas: process.env.MULTIBAAS_WALLET_GAS ?? null });

@@ -68,3 +68,15 @@ test('the data directory is checked for writes at boot, with the reason and the 
     await rm(directory, { recursive: true, force: true });
   }
 });
+
+test('DEMO_LIMITS is a JSON object of positive integers, absent means defaults', async () => {
+  const { demoLimits } = await import('../src/runtime-config.js');
+  assert.deepEqual(demoLimits({}), {});
+  assert.deepEqual(demoLimits({ DEMO_LIMITS: ' ' }), {});
+  assert.deepEqual(demoLimits({ DEMO_LIMITS: '{"deploysPerWorkspace":10,"deploysPerInterval":50}' }), { deploysPerWorkspace: 10, deploysPerInterval: 50 });
+  assert.throws(() => demoLimits({ DEMO_LIMITS: 'nope' }), /JSON object/);
+  assert.throws(() => demoLimits({ DEMO_LIMITS: '[1]' }), /JSON object/);
+  assert.throws(() => demoLimits({ DEMO_LIMITS: '{"deploysPerWorkspace":0}' }), /positive integer/);
+  const { DemoWorkspaces } = await import('../src/demo-workspaces.js');
+  assert.throws(() => new DemoWorkspaces({ agreements: { create() {} }, chainId: 31337, ...demoLimits({ DEMO_LIMITS: '{"nope":1}' }) }), /Unknown demo limit/);
+});

@@ -33,6 +33,8 @@ services:
       WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
       # Empty means the existing deterministic mock Noolog adapter; proof verification is NOT mocked.
       NOOLOG_API_KEY: ${NOOLOG_API_KEY:-}
+      # Public demo quotas, JSON: {"deploysPerWorkspace":10,"deploysPerInterval":50}. Defaults are 2 and 5 per hour.
+      DEMO_LIMITS: ${DEMO_LIMITS:-}
       MULTIBAAS_URL: ${MULTIBAAS_URL:-}
       MULTIBAAS_API_KEY: ${MULTIBAAS_API_KEY:-}
     healthcheck:

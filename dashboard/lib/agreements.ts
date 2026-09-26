@@ -318,3 +318,22 @@ export function poll<T>(
     clearTimeout(timer);
   };
 }
+
+/** True once, when a mint or seed operation first reaches confirmed; views then re-read the balances they show. */
+export function operationSettled(
+  previous: { status: string } | null | undefined,
+  next: { status: string }
+): boolean {
+  return next.status === "confirmed" && previous?.status !== "confirmed";
+}
+
+/** Short label for the stage a pending mint or seed operation is waiting on. */
+export function operationLabel(stage: string): string {
+  const labels: Record<string, string> = {
+    approval: "Approving tokens…",
+    mint: "Minting…",
+    release: "Releasing tokens…",
+    seed: "Seeding pool…",
+  };
+  return labels[stage] ?? "Waiting for confirmation…";
+}

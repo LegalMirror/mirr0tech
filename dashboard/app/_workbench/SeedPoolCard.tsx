@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { parseUnits } from "ethers";
 import {
+  operationLabel,
+  operationSettled,
   poll,
   type AgreementDetail,
   type AgreementsClient,
@@ -10,18 +12,29 @@ import {
   type SeedOperation,
 } from "@/lib/agreements";
 import { sharedPoolMismatch } from "@/lib/swap";
-import { Modal, Notice } from "./ui";
+import { actionError, amountError } from "@/lib/validate";
+import { Busy, FieldError, Modal, Notice } from "./ui";
+
+const budgetError = (amount: string, balance: string | undefined) =>
+  amountError(amount) ??
+  (balance !== undefined && parseUnits(amount.trim(), 6) > parseUnits(balance, 6)
+    ? "Exceeds the backend wallet balance."
+    : null);
 
 export function SeedPoolCard({
   record,
   client,
   blocked,
+  refresh = 0,
 }: {
   record: AgreementDetail;
   client: AgreementsClient;
   blocked: string | null;
+  /** Changes when another view confirms an operation that moves the backend's balances. */
+  refresh?: number;
 }) {
   const [state, setState] = useState<LiquidityState | null>(null);
+  const [stateError, setStateError] = useState("");
   const [error, setError] = useState("");
   const [rwaAmount, setRwaAmount] = useState("");
   const [usdAmount, setUsdAmount] = useState("");
@@ -58,12 +71,12 @@ export function SeedPoolCard({
       (signal) => client.liquidity(record.id, signal),
       (next) => {
         setState(next);
-        setError("");
+        setStateError("");
       },
-      (failure) => setError(failure.message),
+      (failure) => setStateError(actionError(failure)),
       () => 10000
     );
-  }, [client, record.id, disabled, revision]);
+  }, [client, record.id, disabled, revision, refresh]);
   useEffect(() => {
     if (!operation || operation.status !== "pending") return;
     return poll(
@@ -75,27 +88,22 @@ export function SeedPoolCard({
         } catch {
           /* Gateway remains authoritative. */
         }
-        if (next.status === "confirmed") setRevision((value) => value + 1);
+        if (operationSettled(operation, next)) setRevision((value) => value + 1);
       },
-      (failure) => setError(failure.message),
+      (failure) => setError(`${actionError(failure)} The backend may still be processing this request.`),
       () => 2000
     );
   }, [client, record.id, operation?.requestId, operation?.status, storageKey]);
   const pending = sending || operation?.status === "pending";
+  const rwaIssue = budgetError(rwaAmount, state?.rwaBalance);
+  const usdIssue = budgetError(usdAmount, state?.usdBalance);
   function prepare() {
     setError("");
     try {
       if (!state) throw new Error("Refresh backend balances first.");
-      for (const [amount, balance] of [
-        [rwaAmount, state.rwaBalance],
-        [usdAmount, state.usdBalance],
-      ]) {
-        if (!/^\d+(\.\d{1,6})?$/.test(amount) || parseUnits(amount, 6) <= 0n)
-          throw new Error("Enter positive amounts with up to six decimals.");
-        if (parseUnits(amount, 6) > parseUnits(balance, 6))
-          throw new Error("The backend needs enough of both tokens to cover these budgets.");
-      }
-      setReview({ rwaAmount, usdAmount, requestId: crypto.randomUUID() });
+      const issue = rwaIssue ?? usdIssue;
+      if (issue) throw new Error(issue);
+      setReview({ rwaAmount: rwaAmount.trim(), usdAmount: usdAmount.trim(), requestId: crypto.randomUUID() });
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "Invalid amounts.");
     }
@@ -120,6 +128,7 @@ export function SeedPoolCard({
     }
     try {
       const next = await client.seed(record.id, body);
+      if (operationSettled(operation, next)) setRevision((value) => value + 1);
       setOperation(next);
       try {
         sessionStorage.setItem(storageKey, JSON.stringify(next));
@@ -127,7 +136,7 @@ export function SeedPoolCard({
         /* Optional storage. */
       }
     } catch (failure) {
-      const message = failure instanceof Error ? failure.message : "Seed request failed.";
+      const message = actionError(failure);
       setOperation({ ...attempt, error: `${message} Retry this same request to check its status.` });
     } finally {
       setReview(null);
@@ -184,6 +193,7 @@ export function SeedPoolCard({
             disabled={!!disabled || !!pending}
             required
           />
+          <FieldError error={rwaAmount && rwaIssue} />
         </label>
         <label>
           Maximum mUSDC to deposit
@@ -194,14 +204,22 @@ export function SeedPoolCard({
             disabled={!!disabled || !!pending}
             required
           />
+          <FieldError error={usdAmount && usdIssue} />
         </label>
         <p className="wb-muted">
           The backend approves these maximum amounts and adds a full-range position at the current pool price.
           Actual deposits may be smaller; unused tokens stay in the backend wallet.
         </p>
         <div className="wb-actions">
-          <button className="wb-primary" disabled={!!disabled || !!pending || !state}>
-            Review seed
+          <button
+            className="wb-primary"
+            disabled={!!disabled || !!pending || !state || !!rwaIssue || !!usdIssue}
+          >
+            {pending ? (
+              <Busy label={operation && !sending ? operationLabel(operation.stage) : "Submitting…"} />
+            ) : (
+              "Review seed"
+            )}
           </button>
           <button
             type="button"
@@ -212,6 +230,7 @@ export function SeedPoolCard({
           </button>
         </div>
       </form>
+      {stateError && <Notice error>{stateError}</Notice>}
       {error && <Notice error>{error}</Notice>}
       {operation && (
         <div aria-label="Pool seed operation">
@@ -246,7 +265,7 @@ export function SeedPoolCard({
           )}
           {operation.status === "failed" && (
             <button disabled={!!disabled || !!pending} onClick={() => submit(operation)}>
-              Retry same seed request
+              {sending ? <Busy label="Retrying…" /> : "Retry same seed request"}
             </button>
           )}
         </div>
@@ -264,7 +283,7 @@ export function SeedPoolCard({
             backend signs approvals and the liquidity transaction, and pays gas.
           </p>
           <button className="wb-primary" disabled={sending || !!disabled} onClick={() => submit(review)}>
-            {sending ? "Submitting…" : "Seed pool from backend"}
+            {sending ? <Busy label="Seeding…" /> : "Seed pool from backend"}
           </button>
         </Modal>
       )}

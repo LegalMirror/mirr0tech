@@ -127,3 +127,19 @@ export function Notice({ children, error = false }: { children: ReactNode; error
     </div>
   );
 }
+/** Button content while an action is in flight: the shared spinner and what the action is waiting on. */
+export function Busy({ label }: { label: string }) {
+  return (
+    <>
+      <span className="wb-spinner" aria-hidden="true" />
+      {label}
+    </>
+  );
+}
+export function FieldError({ error }: { error: string | null }) {
+  return error ? (
+    <small className="wb-field-error" aria-live="polite">
+      {error}
+    </small>
+  ) : null;
+}

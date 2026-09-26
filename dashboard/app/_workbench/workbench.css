@@ -1182,6 +1182,11 @@
 .wb-form label > .wb-muted {
   font-size: 10px;
 }
+.wb-field-error {
+  display: block;
+  font-size: 11px;
+  color: #f2bfc0;
+}
 .wb-form label > input,
 .wb-form label > textarea,
 .wb-form label > select {

@@ -12,13 +12,14 @@ import {
   observeWallet,
   sendWalletTransaction,
   switchToSepolia,
-  walletError,
   WalletChanged,
   type WalletIdentity,
 } from "@/lib/investor/wallet";
-import { Icon, Notice } from "./ui";
+import { actionError, amountError } from "@/lib/validate";
+import { Busy, FieldError, Icon, Notice } from "./ui";
 
 type Token = { address: string; symbol: string; decimals: number; balance: string };
+type Task = "connect" | "quote" | "refresh" | "approve" | "swap";
 const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
 const explorer = "https://sepolia.etherscan.io";
 function Address({ address }: { address: string }) {
@@ -49,6 +50,7 @@ export function SwapView({
   const [quote, setQuote] = useState<SwapQuote | null>(null);
   const [approved, setApproved] = useState(false);
   const [busy, setBusy] = useState("");
+  const [task, setTask] = useState<Task | null>(null);
   const [error, setError] = useState("");
   const [transactions, setTransactions] = useState<{ label: string; hash: string; status: string }[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -91,21 +93,30 @@ export function SwapView({
   const input = direction === "buy" ? tokens?.asset : tokens?.rwa;
   const output = direction === "buy" ? tokens?.rwa : tokens?.asset;
   const expired = !!quote && now >= quote.expiresAt;
+  const amountIssue =
+    amountError(amount) ??
+    (input && parseUnits(amount.trim(), input.decimals) > BigInt(input.balance)
+      ? `Exceeds your ${input.symbol} balance.`
+      : null);
 
-  async function run(label: string, action: (current: () => boolean) => Promise<void>) {
+  async function run(next: Task, label: string, action: (current: () => boolean) => Promise<void>) {
     if (running.current || blocked) return;
     running.current = true;
     const revision = version.current;
     const current = () => live.current && revision === version.current;
     setBusy(label);
+    setTask(next);
     setError("");
     try {
       await action(current);
     } catch (failure) {
-      if (current()) setError(walletError(failure));
+      if (live.current) setError(actionError(failure));
     } finally {
       running.current = false;
-      if (live.current) setBusy("");
+      if (live.current) {
+        setBusy("");
+        setTask(null);
+      }
     }
   }
   async function loadTokens(identity: WalletIdentity, current: () => boolean) {
@@ -127,7 +138,7 @@ export function SwapView({
   }
 
   async function connect() {
-    await run("Connecting wallet…", async (current) => {
+    await run("connect", "Connecting wallet…", async (current) => {
       const provider = injectedWallet();
       if (!provider) throw new Error("Install a Sepolia-capable browser wallet to swap.");
       let identity = await connectWallet(provider);
@@ -143,14 +154,15 @@ export function SwapView({
     if (!wallet || !input || !output || poolMismatch) return;
     setQuote(null);
     setApproved(false);
-    await run("Finding a quote…", async (current) => {
+    await run("quote", "Finding a quote…", async (current) => {
       const provider = injectedWallet();
       if (!provider) throw new Error("Reconnect your wallet.");
       await assertWallet(provider, wallet, current);
       const fresh = await loadTokens(wallet, current);
       const freshInput = direction === "buy" ? fresh.asset : fresh.rwa;
-      if (!/^\d+(?:\.\d+)?$/.test(amount)) throw new Error("Enter a positive token amount.");
-      const units = parseUnits(amount, freshInput.decimals);
+      const issue = amountError(amount);
+      if (issue) throw new Error(issue);
+      const units = parseUnits(amount.trim(), freshInput.decimals);
       const bps = Number(slippage) * 100;
       if (units <= 0n || units > BigInt(freshInput.balance))
         throw new Error("Enter an amount within your token balance.");
@@ -180,7 +192,7 @@ export function SwapView({
   }
   async function refreshBalances() {
     if (!wallet) return;
-    await run("Refreshing balances…", async (current) => {
+    await run("refresh", "Refreshing balances…", async (current) => {
       await loadTokens(wallet, current);
     });
   }
@@ -221,7 +233,10 @@ export function SwapView({
       setQuote(null);
       setApproved(false);
     }
-    if (live.current) setTransactions((items) => [...items, { label, hash, status: "Pending" }]);
+    if (live.current) {
+      setTransactions((items) => [...items, { label, hash, status: "Pending" }]);
+      setBusy(`Waiting for ${label.toLowerCase()} confirmation…`);
+    }
     const until = Date.now() + 180000;
     while (live.current && Date.now() < until) {
       const receipt = await client.swapReceipt(record.id, hash);
@@ -243,7 +258,7 @@ export function SwapView({
 
   async function approve() {
     if (!quote || !wallet) return;
-    await run("Checking approval…", async (current) => {
+    await run("approve", "Checking approval…", async (current) => {
       const result = await client.swapApproval(record.id, { wallet: wallet.address, quoteId: quote.id });
       if (!current()) return;
       for (const [label, tx] of [
@@ -261,7 +276,7 @@ export function SwapView({
   }
   async function swap() {
     if (!quote || !wallet || !approved) return;
-    await run("Preparing swap…", async (current) => {
+    await run("swap", "Preparing swap…", async (current) => {
       const provider = injectedWallet();
       if (!provider) throw new Error("Reconnect your wallet.");
       await assertWallet(provider, wallet, current);
@@ -322,7 +337,7 @@ export function SwapView({
                 </p>
               ) : (
                 <button className="wb-primary" onClick={connect} disabled={!!busy}>
-                  Connect wallet
+                  {task === "connect" ? <Busy label="Connecting…" /> : "Connect wallet"}
                 </button>
               )}
               <label>
@@ -351,6 +366,7 @@ export function SwapView({
                     invalidate();
                   }}
                 />
+                <FieldError error={amount && amountIssue} />
               </label>
               {input && (
                 <p className="wb-muted">
@@ -361,7 +377,7 @@ export function SwapView({
               )}
               {wallet && (
                 <button disabled={!!busy} onClick={refreshBalances}>
-                  Refresh balances
+                  {task === "refresh" ? <Busy label="Refreshing…" /> : "Refresh balances"}
                 </button>
               )}
               <label>
@@ -378,11 +394,17 @@ export function SwapView({
               </label>
               <button
                 className="wb-primary"
-                disabled={!wallet || !tokens || !amount || !!busy || !!poolMismatch}
+                disabled={!wallet || !tokens || !!amountIssue || !!busy || !!poolMismatch}
                 onClick={getQuote}
               >
-                <Icon name="refresh" />
-                Get quote
+                {task === "quote" ? (
+                  <Busy label="Quoting…" />
+                ) : (
+                  <>
+                    <Icon name="refresh" />
+                    Get quote
+                  </>
+                )}
               </button>
               {quote && output && (
                 <section aria-label="Swap quote" className="wb-swap-quote">
@@ -414,16 +436,20 @@ export function SwapView({
                   </p>
                   {!approved ? (
                     <button onClick={approve} disabled={!!busy || expired}>
-                      Check / approve token
+                      {task === "approve" ? <Busy label="Approving…" /> : "Check / approve token"}
                     </button>
                   ) : (
                     <button className="wb-primary" onClick={swap} disabled={!!busy || expired}>
-                      Confirm swap
+                      {task === "swap" ? <Busy label="Swapping…" /> : "Confirm swap"}
                     </button>
                   )}
                 </section>
               )}
-              {busy && <p role="status">{busy}</p>}
+              {busy && (
+                <p role="status">
+                  <Busy label={busy} />
+                </p>
+              )}
               {error && <Notice error>{error}</Notice>}
             </section>
             <section className="wb-surface">

@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { getAddress, isAddress, parseUnits, ZeroAddress } from "ethers";
+import { getAddress, parseUnits } from "ethers";
 import {
+  operationLabel,
+  operationSettled,
   poll,
   type AgreementDetail,
   type AgreementsClient,
@@ -10,8 +12,9 @@ import {
   type StackStatus,
 } from "@/lib/agreements";
 import testFlags from "../../../shared/mint-test-flags.json";
+import { actionError, addressError, amountError } from "@/lib/validate";
 import { SeedPoolCard } from "./SeedPoolCard";
-import { Modal, Notice } from "./ui";
+import { Busy, FieldError, Modal, Notice } from "./ui";
 
 export function MintView({
   record,
@@ -45,6 +48,7 @@ export function MintView({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
   const [pollError, setPollError] = useState("");
+  const [refresh, setRefresh] = useState(0);
   const lock = useRef(false);
   const storageKey = `mirr0:mint:${record.id}:${record.deployment?.token}`;
   const [restored, setRestored] = useState(false);
@@ -66,6 +70,8 @@ export function MintView({
     }
   }, [restored, storageKey, operation]);
   const pending = sending || operation?.status === "pending";
+  const recipientIssue = addressError(recipient);
+  const amountIssue = amountError(amount);
   const backend = status?.chain?.deployer ?? operation?.backend;
   const blocked = sample
     ? "Deploy your own agreement before minting. Samples are read-only."
@@ -85,23 +91,22 @@ export function MintView({
     return poll(
       (signal) => client.mintOperation(record.id, operation.requestId, signal),
       (next) => {
+        if (operationSettled(operation, next)) setRefresh((value) => value + 1);
         setOperation(next);
         setPollError("");
       },
-      (failure) => setPollError(`${failure.message} The backend may still be processing this request.`),
+      (failure) => setPollError(`${actionError(failure)} The backend may still be processing this request.`),
       () => 2000
     );
   }, [client, record.id, operation?.requestId, operation?.status]);
   function prepare() {
     setError("");
     try {
-      if (!isAddress(recipient) || recipient === ZeroAddress)
-        throw new Error("Enter a valid recipient address.");
-      if (!/^\d+(?:\.\d{1,6})?$/.test(amount) || parseUnits(amount, 6) <= 0n)
-        throw new Error("Enter a positive amount with up to six decimals.");
+      const issue = recipientIssue ?? amountIssue;
+      if (issue) throw new Error(issue);
       setReview({
-        recipient: getAddress(recipient),
-        amount,
+        recipient: getAddress(recipient.trim()),
+        amount: amount.trim(),
         requestId: crypto.randomUUID(),
         bypassSubscription,
         simulateDeposit,
@@ -141,10 +146,11 @@ export function MintView({
         /* Gateway persists accepted requests. */
       }
       const next = await client.mint(record.id, body);
+      if (operationSettled(operation, next)) setRefresh((value) => value + 1);
       setOperation(next);
       setReview(null);
     } catch (failure) {
-      const message = failure instanceof Error ? failure.message : "Mint request failed.";
+      const message = actionError(failure);
       setError(message);
       setOperation((current) => ({
         ...(current?.requestId === body.requestId ? current : {}),
@@ -202,6 +208,7 @@ export function MintView({
               disabled={!!blocked || !!pending}
               required
             />
+            <FieldError error={recipient && recipientIssue} />
           </label>
           <label>
             Amount of RWA tokens
@@ -213,9 +220,17 @@ export function MintView({
               disabled={!!blocked || !!pending}
               required
             />
+            <FieldError error={amount && amountIssue} />
           </label>
-          <button className="wb-primary" disabled={!!blocked || !!pending || !recipient || !amount}>
-            Review mint
+          <button
+            className="wb-primary"
+            disabled={!!blocked || !!pending || !!recipientIssue || !!amountIssue}
+          >
+            {pending ? (
+              <Busy label={operation && !sending ? operationLabel(operation.stage) : "Submitting…"} />
+            ) : (
+              "Review mint"
+            )}
           </button>
         </form>
         {error && <Notice error>{error}</Notice>}
@@ -323,12 +338,12 @@ export function MintView({
           {pollError && <Notice error>{pollError}</Notice>}
           {operation.status === "failed" && (
             <button disabled={!!blocked || !!pending} onClick={() => submit(operation)}>
-              Retry same request
+              {sending ? <Busy label="Retrying…" /> : "Retry same request"}
             </button>
           )}
         </section>
       )}
-      <SeedPoolCard record={record} client={client} blocked={blocked} />
+      <SeedPoolCard record={record} client={client} blocked={blocked} refresh={refresh} />
       {review && (
         <Modal
           title="Confirm backend mint"
@@ -366,7 +381,7 @@ export function MintView({
             )}
             {error && <Notice error>{error}</Notice>}
             <button className="wb-primary" disabled={sending || !!blocked} onClick={() => submit(review)}>
-              {sending ? "Submitting…" : "Mint from backend"}
+              {sending ? <Busy label="Minting…" /> : "Mint from backend"}
             </button>
           </div>
         </Modal>

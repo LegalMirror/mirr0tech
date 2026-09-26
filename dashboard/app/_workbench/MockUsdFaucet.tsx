@@ -10,11 +10,11 @@ import {
   observeWallet,
   sendWalletTransaction,
   switchToSepolia,
-  walletError,
   WalletChanged,
   type WalletIdentity,
 } from "@/lib/investor/wallet";
-import { Notice } from "./ui";
+import { actionError, amountError } from "@/lib/validate";
+import { Busy, FieldError, Notice } from "./ui";
 
 export function MockUsdFaucet({ onBusyChange }: { onBusyChange: (busy: boolean) => void }) {
   const [amount, setAmount] = useState("10000");
@@ -26,6 +26,7 @@ export function MockUsdFaucet({ onBusyChange }: { onBusyChange: (busy: boolean) 
   const mounted = useRef(true);
   const epoch = useRef(0);
   const running = useRef(false);
+  const amountIssue = amountError(amount);
   useEffect(() => {
     mounted.current = true;
     const provider = injectedWallet();
@@ -54,7 +55,7 @@ export function MockUsdFaucet({ onBusyChange }: { onBusyChange: (busy: boolean) 
       if (mounted.current) {
         if (failure instanceof WalletChanged && failure.txHash)
           setReceipt({ hash: failure.txHash, status: "Submitted — check Etherscan" });
-        setError(walletError(failure));
+        setError(actionError(failure));
       }
     } finally {
       running.current = false;
@@ -161,17 +162,22 @@ export function MockUsdFaucet({ onBusyChange }: { onBusyChange: (busy: boolean) 
               disabled={!!busy}
               onChange={(event) => setAmount(event.target.value)}
             />
-            <button type="submit" className="wb-primary" disabled={!!busy || !amount.trim()}>
-              Mint mUSDC
+            <FieldError error={amountIssue} />
+            <button type="submit" className="wb-primary" disabled={!!busy || !!amountIssue}>
+              {busy ? <Busy label="Minting…" /> : "Mint mUSDC"}
             </button>
           </form>
         </>
       ) : (
         <button type="button" className="wb-primary" disabled={!!busy} onClick={connect}>
-          Connect wallet to mint
+          {busy ? <Busy label="Connecting…" /> : "Connect wallet to mint"}
         </button>
       )}
-      {busy && <p role="status">{busy}</p>}
+      {busy && (
+        <p role="status">
+          <Busy label={busy} />
+        </p>
+      )}
       {error && <Notice error>{error}</Notice>}
       {receipt && (
         <p role="status">

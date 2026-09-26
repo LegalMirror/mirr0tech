@@ -15,6 +15,7 @@ export const LOGIN_MODES = ['mock', 'sandbox', 'v3', 'production'];
 // v3 is the staging simulator; production is a real World App with an Orb credential. Both are uniqueness requests under an action.
 const environmentOf = (mode) => (mode === 'v3' ? 'staging' : mode);
 const UNIQUENESS = new Set(['v3', 'production']);
+const SIMULATOR_LEVELS = ['device', 'document', 'secure_document', 'face', 'selfie'];
 /// World verifies staging and sandbox proofs only inside a window opened in the Developer Portal
 /// (set_world_id_staging_verification); the window's token travels in this header. Production needs none.
 export const stagingHeaders = (environment, token = process.env.WORLD_STAGING_VERIFICATION_TOKEN) =>
@@ -114,8 +115,9 @@ export class WorldLogin {
       protocol_version: proof?.protocol_version === '3.0' || (mode === 'production' && v4), environment: proof?.environment === environmentOf(mode),
       nonce: proof?.nonce === challenge.nonce, action: proof?.action === this.action, no_session_id: !('session_id' in (proof ?? {})),
       one_response: Array.isArray(proof?.responses) && proof.responses.length === 1,
-      // The simulator's identities are often device-level; a real World App login must be an Orb credential.
-      identifier: [...(mode === 'v3' ? ['device'] : []), 'orb', 'proof_of_human'].includes(item?.identifier), nullifier: hex(item?.nullifier),
+      // A legacy preset returns the user's highest credential, and simulator identities come at any level;
+      // on the simulator any legacy level World verifies signs in. A real World App login must be an Orb credential.
+      identifier: [...(mode === 'v3' ? SIMULATOR_LEVELS : []), 'orb', 'proof_of_human'].includes(item?.identifier), nullifier: hex(item?.nullifier),
       merkle_root: v4 || hex(item?.merkle_root),
       proof: v4 ? Array.isArray(item?.proof) && item.proof.length === 5 && item.proof.every(hex) : typeof item?.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof),
       signal_hash: sameHex(item?.signal_hash, hashSignal(challenge.signal)),

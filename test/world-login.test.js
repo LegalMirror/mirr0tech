@@ -263,7 +263,7 @@ test('v3 rejects wrong protocol, environment, action, signal, nonce and credenti
     p => { p.protocol_version = '4.0'; }, p => { p.environment = 'sandbox'; },
     p => { p.environment = 'production'; }, p => { p.action = 'other'; },
     p => { p.nonce = 'other'; }, p => { p.responses[0].signal_hash = '0x123'; },
-    p => { p.responses[0].identifier = 'document'; }, p => { p.session_id = worldSessionId; },
+    p => { p.responses[0].identifier = 'passport'; }, p => { p.session_id = worldSessionId; },
     p => { p.responses[0].proof = '0x123'; }, p => { p.responses.push(p.responses[0]); },
   ]) {
     const c = login.challenge(); const p = legacyProofFor(c); mutate(p);
@@ -358,6 +358,13 @@ test('the simulator\'s device-level identity signs in on v3; production still re
   const proof = legacyProofFor(c);
   proof.responses[0].identifier = 'device';
   assert.equal((await login.login({ challengeToken: c.challengeToken, proof })).account.environment, 'staging');
+  for (const level of ['document', 'secure_document', 'face', 'selfie']) {
+    const next = login.challenge({ mode: 'v3' });
+    const leveled = legacyProofFor(next);
+    leveled.responses[0].identifier = level;
+    leveled.responses[0].proof = `0x${level.length.toString(16).padStart(2, '0')}${'ab'.repeat(255)}`;
+    assert.equal((await login.login({ challengeToken: next.challengeToken, proof: leveled })).account.environment, 'staging', level);
+  }
   const p = login.challenge({ mode: 'production' });
   const device = { ...legacyProofFor(p), environment: 'production' };
   device.responses[0].identifier = 'device';

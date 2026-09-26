@@ -306,11 +306,14 @@ export class DemoWorkspaces {
       const session = this.owned(token, id);
       ensure(['constrain', 'regenerate', 'deploy', 'mint', 'seed'].includes(method), 403, 'FORBIDDEN', 'Demo operation not allowed');
       if (method === 'seed') {
-        invalid(fields(body, ['requestId', 'rwaAmount', 'usdAmount']), 'Unsupported seed field');
+        invalid(object(body), 'Expected a seed request');
+        body = Object.fromEntries(['requestId', 'rwaAmount', 'usdAmount'].filter((key) => key in body).map((key) => [key, body[key]]));
         invalid(['rwaAmount', 'usdAmount'].every((key) => typeof body[key] === 'string' && /^\d+(\.\d{1,6})?$/.test(body[key]) && Number(body[key]) <= PUBLIC_MINT_CAP), `A public demo seed is at most ${PUBLIC_MINT_CAP} of each token`);
       }
       if (method === 'mint') {
-        invalid(fields(body, ['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit', 'testAttestations']), 'Unsupported mint field');
+        // A retry resends the stored operation; keep only the mint fields, as the operator API does.
+        invalid(object(body), 'Expected a mint request');
+        body = Object.fromEntries(['recipient', 'amount', 'requestId', 'bypassSubscription', 'simulateDeposit', 'testAttestations'].filter((key) => key in body).map((key) => [key, body[key]]));
         invalid(typeof body.amount === 'string' && /^\d+(\.\d{1,6})?$/.test(body.amount) && Number(body.amount) <= PUBLIC_MINT_CAP, `A public demo mint is at most ${PUBLIC_MINT_CAP} shares`);
       }
       if (method === 'regenerate') this.mockOnly();

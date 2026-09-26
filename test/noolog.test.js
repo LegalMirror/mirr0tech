@@ -244,3 +244,21 @@ test('what the deployment cannot enforce is demoted to unresolved, and the instr
   assert.doesNotThrow(() => compilePolicy({ ...envelope, ast }, config, document, { demo: true }));
   assert.throws(() => compilePolicy({ ...envelope, ast: wide }, config, document, { demo: true }), /withdraw/);
 });
+
+test('terms the deployment cannot enforce are set aside before validation, so a missing rationale on them does not fail the extraction', async () => {
+  const { extractWithOpenAI, instructionsFor } = await import('../src/noolog/extract.js');
+  const { sampleFixture } = await import('../src/policy/fixture.js');
+  const draft = sampleFixture(document, { secondary: true }).ast;
+  assert.match(instructionsFor({ profile: 'rwa-secondary' }), /Every rule and every term carries a "rationale"/);
+  // What the legal seats returned live: contractual notice windows as terms, without a rationale.
+  const answer = { ...draft, terms: [{ name: 'issuerBreachNoticeWindow', value: '30', unit: 'days', source: { clause: '9.2', quote: 'redemption is legally authorized.' } }] };
+  const fetchImpl = async () => ({ ok: true, json: async () => ({ id: 'c', choices: [{ message: { content: JSON.stringify(answer) } }] }) });
+  const env = { OPENAI_API_KEY: 'k', OPENAI_MODEL: 'm' };
+  const { envelope: out } = await extractWithOpenAI({ document, fetchImpl, env });
+  assert.equal(out.ast.terms.length, 0);
+  assert.deepEqual(out.extraction.demoted, [{ kind: 'term', name: 'issuerBreachNoticeWindow', clause: '9.2' }]);
+  // A rule the deployment keeps must still be well-formed.
+  const broken = { ...draft, rules: [{ ...draft.rules[0], rationale: undefined }] };
+  const brokenFetch = async () => ({ ok: true, json: async () => ({ id: 'c', choices: [{ message: { content: JSON.stringify(broken) } }] }) });
+  await assert.rejects(extractWithOpenAI({ document, fetchImpl: brokenFetch, env }), /rationale/);
+});

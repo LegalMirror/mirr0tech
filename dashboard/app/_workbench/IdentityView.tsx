@@ -619,31 +619,6 @@ export function IdentityView({
             <button onClick={onConfigure}>Configure issuer policy</button>
           </section>
         )}
-        <section className="wb-surface wb-trust-sequence">
-          <span className="wb-eyebrow">WHY THIS MATTERS</span>
-          <h3>Not a “verified” sticker.</h3>
-          <ol>
-            <li>
-              <strong>01 · The contract names the gate</strong>
-              <p>A require rule ties the credential fact to a verbatim clause and specific actions.</p>
-            </li>
-            <li>
-              <strong>02 · The server earns the fact</strong>
-              <p>
-                IDKit collects a wallet-bound proof. The gateway verifies it and submits the attestation. A
-                client callback grants nothing.
-              </p>
-            </li>
-            <li>
-              <strong>03 · The policy still decides</strong>
-              <p>
-                Read the actual action decisions again. KYC, AML, sanctions, issuer approval and other
-                requirements do not disappear.
-              </p>
-            </li>
-          </ol>
-          <p className="wb-privacy">{IDENTITY_PRIVACY}</p>
-        </section>
       </div>
       {demoWorkspace && (
         <Notice>

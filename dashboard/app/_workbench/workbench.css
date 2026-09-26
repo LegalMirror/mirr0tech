@@ -340,11 +340,6 @@
 .wb-views > div:first-child {
   padding: 0 11px;
 }
-.wb-views h2 {
-  margin-top: 12px;
-  font-size: 13px;
-  font-weight: 550;
-}
 .wb-views nav {
   display: grid;
   gap: 5px;

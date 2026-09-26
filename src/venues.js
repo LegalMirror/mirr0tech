@@ -52,6 +52,16 @@ export class VenueService {
     if (this.auditPath) this.audit = await readFile(this.auditPath, 'utf8').then(JSON.parse, () => []);
     return this;
   }
+  /// A load-balanced RPC can serve a receipt from one node and the next call from a node still a
+  /// block behind; a quote right after a ship would then see no strategy. Wait until the RPC reads
+  /// the receipt's block before returning to the caller.
+  async settled(blockNumber, { attempts = 40, delayMs = 250 } = {}) {
+    for (let i = 0; i < attempts; i++) {
+      if ((await this.provider.getBlockNumber()) >= blockNumber) return true;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return false;
+  }
   async persist() {
     if (!this.auditPath) return;
     await mkdir(dirname(this.auditPath), { recursive: true });
@@ -95,6 +105,7 @@ export class VenueService {
     try {
       const result = await action();
       const receipt = result?.wait ? await result.wait() : null;
+      if (receipt) await this.settled(receipt.blockNumber);
       Object.assign(entry, { status: 'ok', txHash: receipt?.hash ?? null, ...(receipt ? {} : { result }) });
       this.audit.push(entry);
       await this.persist();

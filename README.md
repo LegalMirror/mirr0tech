@@ -25,7 +25,7 @@ Only a handful of incumbent platforms can do this work today, because each deal 
 
 mirr0tech replaces that manual translation:
 
-1. **Several models read the agreement.** A [Noolog](docs/NOOLOG.md) deliberation seats Claude Fable, GPT-6 Astra and GPT-OSS-Safeguard. They propose the rules, then score and cross-check each other's claims over up to three rounds. Every rule must quote the agreement verbatim.
+1. **Several models read the agreement.** A decentralised inference collective intellect API [Noolog](docs/NOOLOG.md) implements **RWA_LEGAL_PRO** model seating Claude Fable, GPT-6 Astra and GPT-OSS-Safeguard. They propose the rules, then score and cross-check each other's claims over up to three rounds. Every rule must quote the agreement verbatim.
 2. **The rules become an abstract syntax tree (AST).** The AST is the backend's single source of truth. The API, the dashboard and the compiler all read it.
 3. **The AST compiles to Solidity.** It deploys as a permissioned token plus a Uniswap v4 hook that enforces the agreement on every swap and liquidity change.
 4. **Hallucinations can't reach the chain.** A quote that isn't in the document is rejected. The compiler checks the on-chain logic against a reference interpreter on every possible combination of facts, and refuses to emit contracts if they disagree. What the models couldn't ground stays in "unresolved" instead of being enforced.

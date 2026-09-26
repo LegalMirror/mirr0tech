@@ -30,6 +30,8 @@ export class NoologClient {
     if (!jobId) throw new NoologError(502, 'The completion named no deliberation job (x-nsed-session-id)');
     return { completion, jobId };
   }
+  /// GET /v1/models → the deliberating models this token may name (OpenAI shape).
+  async models() { return (await this.call('GET', '/v1/models')).data?.map((model) => model.id) ?? []; }
   /// GET /deliberation/{id}/result → { job_id, status, result }
   status(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/result`); }
   details(jobId) { return this.call('GET', `/deliberation/${encodeURIComponent(jobId)}/details`); }

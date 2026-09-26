@@ -153,6 +153,7 @@ export function createMockNoolog({ apiKey = null } = {}) {
     res.status(202).json({ job_id: jobId });
   });
   // OpenAI-compatible generation: the deliberation runs, the winner's content is the answer, the job id travels in the header.
+  app.get('/v1/models', (_req, res) => res.json({ object: 'list', data: ['nsed:deep', 'nsed:legal_rwa_pro'].map((id) => ({ id, object: 'model', created: 0, owned_by: 'nsed' })) }));
   app.post('/v1/chat/completions', (req, res) => {
     const body = req.body ?? {};
     const nsed = body.nsed ?? {};

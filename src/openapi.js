@@ -23,7 +23,7 @@ export const schemas = {
   Error: obj({ error: obj({ code: str('Machine-readable code, e.g. POLICY_REFUSED'), message: str('Plain-words reason'), details: { description: 'The audit entry, for a refusal', type: 'object' } }, ['code', 'message']) }),
   Health: obj({ status: str('ok | reconciliation_required'), mode: str('stack | mock | live'), policyHash: { type: ['string', 'null'] }, stack: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, rwa: str('Fund policy hash'), credit: str('Credit policy hash') } } }),
   Status: obj({
-    model: obj({ provider: str('noolog'), mode: str('mock | live'), url: str('Deliberation API'), model: str('Model id') }),
+    model: obj({ provider: str('noolog'), mode: str('mock | live'), url: str('Deliberation API'), model: str('Model id, e.g. nsed:legal_rwa_pro'), listed: { type: ['boolean', 'null'], description: 'The live gateway lists this model on /v1/models (null: could not ask)' }, models: { type: 'array', items: { type: 'string' }, description: 'Every model the token may name (live only)' } }, ['provider', 'mode', 'url', 'model']),
     compiler: obj({ solidity: obj({ core: str('solc version'), swapvm: str('solc version'), 'uniswap-v4': str('solc version') }) }),
     chain: { type: ['object', 'null'], properties: { chainId: { type: 'integer' }, deployer: str('Operator address'), attestor: str('PolicyAttestor'), poolManager: str('Uniswap v4 PoolManager') } },
   }),

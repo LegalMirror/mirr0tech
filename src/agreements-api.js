@@ -3,14 +3,26 @@ import { Router } from 'express';
 import { venueRoutes } from './venues-api.js';
 import { ensure } from './errors.js';
 import { MODEL } from './noolog/extract.js';
+import { NoologClient } from './noolog/client.js';
 import { compilerVersions } from './solc.js';
 
 const NOOLOG_URL = 'https://api.peeramid.xyz';
+let listing = { at: 0, models: null };
+
+/// Whether the live gateway lists the configured model (its OpenAI-compatible /v1/models); cached a minute.
+async function modelListed() {
+  if (!process.env.NOOLOG_API_KEY) return { listed: true, models: null };
+  if (Date.now() - listing.at > 60_000) {
+    listing = { at: Date.now(), models: await new NoologClient().models().catch(() => null) };
+  }
+  return { listed: listing.models ? listing.models.includes(MODEL) : null, models: listing.models };
+}
 
 /// The three health lights: the model behind extraction, the compilers, the chain this gateway signs on.
 export async function stackStatus(venues) {
+  const { listed, models } = await modelListed();
   return {
-    model: { provider: 'noolog', mode: process.env.NOOLOG_API_KEY ? 'live' : 'mock', url: process.env.NOOLOG_URL ?? NOOLOG_URL, model: MODEL },
+    model: { provider: 'noolog', mode: process.env.NOOLOG_API_KEY ? 'live' : 'mock', url: process.env.NOOLOG_URL ?? NOOLOG_URL, model: MODEL, listed, ...(models ? { models } : {}) },
     compiler: { solidity: await compilerVersions() },
     chain: venues ? { chainId: venues.record.chainId, deployer: venues.record.deployer, attestor: venues.record.attestor, poolManager: venues.record.rwa.poolManager } : null,
   };

@@ -119,3 +119,12 @@ test('a request names a fresh room each run, seats only the generic model, and a
   const down = { chatCompletion: async () => { throw new NoologError(500, 'boom'); } };
   await assert.rejects(extractWithNoolog({ profile: 'rwa-secondary', document, client: down }), /boom/);
 });
+
+test('the models the token may name are listed, the mock included', async () => {
+  const server = createMockNoolog({ apiKey: 'secret' }).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const client = new NoologClient({ url: `http://127.0.0.1:${server.address().port}`, apiKey: 'secret' });
+    assert.deepEqual(await client.models(), ['nsed:deep', 'nsed:legal_rwa_pro']);
+  } finally { server.close(); }
+});

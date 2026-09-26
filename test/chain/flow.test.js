@@ -75,7 +75,8 @@ test('the flow from the terminal: upload, constrain, deploy, verify, and use the
   for (const wallet of ['Investor', 'Stranger']) assert.equal((await cli('fund', uploaded.id, wallet, '10000')).funded, '10000');
   // Deploy already initialized the hooked pool: the investor adds liquidity and swaps through it.
   assert.match(deployed.deployment.poolId, /^0x[0-9a-f]{64}$/);
-  for (const step of ['liquidity', 'swap']) { const result = await cli('pool', uploaded.id, step, 'Investor'); assert.equal(result.status, 'ok', `${step}: ${JSON.stringify(result)}`); }
+  // Swaps after the first must work too: the pool price has moved off 1:1 by then.
+  for (const step of ['liquidity', 'swap', 'swap', 'swap']) { const result = await cli('pool', uploaded.id, step, 'Investor'); assert.equal(result.status, 'ok', `${step}: ${JSON.stringify(result)}`); }
   const refused = await cli('pool', uploaded.id, 'swap', 'Stranger');
   assert.equal(refused.error.code, 'POLICY_REFUSED');
   assert.ok(refused.error.details.refusal.clause.quote, 'the sentence that refused');

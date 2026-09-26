@@ -323,7 +323,8 @@ export class VenueService {
     ensure(!this.record.rwa.cashier, 400, 'BOUNDED_ORDER_REQUIRED', 'Use /rwa/cashier/swap with amount, minOut and deadline for this agreement');
     const signer = await this.signerFor(wallet);
     return this.run('rwa.pool.swap', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () =>
-      this.c.v4Router.connect(signer).swap(this.poolKey(hooked), { zeroForOne: true, amountSpecified: -1000n, sqrtPriceLimitX96: SQRT_PRICE_1_1 - 1000n }));
+      // The protocol's own bounds (MIN_SQRT_PRICE + 1): a limit near 1:1 made every swap after the first revert.
+      this.c.v4Router.connect(signer).swap(this.poolKey(hooked), { zeroForOne: true, amountSpecified: -1000n, sqrtPriceLimitX96: 4295128740n }));
   }
 
   requireCashier() {

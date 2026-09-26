@@ -70,6 +70,7 @@ export class WorldLogin {
     // Only v3 uniqueness requests have an action; v4 session requests must omit it.
     const signed = signRequest({ signingKeyHex: this.signingKey, ttl: 300, ...(this.mode === 'v3' ? { action: this.action } : {}) });
     const challengeToken = secret();
+    // No 0x prefix: IDKit's hashSignal reads `0x`+hex as bytes and anything else as UTF-8 text; this signal is text on both sides.
     const signal = secret();
     this.db.prepare('INSERT INTO login_challenges (hash, nonce, signal, expires, expected_session) VALUES (?, ?, ?, ?, ?)').run(hash(challengeToken), signed.nonce, signal, signed.expiresAt, existingSessionId || null);
     return { challengeToken, signal, app_id: this.appId, environment: this.environment(),

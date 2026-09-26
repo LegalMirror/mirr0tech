@@ -31,7 +31,7 @@ services:
       WORLD_RP_SIGNING_KEY: ${WORLD_RP_SIGNING_KEY:?Set the RP signing key as a runtime secret}
       WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
       WORLD_CREDENTIAL: document
-      WORLD_ENVIRONMENT: sandbox
+      WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
       WORLD_LOGIN_MODE: ${WORLD_LOGIN_MODE:-mock}
       WORLD_LOGIN_ACTION: ${WORLD_LOGIN_ACTION:-}
       WORLD_SESSION_DB: /app/.data/world-sessions.sqlite

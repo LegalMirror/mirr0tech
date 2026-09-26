@@ -5,7 +5,15 @@ import { venuesFor, renderRefusal } from "@/lib/enforcement";
 import { factsOfCondition } from "@/lib/evaluate";
 import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
-import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel, termLabel, venueLabel } from "@/lib/labels";
+import {
+  actionLabel,
+  EFFECT_LABEL,
+  EFFECT_SENTENCE,
+  factLabel,
+  plainSummary,
+  termLabel,
+  venueLabel,
+} from "@/lib/labels";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
 import { claimsFor, confidenceLabel } from "@/lib/verification";
 import { ClauseTableBadge, EffectChip, Glyph, HexCopy, toneOf } from "../_components/common";
@@ -72,7 +80,7 @@ function ClaimVerdicts({ policy, reference }: { policy: PolicyData; reference: s
             .join("\n")}
         >
           <Glyph state={claim.score === 1 ? "true" : claim.score === 0 ? "false" : "unknown"} />{" "}
-          <span>{claim.claim}</span>{" "}
+          <span>{plainSummary(claim.claim)}</span>{" "}
           <span className="meta">{claim.verdicts.map((v) => `${v.verdict} by ${v.agent}`).join(", ")}</span>
         </li>
       ))}

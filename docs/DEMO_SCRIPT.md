@@ -14,7 +14,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 ## Act 1 — tokenize and trade (60 s)
 
 0. **Overview**: one asset, both acts, who stands where, the Sepolia links. *One agreement in, the code that admits, refuses and pays out.*
-1. **Agreement** screen, profile *Tokenize*. Show the Securitize/BlackRock agreement with every quoted span lit
+1. **Agreement** screen, act *Fund*. Show the Securitize/BlackRock agreement with every quoted span lit
    and the coverage bar. Click a lit paragraph. *Eight rules, each one a verbatim quote from the hashed
    document. Terms it leaves open are flagged, not guessed.* Point at the pipeline: quote → rule → logic →
    bytes → contract → what-would-happen. *The interpreter and the on-chain bitmask agree on every input —
@@ -28,7 +28,7 @@ that reaches the chain — it becomes a spreadsheet and an allowlist. mirr0tech 
 
 ## Act 2 — lend it out (75 s)
 
-4. **Agreement**, profile *Lend it out*. *Same compiler, different paper: Wildcat's template Master Loan
+4. **Agreement**, act *Loan*. *Same compiler, different paper: Wildcat's template Master Loan
    Agreement, the borrower's own Lender Check Policy, one addendum clause.* Click the §1 "Role Provider"
    paragraph. *The agreement delegates admission to a role provider — so that is what we compiled it into.*
 5. **Lenders**: A admitted, B in review, C flagged. Click B. *No countersignature — the policy quotes Lender

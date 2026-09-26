@@ -430,3 +430,22 @@ test('a public upload may ask for a Noolog deliberation, only when the gateway h
     if (saved === undefined) delete process.env.NOOLOG_API_KEY; else process.env.NOOLOG_API_KEY = saved;
   }
 });
+
+test('EXTRACTOR=noolog with a key makes Noolog the hosted demo\'s default reader and the status says so', async () => {
+  const { workspaces } = await service();
+  const { noologDefault, noologStatus } = await import('../src/openai-extract.js');
+  const saved = { EXTRACTOR: process.env.EXTRACTOR, NOOLOG_API_KEY: process.env.NOOLOG_API_KEY };
+  try {
+    process.env.EXTRACTOR = 'noolog';
+    delete process.env.NOOLOG_API_KEY;
+    assert.equal(noologDefault(), false, 'no key, no default');
+    assert.equal(workspaces.prepare(upload).generation, 'demo');
+    process.env.NOOLOG_API_KEY = 'test-only-never-send';
+    assert.equal(noologDefault(), true);
+    assert.equal(workspaces.prepare(upload).generation, 'noolog');
+    assert.equal(workspaces.prepare({ ...upload, generation: 'demo' }).generation, 'demo', 'an explicit choice still wins');
+    assert.deepEqual(noologStatus(), { provider: 'noolog', mode: 'live', model: process.env.NOOLOG_MODEL || 'nsed:legal_rwa_pro' });
+  } finally {
+    for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; }
+  }
+});

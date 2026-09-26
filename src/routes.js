@@ -6,7 +6,7 @@ import { ensure, AppError } from './errors.js';
 import { openapiDocument, swaggerHtml } from './openapi.js';
 import { SIGNATURE_HEADER, verifySignature, paymentFrom } from './payments.js';
 import { compilerVersions } from './onchain/solc.js';
-import { extractWorkspace, extractDemo, OPENAI_MODEL, GENERATIONS } from './openai-extract.js';
+import { extractWorkspace, extractDemo, OPENAI_MODEL, GENERATIONS, noologDefault, noologStatus } from './openai-extract.js';
 import { PROFILES, exportProfile } from '../scripts/export-ui.js';
 import { auditEvents } from './onchain/audit-events.js';
 import { PoolSwaps } from './onchain/pool-swaps.js';
@@ -204,7 +204,7 @@ function publicStatus(value, workspaces) {
     const version = value?.compiler?.solidity?.[key];
     if (typeof version === 'string' && /^\d+\.\d+\.\d+(?:[+.-][A-Za-z0-9.+-]+)?$/.test(version) && version.length <= 100) solidity[key] = version;
   }
-  return { model: { provider: 'demo', mode: [extractWorkspace, extractDemo].includes(workspaces.agreements.extract) ? 'mock' : 'unavailable' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
+  return { model: noologDefault() ? noologStatus() : { provider: 'demo', mode: [extractWorkspace, extractDemo].includes(workspaces.agreements.extract) ? 'mock' : 'unavailable' }, compiler: { solidity }, chain: { chainId: workspaces.chainId } };
 }
 
 // Mount at /v1 BEFORE operator auth/body parsers. Non-demo credentials always leave this router.
@@ -285,7 +285,7 @@ export function paymentWebhook(venues, secret, agreements = null) {
 /// The three health lights: the model behind extraction, the compilers, the chain this gateway signs on.
 export async function stackStatus(venues) {
   return {
-    model: { provider: 'openai', mode: process.env.OPENAI_API_KEY || process.env.OPENAPI_KEY ? 'live' : 'unavailable', model: process.env.OPENAI_MODEL || OPENAI_MODEL },
+    model: noologDefault() ? noologStatus() : { provider: 'openai', mode: process.env.OPENAI_API_KEY || process.env.OPENAPI_KEY ? 'live' : 'unavailable', model: process.env.OPENAI_MODEL || OPENAI_MODEL },
     compiler: { solidity: await compilerVersions() },
     chain: venues ? { chainId: venues.record.chainId, deployer: venues.record.deployer, attestor: venues.record.attestor, poolManager: venues.record.rwa.poolManager } : null,
   };

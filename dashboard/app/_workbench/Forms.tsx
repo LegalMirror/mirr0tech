@@ -180,6 +180,9 @@ export function UploadDialog({
   const [mode, setMode] = useState<"demo" | "files">("demo");
   // A live multi-model deliberation (Noolog legal_rwa_pro) instead of the fixture or a single OpenAI call.
   const [deliberate, setDeliberate] = useState(false);
+  // When the gateway reads with Noolog by default (EXTRACTOR=noolog), the box starts ticked.
+  const noologDefault = status?.model.provider === "noolog";
+  useEffect(() => setDeliberate(noologDefault), [noologDefault]);
   const [bundle, setBundle] = useState<Upload | null>(null);
   const [cashierDemo, setCashierDemo] = useState(false);
   const [demoError, setDemoError] = useState("");

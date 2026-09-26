@@ -4,7 +4,7 @@ import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { draftFor } from './agreements.js';
 import { AppError, ensure } from './errors.js';
-import { extractWorkspace, extractDemo } from './openai-extract.js';
+import { extractWorkspace, extractDemo, noologDefault } from './openai-extract.js';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
 import { PROFILES } from '../scripts/export-ui.js';
@@ -219,7 +219,7 @@ export class DemoWorkspaces {
   prepare(body) {
     invalid(fields(body, ['name', 'documents', 'text', 'filename', 'profile', 'config', 'generation']), 'Unsupported upload field');
     // The bundled reading, or a live Noolog deliberation over the same bundled documents when the gateway holds a key.
-    const generation = body.generation ?? 'demo';
+    const generation = body.generation ?? (noologDefault() ? 'noolog' : 'demo');
     invalid(['demo', 'noolog'].includes(generation), 'Public demo generation is demo or noolog');
     unavailable(generation !== 'noolog' || process.env.NOOLOG_API_KEY, 'Noolog deliberation is not configured on this gateway (NOOLOG_API_KEY).');
     ensure(Buffer.byteLength(JSON.stringify(body)) <= this.limits.maxRequestBytes, 413, 'BODY_TOO_LARGE', 'Demo upload is too large');

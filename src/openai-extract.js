@@ -11,6 +11,9 @@ export async function extractWithOpenAI({ document, apiKey = process.env.OPENAI_
 // EXTRACTOR=noolog makes the Noolog deliberation the default for uploads that name no generation.
 export const GENERATIONS = ['demo', 'openai', 'noolog'];
 export const defaultGeneration = () => (process.env.EXTRACTOR === 'noolog' ? 'noolog' : 'openai');
+/// Noolog is the default reader when EXTRACTOR=noolog and the gateway holds a key; status routes report it.
+export const noologDefault = () => process.env.EXTRACTOR === 'noolog' && Boolean(process.env.NOOLOG_API_KEY);
+export const noologStatus = () => ({ provider: 'noolog', mode: 'live', model: process.env.NOOLOG_MODEL || 'nsed:legal_rwa_pro' });
 
 export async function extractWorkspace({ generation = defaultGeneration(), draft, document, profile, onProgress = null, config = { profile }, ...options }) {
   // The live legal_rwa_pro deliberation: seats read the document alone, the result is fitted to the deployment.

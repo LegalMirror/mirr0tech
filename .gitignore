@@ -12,3 +12,4 @@ vendor/
 .dev-stack.log
 .dashboard.log
 .check.log
+.mirr0rc.json

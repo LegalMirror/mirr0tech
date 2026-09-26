@@ -36,7 +36,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
     policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,
   }));
   // The payment rail signs its events instead of carrying the bearer; the raw body is what it signed.
-  if (venues) app.use('/webhooks', paymentWebhook(venues, paymentSecret));
+  if (venues) app.use('/webhooks', paymentWebhook(venues, paymentSecret, agreements));
   app.use('/v1', (req, _res, next) => {
     const actual = Buffer.from(req.headers.authorization ?? '');
     const presents = (key) => { const expected = Buffer.from(`Bearer ${key}`); return actual.length === expected.length && timingSafeEqual(actual, expected); };

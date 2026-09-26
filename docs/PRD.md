@@ -208,7 +208,8 @@ ETHGlobal general: commits across the weekend, video, description, screenshots, 
 
 - `PolicyAttestor`, `MockSanctionsOracle`, `mUSDC`; `PolicyOracle` (fund), `CompiledMirrorToken`, `MirrorPolicyHook`, `MirrorLiquidityRouter` on the canonical `PoolManager`. Recorded: identity verified with a World ID document · shares released to the verified investor · hooked pool created · liquidity through the hook · swap.
 - MultiBaas: 13 contracts registered, 10 linked and indexed under the dev plan; `GET /v1/stack/events` serves them.
-- Recorded on anvil, not yet on Sepolia: a per-agreement `POST /deploy` (`test/chain/flow.test.js`); an HSM-signed transaction (no Cloud Wallet on the dev deployment).
+- One agreement through the whole flow (`agr_1b8a5c438bb1`): uploaded, constrained (document credential), its own oracle, token, hook and pool deployed; facts alone refused, World ID proof admitted, liquidity and a swap through the hook, the stranger refused with the sentence; a signed payment settled 125.50 shares, the stranger's held. Addresses and tx links in the README.
+- Recorded on anvil, not yet on Sepolia: an HSM-signed transaction (no Cloud Wallet on the dev deployment).
 
 ## 14. Plan and cut order
 

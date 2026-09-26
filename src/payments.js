@@ -33,12 +33,15 @@ export function paymentFrom(event) {
   ensure(Number.isInteger(object.amount) && object.amount > 0, 400, 'INVALID_PAYMENT', 'amount must be a positive integer of minor units');
   ensure(String(object.currency ?? '').toLowerCase() === 'usd', 400, 'INVALID_PAYMENT', 'Only USD payments settle into this fund');
   ensure(typeof wallet === 'string' && wallet, 400, 'INVALID_PAYMENT', 'metadata.wallet names the investor wallet');
-  return { id: event.id, wallet, amount: (object.amount / 100).toFixed(2), currency: 'usd', reference: object.id ?? null };
+  const agreement = object.metadata?.agreement ?? null;
+  ensure(agreement === null || (typeof agreement === 'string' && agreement), 400, 'INVALID_PAYMENT', 'metadata.agreement, when given, is an agreement id');
+  return { id: event.id, wallet, amount: (object.amount / 100).toFixed(2), currency: 'usd', reference: object.id ?? null, agreement };
 }
 
 /// POST /webhooks/payments: no bearer, the signature is the credential. Always 2xx once verified,
-/// so the rail does not retry a policy decision.
-export function paymentWebhook(venues, secret) {
+/// so the rail does not retry a policy decision. `metadata.agreement` settles on that agreement's
+/// token; without it the payment settles on the stack's fund token.
+export function paymentWebhook(venues, secret, agreements = null) {
   const router = express.Router();
   router.post('/payments', express.raw({ type: '*/*', limit: '64kb' }), (req, res, next) => (async () => {
     ensure(secret, 503, 'NO_WEBHOOK_SECRET', 'Set PAYMENT_WEBHOOK_SECRET to accept payment events');
@@ -48,7 +51,9 @@ export function paymentWebhook(venues, secret) {
     try { event = JSON.parse(raw); } catch { throw new AppError(400, 'INVALID_JSON', 'Body is not JSON'); }
     const payment = paymentFrom(event);
     if (payment.ignored) return res.json({ received: true, ignored: payment.ignored });
-    res.json({ received: true, payment, settlement: await venues.settlePayment(payment) });
+    ensure(!payment.agreement || agreements, 400, 'INVALID_PAYMENT', 'This gateway has no agreements to settle on');
+    const venue = payment.agreement ? await agreements.venue(payment.agreement) : venues;
+    res.json({ received: true, payment, settlement: await venue.settlePayment(payment) });
   })().catch(next));
   return router;
 }

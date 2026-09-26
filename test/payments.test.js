@@ -20,7 +20,9 @@ test('the signature scheme is Stripe\'s: timestamped HMAC over the raw body, wit
 });
 
 test('a settled USD payment becomes a decimal amount for a wallet; anything else is ignored or refused', () => {
-  assert.deepEqual(paymentFrom(event()), { id: 'evt_1', wallet: 'Investor', amount: '125.50', currency: 'usd', reference: 'pi_1' });
+  assert.deepEqual(paymentFrom(event()), { id: 'evt_1', wallet: 'Investor', amount: '125.50', currency: 'usd', reference: 'pi_1', agreement: null });
+  assert.equal(paymentFrom(event({ metadata: { wallet: 'Investor', agreement: 'agr_1' } })).agreement, 'agr_1');
+  assert.throws(() => paymentFrom(event({ metadata: { wallet: 'Investor', agreement: 7 } })), /metadata\.agreement/);
   assert.deepEqual(paymentFrom({ type: 'customer.created' }), { ignored: 'customer.created' });
   assert.deepEqual(paymentFrom(null), { ignored: 'unknown' });
   assert.throws(() => paymentFrom(event({ amount: 0 })), /positive integer/);
@@ -55,4 +57,16 @@ test('POST /webhooks/payments: the signature is the credential, the rail always 
   assert.equal(ok.status, 200);
   assert.equal(ok.data.settlement.paymentId, 'evt_1');
   assert.equal(settled[0].amount, '125.50');
+
+  // A payment that names an agreement settles on that agreement's venue.
+  const forAgreement = JSON.stringify(event({ metadata: { wallet: 'Investor', agreement: 'agr_1' } }));
+  assert.equal((await post(url, forAgreement, sign(forAgreement, SECRET))).data.error.code, 'INVALID_PAYMENT', 'no agreements here');
+  const onAgreement = [];
+  const agreements = { venue: async (id) => ({ settlePayment: async (payment) => { onAgreement.push([id, payment.wallet]); return { status: 'ok', paymentId: payment.id, agreement: id }; } }) };
+  const withAgreements = createApp(null, key, venues, null, null, agreements, { paymentSecret: SECRET }).listen(0, '127.0.0.1');
+  await once(withAgreements, 'listening');
+  t.after(() => new Promise((resolve) => { withAgreements.close(resolve); withAgreements.closeAllConnections(); }));
+  const routed = await post(`http://127.0.0.1:${withAgreements.address().port}/webhooks/payments`, forAgreement, sign(forAgreement, SECRET));
+  assert.equal(routed.data.settlement.agreement, 'agr_1');
+  assert.deepEqual(onAgreement, [['agr_1', 'Investor']]);
 });

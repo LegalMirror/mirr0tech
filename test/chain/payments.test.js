@@ -58,9 +58,26 @@ test('a signed payment settles into shares under the policy, or is held with the
   assert.equal(replay.data.settlement.replay, true);
   assert.equal((await call('/wallets/Investor')).balances.MIRROR, '125.5');
 
+  // A plain attestation keeps the identity fact only a proof can set.
+  await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true, sanctionsClear: true, issuerAuthorized: true, offeringCompliant: true, subscriptionAccepted: true } });
+  assert.equal((await call('/wallets/Investor')).rwa.facts.identityVerified, true);
+  await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, identityVerified: false } });
+  assert.equal((await call('/wallets/Investor')).rwa.facts.identityVerified, false, 'saying so explicitly still works');
+  await call('/wallets/Investor/worldid', { proof: mockProof('Investor') });
+  await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true, sanctionsClear: true, issuerAuthorized: true, offeringCompliant: true, subscriptionAccepted: true, depositConfirmed: true } });
+  assert.equal((await call('/wallets/Investor/explain?policy=rwa&action=mint')).allowed, true, 'the identity fact survived the re-attestation');
+
+  // The chain refusing (the supply cap) is `failed`, answered 200, and not remembered as settled.
+  await call('/rwa/mint', { amount: '999874.5' });
+  const capped = await pay(event('evt_capped', 'Investor', 100000));
+  assert.equal(capped.status, 200);
+  assert.equal(capped.data.settlement.status, 'failed');
+  assert.match(capped.data.settlement.message, /revert|cap|POLICY|unknown/i);
+  assert.equal((await pay(event('evt_capped', 'Investor', 100000))).data.settlement.replay, undefined, 'a failed settlement is tried again');
+
   const events = auditEvents(venues.audit, 'rwa-secondary', 31337);
   const kinds = events.filter((entry) => entry.kind === 'PaymentSettled');
-  assert.equal(kinds.length, 2);
+  assert.equal(kinds.length, 4);
   assert.match(kinds.find((entry) => /held/.test(entry.summary)).summary, /evt_stranger .* held/);
   assert.match(kinds.find((entry) => /settled into/.test(entry.summary)).summary, /125\.50 USD settled into 125\.50 shares/);
 });

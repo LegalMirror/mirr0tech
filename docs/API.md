@@ -1,5 +1,9 @@
 # Stack API, operator API and repository map
 
+## OpenAPI and Swagger UI
+
+`GET /openapi.json` is the OpenAPI 3.1 document for every route the gateway mounts (agreements, stack, dashboard, the payment webhook under the **Webhooks** tag with its `Stripe-Signature` security scheme); `GET /docs` renders it with Swagger UI. Both are open (no bearer) so an integrator can read the contract before holding a key; "Try it out" works against the serving host. Source: `src/openapi.js`, next to the routes it describes; `test/openapi.test.js` keeps them in step.
+
 ## Stack API
 
 ```sh

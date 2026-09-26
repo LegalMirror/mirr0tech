@@ -5,6 +5,7 @@ import { venueRoutes } from './venues-api.js';
 import { dashboardRoutes } from './dashboard-api.js';
 import { agreementRoutes, stackStatus } from './agreements-api.js';
 import { paymentWebhook } from './payments.js';
+import { openapiDocument, swaggerHtml } from './openapi.js';
 
 function bodyFields(body, required, optional = []) {
   ensure(body && !Array.isArray(body) && typeof body === 'object' && required.every((key) => Object.hasOwn(body, key)) && Object.keys(body).every((key) => [...required, ...optional].includes(key)), 400, 'INVALID_BODY', `Expected fields: ${required.join(', ')}`);
@@ -26,6 +27,9 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });
+  // The contract for integrators, webhooks included: the document, and Swagger UI over it.
+  app.get('/openapi.json', (req, res) => res.json(openapiDocument({ serverUrl: `${req.protocol}://${req.get('host')}` })));
+  app.get('/docs', (_req, res) => res.type('html').send(swaggerHtml));
   app.get('/health', (_req, res) => res.json({
     status: service?.pending() ? 'reconciliation_required' : 'ok', mode: service?.chain.mode ?? 'stack',
     policyHash: service?.policy.hash ?? null, stack: venues ? { chainId: venues.record.chainId, rwa: venues.record.rwa.policyHash, credit: venues.record.credit.policyHash } : null,

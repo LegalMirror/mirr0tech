@@ -23,6 +23,7 @@ it("the hook card shows the gated callbacks, the pool and every clause deciding 
   for (const callback of ["Add liquidity", "Remove liquidity", "Swap"]) expect(shown).toContain(callback);
   expect(shown).toContain("fee 0.3%");
   expect(shown).toContain("tick spacing 60");
+  expect(shown).not.toContain("Every one of these asks the agreement first");
   for (const clause of ledger.boundaries.transferClauses) {
     expect(shown).toContain(`§${clause.clauseId} ${clause.effect}`);
     expect(shown).toContain(clause.quote!.slice(0, 40));
@@ -34,9 +35,9 @@ it("the decisions card lists each indexed decision with an explorer link and the
   expect(ledger.decisions.length).toBeGreaterThanOrEqual(3);
   const html = renderToStaticMarkup(createElement(Decisions, { ledger }));
   const shown = text(createElement(Decisions, { ledger }));
-  expect(shown).toContain(`admitted: ${ledger.decisions.filter((d) => d.allowed).length} allowed`);
+  expect(shown).not.toContain("admitted: ");
   for (const decision of ledger.decisions.filter((d) => d.tx)) expect(html).toContain(`https://sepolia.etherscan.io/tx/${decision.tx}`);
-  expect(shown).toContain("A refused swap reverts before a transaction exists");
+  expect(shown).not.toContain("A refused swap reverts before a transaction exists");
   expect(shown).toContain("no transaction · gateway audit");
   expect(shown).toContain("refused · transfer-identity-verified");
 });
@@ -53,7 +54,7 @@ it("a refused decision names its rule, and an empty ledger says indexing starts 
 it("the supply card shows minted and redeemed shares and the attestations with their expiry", () => {
   const shown = text(createElement(Supply, { ledger }));
   expect(shown).toContain("8,500 shares minted");
-  expect(shown).toContain("summed by the MultiBaas query language");
+  expect(shown).not.toContain("summed by the MultiBaas query language");
   expect(shown).toContain(`valid until ${new Date(ledger.attestations[0].expiresAt * 1000).toISOString().slice(0, 10)}`);
 });
 

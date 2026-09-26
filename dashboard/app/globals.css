@@ -1975,3 +1975,12 @@ blockquote.why {
   border-radius: var(--radius-sm);
   background: var(--bg);
 }
+
+.human-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.meta.error {
+  color: var(--forbid);
+}

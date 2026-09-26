@@ -10,6 +10,8 @@ export const FACTS = [
   // Policy. `sanctionsClear` above is shared: it is read from the sanctions oracle, never attested.
   'mlaCountersigned', 'lenderCheckPassed', 'amlKycProvided', 'notInsolvent',
   'screeningCurrent', 'openTermState', 'borrowerOverride',
+  // Proof of human: a World ID proof verified by the gateway, its nullifier bound to the wallet.
+  'humanVerified',
 ];
 
 // Bit index is the position in this array; it is committed inside the policy hash. A fill on a

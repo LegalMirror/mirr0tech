@@ -1,6 +1,8 @@
 // Seeds a running stack API with the golden-path state so the dashboard opens on a story:
 // shares minted and released, a hooked and a hookless pool, three lenders in three states, a
 // shipped buyback with one fill and one refused quote. Idempotent enough to rerun after a restart.
+import { mockProof } from '../src/worldid.js';
+
 const base = (process.env.STACK_URL ?? 'http://127.0.0.1:3200').replace(/\/$/, '');
 const key = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const call = async (path, body, method = body ? 'POST' : 'GET') => {
@@ -14,6 +16,8 @@ const ADMITTED = { mlaCountersigned: true, lenderCheckPassed: true, amlKycProvid
 // Act 1
 await call('/rwa/mint', { amount: '1000000' });
 await call('/rwa/release', { wallet: 'Stranger', amount: '10' });                 // refused: not onboarded
+const investor = (await call('/wallets')).find((wallet) => wallet.name === 'Investor').address;
+await call('/wallets/Investor/worldid', { proof: mockProof(investor) });                     // World ID proof of human → humanVerified
 await call('/wallets/Investor/facts', { policy: 'rwa', facts: { kycApproved: true, amlApproved: true } });
 await call('/rwa/release', { wallet: 'Investor', amount: '500000' });
 for (const wallet of ['Investor', 'Stranger']) await call(`/wallets/${encodeURIComponent(wallet)}/fund`, { amount: '1000000' });

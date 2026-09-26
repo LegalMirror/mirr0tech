@@ -16,7 +16,7 @@ const artifacts = Object.fromEntries(await Promise.all(
 
 const FACTS = policy.factOrder;
 const bit = (name) => 1n << BigInt(FACTS.indexOf(name));
-const ONBOARDED = { kycApproved: true, amlApproved: true };
+const ONBOARDED = { kycApproved: true, amlApproved: true, humanVerified: true };
 const pack = (facts) => {
   let known = 0n; let value = 0n;
   for (const [name, boolean] of Object.entries(facts)) { known |= bit(name); if (boolean) value |= bit(name); }

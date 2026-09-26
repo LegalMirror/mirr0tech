@@ -20,6 +20,7 @@ export const FACT_LABEL: Record<string, string> = {
   screeningCurrent: "Screening is up to date",
   openTermState: "Market is open",
   borrowerOverride: "Borrower override in place",
+  humanVerified: "Verified human (World ID)",
 };
 export const factLabel = (name: string) => FACT_LABEL[name] ?? name;
 
@@ -62,6 +63,7 @@ export const EFFECT_SENTENCE: Record<Effect, string> = {
 
 /** Timeline event kinds as a reader would say them. */
 export const KIND_LABEL: Record<string, string> = {
+  HumanVerified: "Proof of human",
   Attested: "Facts attested",
   Revoked: "Designated / revoked",
   CredentialDecision: "Deposit decision",
@@ -93,6 +95,8 @@ export const REFUSAL_LABEL: Record<string, string> = {
   TransferRefused: "Transfer refused",
   WithdrawalRefused: "Withdrawal refused",
   TransfersDisabled: "Transfers disabled",
+  HUMAN_ALREADY_BOUND: "This human already onboarded another wallet",
+  INVALID_PROOF: "The World ID proof did not verify",
 };
 
 /** Swaps identifiers in a gateway sentence for their plain names. */

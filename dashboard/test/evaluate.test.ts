@@ -136,7 +136,12 @@ describe("verdictOf", () => {
 describe("the secondary RWA profile", () => {
   it("admits an onboarded investor at the pool and refuses a stranger with the onboarding clause", async () => {
     const policy = await compiled("rwa-secondary");
-    const onboarded: Facts = { kycApproved: true, amlApproved: true, sanctionsClear: true };
+    const onboarded: Facts = {
+      kycApproved: true,
+      amlApproved: true,
+      sanctionsClear: true,
+      humanVerified: true,
+    };
     expect(explain(policy, "transfer", onboarded).onchain).toEqual({ allowed: true, clauseId: 0 });
     const stranger = explain(policy, "transfer", {
       kycApproved: false,

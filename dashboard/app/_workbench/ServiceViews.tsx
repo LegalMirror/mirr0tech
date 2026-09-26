@@ -3,6 +3,7 @@
 import type { AgreementDetail, AgreementsClient, Constraints, StackStatus } from "@/lib/agreements";
 import type { PolicyData } from "@/lib/types";
 import { ConstraintForm } from "./Forms";
+import { JobProgress } from "./JobProgress";
 import { LocalEvaluator } from "./PolicyPanes";
 import { Icon, Notice } from "./ui";
 
@@ -13,6 +14,63 @@ export function downloadJson(value: unknown, filename: string) {
   anchor.download = filename;
   anchor.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const rwaDeployPhases = [
+  { at: 8, label: "Prepare compiled policy bundle" },
+  { at: 18, label: "Compile policy oracle and RWA token" },
+  { at: 28, label: "Compile Uniswap v4 hook" },
+  { at: 42, label: "Deploy policy oracle" },
+  { at: 54, label: "Deploy RWA token" },
+  { at: 68, label: "Mine hook address" },
+  { at: 76, label: "Deploy hook with CREATE2" },
+  { at: 86, label: "Configure token policy door" },
+  { at: 92, label: "Initialize Uniswap v4 pool" },
+  { at: 99, label: "Record deployment" },
+];
+const creditDeployPhases = [
+  { at: 8, label: "Prepare compiled policy bundle" },
+  { at: 24, label: "Compile credit contracts" },
+  { at: 34, label: "Compile SwapVM router" },
+  { at: 44, label: "Deploy policy oracle" },
+  { at: 54, label: "Deploy role provider" },
+  { at: 66, label: "Deploy market" },
+  { at: 74, label: "Bind market to oracle" },
+  { at: 82, label: "Deploy policy router" },
+  { at: 90, label: "Authorize venue" },
+  { at: 99, label: "Record deployment" },
+];
+
+function DeployProgressCard({ record }: { record: AgreementDetail }) {
+  if (record.status !== "deploying") return null;
+  const phases = record.profile === "wildcat-credit" ? creditDeployPhases : rwaDeployPhases;
+  const percent = record.progress?.percent ?? 0;
+  const firstPending = phases.findIndex((phase) => percent < phase.at);
+  return (
+    <section className="wb-surface" aria-label="Deployment progress">
+      <h3>Deployment in progress</h3>
+      <JobProgress progress={record.progress ?? null} />
+      <ol>
+        {phases.map((phase, index) => {
+          const state =
+            firstPending === -1 || index < firstPending
+              ? "Done"
+              : index === Math.max(firstPending, 0)
+                ? "Active"
+                : "Pending";
+          return (
+            <li key={phase.label}>
+              <strong>{state}</strong> · {phase.label}
+            </li>
+          );
+        })}
+      </ol>
+      <Notice>
+        Sepolia deployment waits for each transaction confirmation before starting the next step. If this
+        remains active, the backend is still polling the signer/RPC; no wallet prompt is expected here.
+      </Notice>
+    </section>
+  );
 }
 export function ApiView({
   record,
@@ -129,6 +187,7 @@ export function DeployView({
         <h2>{deployment ? "Deployment" : "Prepare for deployment"}</h2>
         <p>The policy hash binds the source, extracted rules and issuer configuration.</p>
       </div>
+      <DeployProgressCard record={record} />
       <div className="wb-deploy-grid">
         <section className="wb-surface">
           <h3>Policy summary</h3>

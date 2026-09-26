@@ -104,6 +104,11 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
 const POOL_MANAGER_ABI = ['function initialize((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) returns (int24)'];
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 
+async function deployProgress(progress, log, status, percent) {
+  log(status);
+  if (progress) await progress({ status, percent });
+}
+
 // Integer Q96 initialization at the document NAV; actual routing still compares executed fills.
 export function cashierInitialSqrtPrice(navMicroUsd, tokenIsCurrency0) {
   const nav = BigInt(navMicroUsd);
@@ -118,30 +123,39 @@ export function cashierInitialSqrtPrice(navMicroUsd, tokenIsCurrency0) {
 /// Act 1 for one more agreement on a running stack: its own oracle, token and hook (compiled now,
 /// from the generated Solidity), and a policy-managed pool against the stack's mock USD on the shared
 /// PoolManager. Facts and sanctions stay on the stack's attestor and oracle.
-export async function deployFund(signer, { record, sources, log = () => {} }) {
+export async function deployFund(signer, { record, sources, log = () => {}, progress = null }) {
+  const step = (status, percent) => deployProgress(progress, log, status, percent);
   const { compileBundle } = await import('./solc.js');
   const cashier = Boolean(sources.cashierTerms || sources.cashier);
   if (cashier && (!sources.cashier || !sources.cashierTerms || sources.cashierTerms.trim() !== emitCashierTerms(sources.cashier).trim())) {
     throw new Error('Cashier deployment requires compiler-authorized sources.cashier metadata and matching sources.cashierTerms');
   }
+  await step('Checking shared Sepolia asset and deployment inputs…', 12);
   const sharedAsset = await sharedMockUsd(signer.provider, record.chainId);
   const parameters = cashier ? cashierConstructorConfig(sources.cashier) : null;
   const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy, 'generated/CompiledMirrorToken.sol': sources.token,
     ...(cashier ? { 'generated/CompiledCashierTerms.sol': sources.cashierTerms } : {}) };
+  await step('Compiling policy oracle and token contracts…', 18);
   const core = await compileBundle('core', [['contracts/PolicyOracle.sol', 'PolicyOracle'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
     ...(cashier && !sharedAsset ? [['contracts/test/MockUSD.sol', 'MockUSD']] : [])], { overrides });
   const hookName = cashier ? 'MirrorCashierHook' : 'MirrorUniswapHook';
   const periphery = Number(record.chainId) === 11155111 ? UNISWAP : record.uniswap ?? UNISWAP;
   if (!cashier && record.rwa.poolManager.toLowerCase() !== periphery.poolManager.toLowerCase()) throw new Error('Configure canonical Uniswap periphery for this chain before deploying a fund.');
+  await step('Compiling Uniswap v4 hook bundle…', 28);
   const v4 = await compileBundle('uniswap-v4', [[`contracts/${hookName}.sol`, hookName],
     ...(cashier ? [['contracts/MirrorCashierRouter.sol', 'MirrorCashierRouter']] : [])], { overrides });
   const deployer = await signer.getAddress();
   const txs = {};
+  const deploymentProgress = { oracle: 42, token: 54, mockUSD: 58, router: 62 };
   const deploy = async (artifact, label, ...args) => {
+    await step(`Submitting ${label} deployment…`, deploymentProgress[label] ?? 50);
     const contract = await new ContractFactory(artifact.abi, artifact.bytecode, signer).deploy(...args);
+    await step(`Waiting for ${label} confirmation…`, Math.min((deploymentProgress[label] ?? 50) + 4, 90));
     await contract.waitForDeployment();
     txs[label] = contract.deploymentTransaction().hash;
-    log(`${label.padEnd(24)} ${await contract.getAddress()}`);
+    const address = await contract.getAddress();
+    await step(`${label} confirmed at ${address}`, Math.min((deploymentProgress[label] ?? 50) + 8, 92));
+    log(`${label.padEnd(24)} ${address}`);
     return contract;
   };
   const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
@@ -151,17 +165,23 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
   const asset = sharedAsset ?? (cashier ? await (await deploy(core.MockUSD, 'mockUSD')).getAddress() : record.usdc);
   const router = cashier ? await (await deploy(v4.MirrorCashierRouter, 'router', record.rwa.poolManager, parameters)).getAddress() : periphery.router;
   const args = [record.rwa.poolManager, oracleAddress, router, tokenAddress, ...(cashier ? [asset, parameters] : [periphery.positionManager, periphery.quoter])];
+  await step('Preparing hook init code and mining permissioned address…', 68);
   const initCode = (await new ContractFactory(v4[hookName].abi, v4[hookName].bytecode, signer).getDeployTransaction(...args)).data;
   const mined = mineHookAddress(initCode, cashier ? CASHIER_HOOK_FLAGS : undefined);
+  await step(`Deploying hook through CREATE2 (${mined.attempts} salt tries)…`, 76);
   txs.hook = (await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait()).hash;
+  await step(`Hook confirmed at ${mined.address}`, 82);
   log(`${'hook'.padEnd(24)} ${mined.address} (${mined.attempts} tries)`);
+  await step('Configuring token with policy oracle and hook door…', 86);
   txs.configure = (await (await token.configureSecondary(oracleAddress, mined.address)).wait()).hash;
   const [currency0, currency1] = BigInt(tokenAddress) < BigInt(asset) ? [tokenAddress, asset] : [asset, tokenAddress];
   const poolSettings = cashier ? parameters.pool : { fee: 3000, tickSpacing: 60 };
   const poolKey = { currency0, currency1, ...poolSettings, hooks: mined.address };
   const initialSqrtPriceX96 = cashier ? cashierInitialSqrtPrice(parameters.navMicroUsd, currency0 === tokenAddress) : SQRT_PRICE_1_1;
   const poolManager = new Contract(record.rwa.poolManager, POOL_MANAGER_ABI, signer);
+  await step('Initializing the Uniswap v4 pool…', 92);
   txs.pool = (await (await poolManager.initialize(poolKey, initialSqrtPriceX96)).wait()).hash;
+  await step('Pool initialized; deriving pool id…', 96);
   const poolId = keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,address,uint24,int24,address)'], [[currency0, currency1, poolSettings.fee, poolSettings.tickSpacing, mined.address]]));
   return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, asset, router,
     ...(!cashier ? { routing: 'uniswap-api', positionManager: periphery.positionManager, permit2: periphery.permit2, quoter: periphery.quoter } : {}),
@@ -171,7 +191,9 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
 
 /// A separate MVP credit market per uploaded, explicitly mapped bundle. Reuses only shared
 /// testnet infrastructure; its policy oracle, role provider and SwapVM guard bind the new hash.
-export async function deployCredit(signer, { record, sources, log = () => {} }) {
+export async function deployCredit(signer, { record, sources, log = () => {}, progress = null }) {
+  const step = (status, percent) => deployProgress(progress, log, status, percent);
+  await step('Checking shared Sepolia asset and credit deployment inputs…', 12);
   const sharedAsset = await sharedMockUsd(signer.provider, record.chainId);
   const { compileBundle } = await import('./solc.js');
   const { verifyPolicy } = await import('../policy/compile.js');
@@ -185,18 +207,25 @@ export async function deployCredit(signer, { record, sources, log = () => {} }) 
   const terms = buybackTermsFrom(policy);
   if (terms.deadlineTimestamp <= Math.floor(Date.now() / 1000)) throw new Error('The source buyback offer has expired');
   const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy };
+  await step('Compiling credit oracle, role provider and market…', 24);
   const core = await compileBundle('core', [
     ['contracts/PolicyOracle.sol', 'PolicyOracle'], ['contracts/MirrortechRoleProvider.sol', 'MirrortechRoleProvider'],
     ['contracts/MockWildcatMarket.sol', 'MockWildcatMarket'], ['contracts/test/MockUSD.sol', 'MockUSD'],
   ], { overrides });
+  await step('Compiling SwapVM policy router…', 34);
   const swap = await compileBundle('swapvm', [['contracts/swapvm/MirrortechRouter.sol', 'MirrortechRouter']], { overrides });
   const borrower = await signer.getAddress();
   const txs = {};
+  const deploymentProgress = { oracle: 44, roleProvider: 54, mockUSD: 60, market: 66, router: 82 };
   const deploy = async (artifact, label, ...args) => {
+    await step(`Submitting ${label} deployment…`, deploymentProgress[label] ?? 50);
     const contract = await new ContractFactory(artifact.abi, artifact.bytecode, signer).deploy(...args);
+    await step(`Waiting for ${label} confirmation…`, Math.min((deploymentProgress[label] ?? 50) + 4, 90));
     await contract.waitForDeployment();
     txs[label] = contract.deploymentTransaction().hash;
-    log(`${label} ${await contract.getAddress()}`);
+    const address = await contract.getAddress();
+    await step(`${label} confirmed at ${address}`, Math.min((deploymentProgress[label] ?? 50) + 8, 92));
+    log(`${label} ${address}`);
     return contract;
   };
   const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
@@ -204,9 +233,12 @@ export async function deployCredit(signer, { record, sources, log = () => {} }) 
   const roleProvider = await deploy(core.MirrortechRoleProvider, 'roleProvider', await oracle.getAddress());
   const assetAddress = sharedAsset ?? await (await deploy(core.MockUSD, 'mockUSD')).getAddress();
   const market = await deploy(core.MockWildcatMarket, 'market', assetAddress, await roleProvider.getAddress(), borrower);
+  await step('Binding credit market into policy oracle…', 74);
   txs.bindMarket = (await (await oracle.bindMarket(await market.getAddress())).wait()).hash;
   const router = await deploy(swap.MirrortechRouter, 'router', record.credit.aqua, record.credit.weth, borrower, await oracle.getAddress());
+  await step('Authorizing policy router as market venue…', 90);
   txs.configureVenue = (await (await market.setVenue(await router.getAddress(), true)).wait()).hash;
+  await step('Preparing buyback order payload…', 96);
   const program = buildBuybackProgram({ opcodes: loadOpcodes(),
     policyGuardOpcode: Number(await router.policyGuardOpcode()), fixedRateBalancesOpcode: Number(await router.fixedRateBalancesOpcode()),
     policyHash: policy.hash, action: policy.actionOrder.indexOf('transfer'), deadline: terms.deadlineTimestamp,

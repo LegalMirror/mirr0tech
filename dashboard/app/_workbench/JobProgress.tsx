@@ -18,6 +18,7 @@ export function JobProgress({ progress }: { progress: AgreementDetail["progress"
       <p>
         <span className="wb-spinner" aria-hidden="true" />
         {percent == null ? "Starting…" : <strong>{percent}%</strong>}
+        {progress?.status ? ` · ${progress.status}` : null}
         {progress?.confidence != null && (
           <>
             {" "}

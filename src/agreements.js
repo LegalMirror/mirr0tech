@@ -383,18 +383,26 @@ export class Agreements {
     const compiled = compilePolicy(record.envelope, record.config, document, { demo: true });
     ensure(compiled.solidity || record.profile === 'wildcat-credit', 409, 'UNSUPPORTED_PROFILE', `The ${record.profile} profile has no deployment adapter`);
     this.venues.delete(id);
-    this.transition(record, 'deploying');
+    const jobId = `deploy:${id}`;
+    const setProgress = async ({ status, percent = null }) => {
+      record.progress = { job: jobId, status, percent, confidence: null, at: now() };
+      this.log(`${record.id} ${status}${percent == null ? '' : ` · ${percent}%`}`);
+      await this.persist();
+    };
+    this.transition(record, 'deploying', { error: null, progress: { job: jobId, status: 'Queued for backend signer…', percent: 3, confidence: null, at: now() } });
     // All agreements share the signer, including operator and anonymous demo requests.
     const job = this.deployQueue.then(async () => {
       try {
+        await setProgress({ status: 'Preparing compiled policy bundle…', percent: 8 });
         this.log(`${record.id} deploying policy ${compiled.policy.hash.slice(0, 10)}… · profile ${record.profile}`);
-        const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
+        const deployment = await this.deployer({ profile: record.profile, policyHash: compiled.policy.hash, name: record.name, progress: setProgress, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(record.profile === 'wildcat-credit' ? { policy: compiled.policy } : {}), ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
+        await setProgress({ status: 'Recording confirmed deployment…', percent: 99 });
         const signOff = signer ? { worldId: signer.id, provider: signer.provider, environment: signer.environment, credential: signer.credential ?? null, mock: Boolean(signer.mock), policyHash: compiled.policy.hash, at: now() } : null;
-        this.transition(record, 'deployed', { deployment: { ...deployment, ...(signOff ? { signOff } : {}) } });
+        this.transition(record, 'deployed', { deployment: { ...deployment, ...(signOff ? { signOff } : {}) }, progress: null, error: null });
         if (signOff) this.log(`${record.id} signed off by World ID ${signOff.worldId} (${signOff.credential ?? signOff.provider}) for policy ${signOff.policyHash.slice(0, 10)}…`);
         this.log(`${record.id} deployed token ${deployment.token} hook ${deployment.hook ?? '-'} oracle ${deployment.oracle ?? '-'} pool ${deployment.poolId ?? '-'}`);
       } catch (error) {
-        this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });
+        this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}`, progress: null });
       } finally {
         try { await this.persist(); } finally { this.jobs.delete(id); }
       }

@@ -25,10 +25,12 @@ export async function workspaceChain(env = process.env) {
     const signer = key ? new Wallet(key, provider) : null;
     return {
       status: { chainId, ...(signer ? { deployer: signer.address } : {}), attestor: record.attestor, poolManager: record.rwa.poolManager },
-      deployer: signer ? async ({ profile, sources }) => {
+      deployer: signer ? async ({ profile, sources, progress }) => {
         if (Number(BigInt(await provider.send('eth_chainId', []))) !== WORKSPACE_CHAIN_ID)
           throw new Error('RPC chain changed; refusing deployment.');
-        return profile === 'wildcat-credit' ? deployCredit(signer, { record, sources }) : deployFund(signer, { record, sources });
+        return profile === 'wildcat-credit'
+          ? deployCredit(signer, { record, sources, progress })
+          : deployFund(signer, { record, sources, progress });
       } : null,
       seeder: signer ? createPoolSeeder(signer) : null,
       minter: signer ? createRwaMinter(signer, { mockSanctionsAddress: record.sanctions, sanctionsAdmin: env.PRIVATE_KEY ? new Wallet(env.PRIVATE_KEY.trim(), provider) : signer }) : null,

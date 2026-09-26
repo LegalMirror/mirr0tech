@@ -27,7 +27,15 @@ export type AgreementDeployment = {
   deployedAt: string;
   txs: Record<string, string>;
   /** The World ID human who approved this deploy, bound to the policy hash it deployed. */
-  signOff?: { worldId: string; provider: string; environment: string; credential: string | null; mock: boolean; policyHash: string; at: string };
+  signOff?: {
+    worldId: string;
+    provider: string;
+    environment: string;
+    credential: string | null;
+    mock: boolean;
+    policyHash: string;
+    at: string;
+  };
 };
 export type Agreement = {
   id: string;
@@ -52,8 +60,14 @@ export type Agreement = {
   coverage: Omit<Coverage, "paragraphs"> | null;
   deployment: AgreementDeployment | null;
   error: string | null;
-  /** While a live deliberation runs: percent done and the confidence so far. */
-  progress?: { job: string; percent: number | null; confidence: number | null; at: string } | null;
+  /** While a live generation or deployment job runs: current status, percent done and optional confidence. */
+  progress?: {
+    job: string;
+    status?: string;
+    percent: number | null;
+    confidence: number | null;
+    at: string;
+  } | null;
   history: { status: AgreementStatus; at: string; policyHash?: string }[];
 };
 export type AgreementDetail = Agreement & {

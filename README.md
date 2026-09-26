@@ -42,11 +42,11 @@ The LLM only proposes. It never runs at transaction time: the chain enforces a f
 
 The Securitize/BlackRock transfer-agent agreement compiles into a permissioned fund token and a Uniswap v4 hook.
 
-1. The issuer uploads the agreement. The workbench shows each clause next to the rule it produced.
-2. The issuer chooses which actions require a verified identity (for example `mint` and `transfer`) and which World ID credential counts.
-3. The token and hook deploy. Shares mint to custody.
-4. An investor verifies with World ID. Shares release to their wallet, and they can add liquidity and swap through the hooked pool.
-5. Anyone may create a pool, but a pool without the hook can't take the token (`NoPolicyDoor`). A stranger in the hooked pool is refused with *"Exhibit A — Investor Onboarding"* quoted.
+1. Upload the agreement. The workbench shows every enforced rule beside the clause it came from.
+2. Pick which actions need identity (`mint`, `transfer`) and which World ID credential counts.
+3. Deploy to Sepolia with a live phase tracker: compile → oracle → token → hook → pool.
+4. The investor keeps their normal EOA wallet. World ID proves a credential for that exact address; the EOA still signs approvals, Permit2 and swaps.
+5. The hooked pool trades only eligible wallets. A stranger is refused with *"Exhibit A — Investor Onboarding"* quoted.
 
 ## How we used World ID
 
@@ -57,7 +57,7 @@ The Securitize/BlackRock transfer-agent agreement compiles into a permissioned f
 **How it works:**
 
 - **The issuer sets the permissions.** When constraining an agreement, the issuer picks the credential and the actions that require it, from `mint`, `burn`, `transfer`, `deposit` and `withdraw`. Each choice becomes an `identityVerified` rule in the policy, quoting the clause it enforces (`src/agreements.js:196-215`).
-- **The investor proves it.** IDKit requests that credential for the investor's wallet. `src/worldid.js` accepts only a matching, server-validated v4 result, then attests `identityVerified` for that wallet on chain. The nullifier is scoped per action, and the signal binds the proof to the wallet.
+- **The investor proves it.** IDKit requests that credential for the connected EOA. `src/worldid.js` accepts only a matching, server-validated result, then attests `identityVerified` for that wallet on chain. World ID is not the wallet; its signal binds the proof to the EOA that later signs transactions.
 - **The chain enforces it.** Every share movement asks the compiled policy first: `MirrorToken._update` checks the receiving wallet (`contracts/MirrorToken.sol:117`), and the hook checks every liquidity change and swap.
 
 **The two paths:**
@@ -374,7 +374,7 @@ There is no custom-router fallback in the liquidity or swap tabs.
   typed-data permit and sends the Universal Router transaction. The API must
   return this agreement’s exact pool; other routes are rejected.
 - Metadata, balances, pool liquidity and receipts come from backend `RPC_URL`;
-  the browser wallet supplies identity and transaction/permit signatures.
+  the browser wallet supplies the World-ID-bound EOA plus transaction/permit signatures.
 - The hook obtains the initiating wallet from the trusted periphery’s
   `msgSender()`. Recipient attestations remain required for execution. Quoter
   simulation cannot authorize token settlement.

@@ -63,6 +63,10 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 
 Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
 
+## How we used World ID
+
+Exhibit A of the fund agreement says onboarding starts with "Know-your-customer (KYC)… checks during onboarding of investors". A World ID proof of human is that identity step, so it compiles to a fact: `humanVerified`, required to be issued shares and to enter the Uniswap pool. `src/worldid.js` verifies the proof (Developer Portal `POST /api/v4/verify/{rp_id}`, `rp_context` signed server-side with `@worldcoin/idkit-core`), binds its nullifier to the wallet so one human cannot onboard twice, and attests the fact with an expiry; every venue reads it like any other fact, so the hook, the mint and the pool need no new code. The dashboard's Investors screen opens the IDKit widget (`@worldcoin/idkit`) when an app is registered; without one a mock proof runs the same path, and "Use the Investor's proof" on the Stranger shows the one-human-one-wallet refusal. `test/worldid.test.js` and `test/chain/gateway.test.js` cover verification, binding, the refusal and the full REST flow.
+
 ## How we used Noolog
 
 New to Noolog? [docs/NOOLOG.md](docs/NOOLOG.md): what it is, the docs MCP server (`.mcp.json` wires it into this checkout), the API and SDK links.

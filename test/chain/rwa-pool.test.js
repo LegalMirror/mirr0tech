@@ -92,7 +92,7 @@ test('the fund agreement compiles into the token and into the only door a pool c
     await (await token.configureSecondary(await addr(oracle), mined.address)).wait();
     await assert.rejects(token.release(id('release-0'), await stranger.getAddress(), 1n), (error) => {
       const parsed = decode(error);
-      return parsed?.name === 'TransferRefused' && clauseOf(parsed.args.clauseId).ruleId === 'transfer-onboarded-holder';
+      return parsed?.name === 'TransferRefused' && clauseOf(parsed.args.clauseId).ruleId === 'transfer-proof-of-human';
     });
     await attest(await investor.getAddress(), ONBOARDED);
     await (await token.release(id('release-1'), await investor.getAddress(), 500_000n * 10n ** 6n)).wait();

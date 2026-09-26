@@ -398,3 +398,27 @@ test('Agreements serializes operator and demo deployer calls and preserves jobs/
   assert.equal(agreements.jobs.size, 0);
   assert.equal(agreements.get(id).status, 'deployed');
 });
+
+test('a failed persist closes public work until the disk takes writes again; a stale temporary file does not block the boot', async (t) => {
+  const { chmod } = await import('node:fs/promises');
+  const directory = await temporary(t);
+  const path = join(directory, 'state', 'demo.json');
+  await mkdir(join(directory, 'state'));
+  await writeFile(`${path}.tmp`, 'left by a crash');
+  const { workspaces } = await service({ path });
+  await assert.rejects(stat(`${path}.tmp`), /ENOENT/, 'the stale temporary file is removed at boot');
+  await workspaces.admit('1.1.1.1');
+  assert.equal(workspaces.broken, false);
+
+  await chmod(join(directory, 'state'), 0o500);
+  t.after(() => chmod(join(directory, 'state'), 0o700).catch(() => {}));
+  await assert.rejects(workspaces.admit('1.1.1.1'), rejected(503, 'UNAVAILABLE'));
+  assert.equal(workspaces.broken, true);
+  await assert.rejects(workspaces.admit('1.1.1.1'), rejected(503, 'UNAVAILABLE'), 'still closed while the disk refuses');
+
+  await chmod(join(directory, 'state'), 0o700);
+  await workspaces.admit('1.1.1.1');
+  assert.equal(workspaces.broken, false, 'healed once a persist succeeds');
+  // The attempt made while the disk refused stays counted: quotas err on the side of less work.
+  assert.equal(JSON.parse(await readFile(path, 'utf8')).requests.length, 3);
+});

@@ -414,6 +414,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               record={record}
               sample={sample}
               client={client}
+              policy={policy}
             />
           ) : isLegalAst(record.ast) ? (
             <LegalAstView

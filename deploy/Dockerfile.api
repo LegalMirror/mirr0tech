@@ -25,7 +25,7 @@ FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
 ENV NODE_ENV=production PORT=3200 HOST=0.0.0.0 \
     EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json \
-    DATA_DIR=/app/.data SEED=false PUBLIC_DEMO=true
+    DATA_DIR=/app/.data SEED=false PUBLIC_DEMO=true MOCK_DELIBERATION_SECONDS=12
 COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
 COPY --from=build --chown=node:node /app /app
 RUN chmod +x deploy/api-entrypoint.sh && mkdir -p /app/.data && chown node:node /app/.data

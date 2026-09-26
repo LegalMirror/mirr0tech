@@ -471,7 +471,11 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                 <>
                   <JobProgress progress={record.progress} />
                   {record.progress && (
-                    <p className="wb-muted">Several legal models are reading the agreement and checking each other&apos;s claims.</p>
+                    <p className="wb-muted">
+                      {record.progress.job.startsWith("mock-")
+                        ? "Simulated deliberation: mock seats check the fixture's claims against the agreement."
+                        : "Several legal models are reading the agreement and checking each other's claims."}
+                    </p>
                   )}
                 </>
               ) : (

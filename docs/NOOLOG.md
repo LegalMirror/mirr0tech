@@ -31,6 +31,7 @@ The bypass posts `/chat/completions` with `response_format: { type: "json_object
 | `NOOLOG_API_KEY` | bearer token (`op-…`) for the live orchestrator; never in source control |
 | `NOOLOG_MODEL` | `nsed:legal_rwa_pro` (default: the legal RWA policy; its seats come from the policy) or `nsed:deep` (generic; the request names `extractor` + `critic`) |
 | `NOOLOG_EFFORT` | the halting dial sent with every deliberation (0–1, default `0.5`): the share of consensus evidence the seats need before they may stop |
+| `MOCK_DELIBERATION_SECONDS` | the fixture reading plays a simulated deliberation for this long (the API image sets 12; 0 is instant): three rounds, the bar, the confidence so far, then the mock seats' verdicts, marked simulated |
 | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `OPENAI_MODEL` | the bypass; the base URL may be any OpenAI-compatible endpoint |
 
 ## How the live path works

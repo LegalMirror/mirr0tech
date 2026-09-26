@@ -180,7 +180,8 @@ export class Agreements {
         const document = this.document(record);
         const draft = draftFor(spec, document, record.config);
         // The orchestrator's status line ("running: round 2 — Starting") is the loading state the record shows.
-        const onProgress = (state) => { record.progress = { job: state.job_id, status: state.status, at: now() }; };
+        // Percent done and the confidence so far; the orchestrator's round text stays internal.
+        const onProgress = (state) => { record.progress = { job: state.job_id, percent: state.percent ?? null, confidence: state.confidence ?? null, at: now() }; };
         const { envelope, verification } = await this.extract({ agreementId: record.id, profile: record.profile, document, draft, generation: record.generation, onProgress, config: record.config });
         record.progress = null;
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });

@@ -262,3 +262,23 @@ test('terms the deployment cannot enforce are set aside before validation, so a 
   const brokenFetch = async () => ({ ok: true, json: async () => ({ id: 'c', choices: [{ message: { content: JSON.stringify(broken) } }] }) });
   await assert.rejects(extractWithOpenAI({ document, fetchImpl: brokenFetch, env }), /rationale/);
 });
+
+test('progress is a percentage of rounds and time, never 100 before completion; confidence so far comes from the scored round', async () => {
+  const { progressOf, interimConfidence, ROUND_SECONDS } = await import('../src/noolog/extract.js');
+  const t0 = 1_000_000;
+  const at = (seconds) => ({ rounds: 3, roundStartedAt: t0, now: t0 + seconds * 1000 });
+  assert.equal(progressOf('pending', at(0)), 2);
+  assert.equal(progressOf('running: round 1 — Starting', at(0)), 3);
+  assert.equal(progressOf('running: round 1 — Starting', at(ROUND_SECONDS / 2)), 17);
+  assert.equal(progressOf('running: round 2 — Starting', at(0)), 33);
+  assert.equal(progressOf('running: round 3 — Starting', at(ROUND_SECONDS * 5)), 97, 'a long last round stops short of 100');
+  assert.equal(progressOf('completed', at(0)), 100);
+  assert.equal(progressOf('running: round 9', at(0)), 67, 'rounds beyond the bound count as the last');
+  const details = { history: [
+    { round: 1, evaluations: [{ evaluation: { score: -1 } }] },
+    { round: 2, evaluations: [{ evaluation: { score: 1 } }, { evaluation: { score: 0 } }] },
+  ] };
+  assert.equal(interimConfidence(details), 0.75, 'the latest round, mapped from [-1, 1]');
+  assert.equal(interimConfidence({ history: [] }), null);
+  assert.equal(interimConfidence(null), null);
+});

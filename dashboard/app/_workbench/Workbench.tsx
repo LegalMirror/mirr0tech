@@ -466,11 +466,29 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                   ? "This contract needs attention."
                   : "Your contract is becoming a policy."}
               </h2>
-              <p>
-                {record.status === "failed"
-                  ? "Review the gateway error above, then regenerate when its cause is resolved."
-                  : "The gateway is extracting, checking and compiling your source. This view polls automatically; you can keep working."}
-              </p>
+              {record.status !== "failed" && record.progress?.percent != null ? (
+                <div className="wb-progress" role="progressbar" aria-valuenow={record.progress.percent} aria-valuemin={0} aria-valuemax={100}>
+                  <div className="wb-progress-track">
+                    <div className="wb-progress-fill" style={{ width: `${record.progress.percent}%` }} />
+                  </div>
+                  <p>
+                    <strong>{record.progress.percent}%</strong>
+                    {record.progress.confidence != null && (
+                      <>
+                        {" "}
+                        · confidence so far <strong>{record.progress.confidence.toFixed(2)}</strong>
+                      </>
+                    )}
+                  </p>
+                  <p className="wb-muted">Several legal models are reading the agreement and checking each other&apos;s claims.</p>
+                </div>
+              ) : (
+                <p>
+                  {record.status === "failed"
+                    ? "Review the gateway error above, then regenerate when its cause is resolved."
+                    : "The gateway is extracting, checking and compiling your source. This view polls automatically; you can keep working."}
+                </p>
+              )}
               <button onClick={state.refresh}>Refresh status</button>
             </div>
           ))}

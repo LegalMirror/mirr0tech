@@ -96,6 +96,30 @@ export function parseAstText(text) {
   throw new Error(`The model answered prose instead of the policy JSON: ${raw.replace(/\s+/g, ' ').slice(0, 300)}`);
 }
 
+// A whole agreement takes about four minutes a round on the legal seats (measured 2026-09-26).
+export const ROUND_SECONDS = 240;
+
+/// Percent done from the orchestrator's status line and time in the current round: each round is an
+/// equal share, the share fills with elapsed time, and nothing short of completion reads 100.
+export function progressOf(status, { rounds, roundStartedAt, now = Date.now() }) {
+  const text = String(status ?? '');
+  if (/^completed/i.test(text)) return 100;
+  if (/^(pending|claimed|queued)/i.test(text)) return 2;
+  const round = Number(text.match(/round\s+(\d+)/i)?.[1] ?? 1);
+  const within = Math.min(0.9, Math.max(0, (now - roundStartedAt) / 1000 / ROUND_SECONDS));
+  return Math.max(3, Math.min(97, Math.round(((Math.min(round, rounds) - 1 + within) / rounds) * 100)));
+}
+
+/// The confidence so far: the seats' scores of the latest scored round, mapped from [-1, 1] to [0, 1].
+export function interimConfidence(details) {
+  const history = details?.history ?? [];
+  const latest = Math.max(0, ...history.map((entry) => entry.round ?? 0));
+  const scores = history.filter((entry) => entry.round === latest).flatMap((entry) => (entry.evaluations ?? []).map((evaluation) => evaluation.evaluation?.score)).filter(Number.isFinite);
+  if (!scores.length) return null;
+  // The orchestrator scores in [-1, 1]; the mock never reports rounds, so it never reaches here.
+  return Number((scores.reduce((sum, score) => sum + (score + 1) / 2, 0) / scores.length).toFixed(2));
+}
+
 const budgetError = (error) => {
   if ([402, 429].includes(error.status) && /budget|quota|credit/i.test(error.message)) return new Error(`The model account is out of credits (${error.status}); top up the Noolog account, or set EXTRACTOR=mock`);
   return error;
@@ -115,13 +139,26 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     }
   }
   try {
-    const policyId = SEATED(MODEL) ? null : (await client.policyFor(tagOf(MODEL))).policy_id;
+    const policy = SEATED(MODEL) ? null : await client.policyFor(tagOf(MODEL));
+    const policyId = policy?.policy_id ?? null;
+    // The policy may run more rounds than requested; the larger bounds the progress bar.
+    const rounds = Math.max(2, policy?.max_rounds ?? 2);
     // The legal seats review a draft instead of answering; live, they read the document alone. The mock needs the draft.
     let jobId;
     try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft: server ? draft : null, policyId, config }))); } catch (error) { throw budgetError(error); }
     // A live deliberation with a legal seat list takes ~10 minutes per round on a whole agreement; the
     // wait matches the policy's own job timeout (an hour). The mock answers at once.
-    const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 3000), timeoutMs: 60 * 60_000, onProgress });
+    let round = 0; let roundStartedAt = Date.now(); let confidence = null;
+    const report = async (state) => {
+      const current = Number(String(state.status).match(/round\s+(\d+)/i)?.[1] ?? 0);
+      if (current > round) {
+        round = current; roundStartedAt = Date.now();
+        // A new round means the last one was scored: read the confidence so far.
+        if (current > 1) confidence = interimConfidence(await client.details(jobId).catch(() => null)) ?? confidence;
+      }
+      await onProgress?.({ job_id: jobId, status: state.status, percent: progressOf(state.status, { rounds, roundStartedAt }), confidence });
+    };
+    const state = await client.waitForResult(jobId, server ? { pollMs, onProgress: report } : { pollMs: Math.max(pollMs, 3000), timeoutMs: 60 * 60_000, onProgress: report });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
     // Demote first: what this deployment cannot enforce need not be well-formed to be set aside.
     const { ast: fitted, demoted } = fitToProfile(parseAstText(state.result), config);

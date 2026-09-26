@@ -45,13 +45,12 @@ export class NoologClient {
     return policy;
   }
   /// Polls until the job leaves pending/running. The live status is a progress line
-  /// ("running: round 2 — Starting"); `onProgress` sees each change.
+  /// ("running: round 2 — Starting"); `onProgress` sees every poll, so time-based progress can advance.
   async waitForResult(jobId, { pollMs = 500, timeoutMs = 120_000, onProgress = null } = {}) {
     const started = Date.now();
-    let last = null;
     for (;;) {
       const state = await this.status(jobId);
-      if (state.status !== last) { last = state.status; await onProgress?.(state); }
+      await onProgress?.(state);
       if (!/^(pending|claimed|running|queued)/i.test(String(state.status))) return state;
       if (Date.now() - started > timeoutMs) throw new NoologError(504, `Job ${jobId} still ${state.status} after ${timeoutMs} ms`);
       await new Promise((resolve) => setTimeout(resolve, pollMs));

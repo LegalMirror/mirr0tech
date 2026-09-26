@@ -50,6 +50,8 @@ export type Agreement = {
   coverage: Omit<Coverage, "paragraphs"> | null;
   deployment: AgreementDeployment | null;
   error: string | null;
+  /** While a live deliberation runs: percent done and the confidence so far. */
+  progress?: { job: string; percent: number | null; confidence: number | null; at: string } | null;
   history: { status: AgreementStatus; at: string; policyHash?: string }[];
 };
 export type AgreementDetail = Agreement & {

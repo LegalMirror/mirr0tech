@@ -57,7 +57,7 @@ async function waitFor(id, state) {
   for (;;) {
     const record = await call(`/v1/agreements/${id}`);
     if (record.status === state || record.status === 'failed' || (state === 'deployed' && record.status === 'compiled' && record.error)) return record;
-    const progress = record.progress?.status ?? record.status;
+    const progress = record.progress ? `${record.progress.percent ?? 0}%${record.progress.confidence == null ? '' : ` · confidence ${record.progress.confidence}`}` : record.status;
     if (progress !== last) { console.error(`  … ${progress}`); last = progress; }
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }

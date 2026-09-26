@@ -101,23 +101,28 @@ export class WorldLogin {
     ensure(mode !== 'mock' && this.enabled(mode), 403, 'SANDBOX_LOGIN_DISABLED', 'Verified login is disabled.');
     const item = proof?.responses?.[0];
     const legacy = mode === 'v3';
-    if (legacy) {
-      ensure(proof?.protocol_version === '3.0' && proof.environment === 'staging'
-        && proof.nonce === challenge.nonce && proof.action === this.action && !('session_id' in proof)
-        && Array.isArray(proof.responses) && proof.responses.length === 1
-        && item?.identifier === 'orb' && hex(item.nullifier) && hex(item.merkle_root)
-        && typeof item.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof)
-        && sameHex(item.signal_hash, hashSignal(challenge.signal)),
-      400, 'INVALID_LOGIN_PROOF', 'Expected a staging World ID v3 Orb proof bound to this login attempt.');
-    } else ensure(proof?.protocol_version === '4.0' && proof.environment === 'sandbox' && proof.nonce === challenge.nonce
-      && !('action' in proof) && sessionId(proof.session_id) && (!challenge.expected_session || proof.session_id === challenge.expected_session)
-      && Array.isArray(proof.responses) && proof.responses.length === 1
-      && item?.identifier === 'proof_of_human' && item.issuer_schema_id === 1
-      && Array.isArray(item.proof) && item.proof.length === 5 && item.proof.every(hex)
-      && Array.isArray(item.session_nullifier) && item.session_nullifier.length === 2 && item.session_nullifier.every(hex)
-      && Number.isSafeInteger(item.expires_at_min) && item.expires_at_min >= 0
-      && sameHex(item.signal_hash, hashSignal(challenge.signal)),
-    400, 'INVALID_LOGIN_PROOF', 'Expected a sandbox World ID session proof bound to this login attempt.');
+    // Each check is named, so a rejection says which part of the proof did not fit this login attempt.
+    const checks = legacy ? {
+      protocol_version: proof?.protocol_version === '3.0', environment: proof?.environment === 'staging',
+      nonce: proof?.nonce === challenge.nonce, action: proof?.action === this.action, no_session_id: !('session_id' in (proof ?? {})),
+      one_response: Array.isArray(proof?.responses) && proof.responses.length === 1,
+      identifier: ['orb', 'proof_of_human'].includes(item?.identifier), nullifier: hex(item?.nullifier), merkle_root: hex(item?.merkle_root),
+      proof: typeof item?.proof === 'string' && /^0x[\da-f]{512}$/i.test(item.proof),
+      signal_hash: sameHex(item?.signal_hash, hashSignal(challenge.signal)),
+    } : {
+      protocol_version: proof?.protocol_version === '4.0', environment: proof?.environment === 'sandbox', nonce: proof?.nonce === challenge.nonce,
+      no_action: !('action' in (proof ?? {})), session_id: sessionId(proof?.session_id) && (!challenge.expected_session || proof.session_id === challenge.expected_session),
+      one_response: Array.isArray(proof?.responses) && proof.responses.length === 1,
+      // Sandbox documents Selfie Check; proof of human is accepted where the app can issue it.
+      credential: (item?.identifier === 'selfie' && item.issuer_schema_id === 11) || (item?.identifier === 'proof_of_human' && item?.issuer_schema_id === 1),
+      proof: Array.isArray(item?.proof) && item.proof.length === 5 && item.proof.every(hex),
+      session_nullifier: Array.isArray(item?.session_nullifier) && item.session_nullifier.length === 2 && item.session_nullifier.every(hex),
+      expires_at_min: Number.isSafeInteger(item?.expires_at_min) && item.expires_at_min >= 0,
+      signal_hash: sameHex(item?.signal_hash, hashSignal(challenge.signal)),
+    };
+    const failed = Object.keys(checks).filter((name) => !checks[name]);
+    if (failed.length) console.warn('[World ID] login proof rejected locally', { requestId, mode, failed, identifier: typeof item?.identifier === 'string' ? item.identifier.slice(0, 32) : typeof item?.identifier, protocol: proof?.protocol_version, environment: proof?.environment });
+    ensure(!failed.length, 400, 'INVALID_LOGIN_PROOF', `The ${legacy ? 'staging v3' : 'sandbox v4'} proof did not match this login attempt: ${failed.join(', ')}.`);
     let response, result;
     const started = Date.now();
     const diagnosticCode = (value) => typeof value === 'string' && /^[a-zA-Z_]{1,64}$/.test(value) ? value : undefined;
@@ -143,11 +148,13 @@ export class WorldLogin {
       environmentMatches: !result?.environment || result.environment === environmentOf(mode),
       resultCount: Array.isArray(result?.results) ? result.results.length : null,
     });
+    // World's own reason, when it gives one, is what the operator needs to fix the Portal setup.
+    const reason = [result?.code, result?.detail, result?.results?.[0]?.code, result?.results?.[0]?.detail].filter((value) => typeof value === 'string' && value.length).map((value) => value.slice(0, 160)).join(' · ');
     ensure(response.ok && result?.success === true && (legacy || result.session_id === proof.session_id)
       && (!result.environment || result.environment === environmentOf(mode)) && !result.code
       && Array.isArray(result.results) && result.results.length === 1
       && result.results[0]?.identifier === item.identifier && result.results[0].success === true && !result.results[0].code,
-    400, 'WORLD_LOGIN_REJECTED', 'World ID did not verify this login proof. Start again.');
+    400, 'WORLD_LOGIN_REJECTED', `World ID did not verify this login proof${reason ? ` (${reason})` : ''}. Start again.`);
     ensure(challenge.expires > this.now(), 400, 'LOGIN_CHALLENGE', 'Login expired. Start again.');
     const proofHash = legacy ? hash(`v3:${this.rpId}:${this.action}:${item.proof.toLowerCase()}`) : hash(`${this.rpId}:${item.session_nullifier.map((value) => BigInt(value).toString(16)).join(':')}`);
     // A v3 nullifier identifies the account and legitimately repeats on each fresh login.
@@ -169,7 +176,7 @@ export class WorldLogin {
   }
   context(id, expiresAt, mode = 'sandbox') {
     const mock = mode === 'mock';
-    return { account: { id, provider: mock ? 'world-id-mock' : 'world-id', environment: mode === 'v3' ? 'staging' : mode, mock, credential: mock ? null : mode === 'v3' ? 'orb' : 'proof_of_human', passportVerified: false }, expiresAt };
+    return { account: { id, provider: mock ? 'world-id-mock' : 'world-id', environment: mode === 'v3' ? 'staging' : mode, mock, credential: mock ? null : mode === 'v3' ? 'orb' : 'selfie', passportVerified: false }, expiresAt };
   }
   authenticate(token) {
     const row = typeof token === 'string' && /^world_[\da-f]{64}$/.test(token)

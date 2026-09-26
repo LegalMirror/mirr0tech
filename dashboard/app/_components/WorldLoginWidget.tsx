@@ -52,7 +52,8 @@ export function WorldLoginWidget({
     <SessionWidget
       {...shared}
       environment="sandbox"
-      constraints={{ type: "proof_of_human", signal: challenge.signal }}
+      // Selfie Check is the credential World documents for sandbox; the React session widget takes it as a constraint.
+      constraints={{ type: "selfie", signal: challenge.signal }}
       existing_session_id={existingSession}
     />
   );

@@ -5,7 +5,7 @@ export type WorldAccount = {
   provider: "world-id" | "world-id-mock";
   environment: "sandbox" | "staging" | "mock";
   mock: boolean;
-  credential: "proof_of_human" | "orb" | null;
+  credential: "proof_of_human" | "selfie" | "orb" | null;
   passportVerified: false;
 };
 export type WorldSession = { account: WorldAccount; expiresAt: number };

@@ -8,7 +8,10 @@ vi.mock("next/dynamic", () => ({
     return null;
   },
 }));
-vi.mock("@worldcoin/idkit", () => ({ orbLegacy: (options: object) => ({ credential: "orb", ...options }) }));
+vi.mock("@worldcoin/idkit", () => ({
+  orbLegacy: (options: object) => ({ credential: "orb", ...options }),
+  selfieCheck: (options: object) => ({ credential: "selfie", ...options }),
+}));
 import { WorldLoginWidget, type LoginChallenge } from "@/app/_components/WorldLoginWidget";
 const base = {
   challengeToken: "token",
@@ -34,7 +37,7 @@ describe("login widget mode", () => {
         expect(widget.props.allow_legacy_proofs).toBe(true);
         expect(widget.props).not.toHaveProperty("existing_session_id");
       } else {
-        expect(widget.props.constraints).toEqual({ type: "proof_of_human", signal: challenge.signal });
+        expect(widget.props.constraints).toEqual({ type: "selfie", signal: challenge.signal });
         expect(widget.props).not.toHaveProperty("action");
         expect(widget.props).not.toHaveProperty("allow_legacy_proofs");
       }

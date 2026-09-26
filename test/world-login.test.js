@@ -304,3 +304,24 @@ test('login and the wallet document check are configured independently: login ne
     assert.equal(new WorldIdVerifier({ mock: false, rpId: 'rp_test', appId: 'app_test', signingKeyHex: '12'.repeat(32) }).environment, environment);
   }
 });
+
+test('a rejected login names what failed: the local check lists fields, World\'s refusal carries its code', async (t) => {
+  const login = await opened(t);
+  const c = login.challenge();
+  const bad = proofFor(c);
+  bad.responses[0].signal_hash = '0x123';
+  bad.environment = 'staging';
+  await assert.rejects(login.login({ challengeToken: c.challengeToken, proof: bad }), (error) => error.code === 'INVALID_LOGIN_PROOF' && /environment, signal_hash/.test(error.message));
+
+  const selfie = await opened(t);
+  const s = selfie.challenge();
+  const proof = proofFor(s);
+  Object.assign(proof.responses[0], { identifier: 'selfie', issuer_schema_id: 11, sybil_score: 3 });
+  selfie.fetchImpl = async (_url, init) => ({ ok: true, json: async () => ({ success: true, environment: 'sandbox', session_id: JSON.parse(init.body).session_id, results: [{ identifier: 'selfie', success: true }] }) });
+  const result = await selfie.login({ challengeToken: s.challengeToken, proof });
+  assert.equal(result.account.environment, 'sandbox', 'sandbox accepts Selfie Check, the credential World documents for it');
+
+  const refused = await opened(t, { fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ success: false, code: 'invalid_action', detail: 'Action not found for this app' }) }) });
+  const r = refused.challenge();
+  await assert.rejects(refused.login({ challengeToken: r.challengeToken, proof: proofFor(r) }), (error) => error.code === 'WORLD_LOGIN_REJECTED' && /invalid_action · Action not found for this app/.test(error.message));
+});

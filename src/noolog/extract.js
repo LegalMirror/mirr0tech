@@ -28,7 +28,7 @@ Schema: ${JSON.stringify(astSchema)}`;
 export function instructionsFor(config = { profile: 'rwa-secondary' }) {
   const actions = enforceableActions(config, ACTIONS);
   return `${INSTRUCTIONS}
-This deployment enforces these actions only: ${actions.join(', ')}. Emit rules for no other action; put obligations about anything else under "unresolved". Emit a term only for a number the agreement states that a venue must enforce (a price, a cap, a period); every other number belongs under "unresolved".`;
+This deployment enforces these actions only: ${actions.join(', ')}. Emit rules for no other action; put obligations about anything else under "unresolved". Emit a term only for a number the agreement states that a venue must enforce (a price, a cap, a period); every other number belongs under "unresolved". Every rule and every term carries a "rationale".`;
 }
 
 /// What the deployment cannot enforce is demoted to "unresolved" rather than failing the compile:
@@ -37,17 +37,17 @@ This deployment enforces these actions only: ${actions.join(', ')}. Emit rules f
 export function fitToProfile(ast, config = { profile: 'rwa-secondary' }) {
   const components = profileComponents(config);
   const demoted = [];
-  const rules = ast.rules.filter((rule) => {
+  const rules = (ast.rules ?? []).filter((rule) => {
     const kept = components.some((component) => component.kind === 'venue' && component.coversRule(rule, config));
-    if (!kept) demoted.push({ kind: 'rule', id: rule.id, action: rule.action, clause: rule.source.clause });
+    if (!kept) demoted.push({ kind: 'rule', id: rule.id, action: rule.action, clause: rule.source?.clause ?? 'unknown' });
     return kept;
   });
-  const terms = ast.terms.filter((term) => {
+  const terms = (ast.terms ?? []).filter((term) => {
     const kept = components.some((component) => component.coversTerm(term, config));
-    if (!kept) demoted.push({ kind: 'term', name: term.name, clause: term.source.clause });
+    if (!kept) demoted.push({ kind: 'term', name: term.name, clause: term.source?.clause ?? 'unknown' });
     return kept;
   });
-  const unresolved = [...ast.unresolved, ...demoted.map((entry) => ({
+  const unresolved = [...(ast.unresolved ?? []), ...demoted.map((entry) => ({
     clause: entry.clause,
     description: entry.kind === 'rule' ? `No venue in this deployment enforces the action "${entry.action}" (rule ${entry.id}); it stays a contractual obligation.` : `No component in this deployment consumes the term "${entry.name}"; it stays a contractual value.`,
   }))];
@@ -123,7 +123,9 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     // wait matches the policy's own job timeout (an hour). The mock answers at once.
     const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 3000), timeoutMs: 60 * 60_000, onProgress });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
-    const { ast, demoted } = fitToProfile(validateAst(parseAstText(state.result), document.text), config);
+    // Demote first: what this deployment cannot enforce need not be well-formed to be set aside.
+    const { ast: fitted, demoted } = fitToProfile(parseAstText(state.result), config);
+    const ast = validateAst(fitted, document.text);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);
     const verification = { ...verificationFrom({ jobId, details, references }), mock: Boolean(server), model: MODEL };
     return {
@@ -155,7 +157,8 @@ export async function extractWithOpenAI({ profile = 'rwa-secondary', document, d
   const completion = await response.json();
   const content = completion.choices?.[0]?.message?.content;
   if (!content) throw new Error('The model returned no content');
-  const { ast, demoted } = fitToProfile(validateAst(parseAstText(content), document.text), config);
+  const { ast: fitted, demoted } = fitToProfile(parseAstText(content), config);
+  const ast = validateAst(fitted, document.text);
   return {
     envelope: {
       ast, extraction: { provider: 'openai', model: completion.model ?? model, responseId: completion.id ?? null, baseUrl: base, demoted },

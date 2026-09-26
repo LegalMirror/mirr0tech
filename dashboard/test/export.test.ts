@@ -117,6 +117,20 @@ describe("anchorFor", () => {
   });
 });
 
+describe("verification export", () => {
+  it("carries the deliberation's verdicts and a confidence per rule", async () => {
+    const policy = await compiled("wildcat-credit");
+    const v = policy.verification!;
+    expect(v.provider).toBe("noolog");
+    expect(v.mock).toBe(true);
+    expect(v.agents).toEqual(["extractor", "critic"]);
+    expect(v.confidence.overall).toBeGreaterThan(0.5);
+    expect(v.confidence.overall).toBeLessThanOrEqual(1);
+    for (const rule of policy.rules) expect(v.confidence.byRef[`rule:${rule.id}`]).toBe(1);
+    expect(v.claims.every((c) => c.verdicts.length > 0)).toBe(true);
+  });
+});
+
 describe("buyback export", () => {
   it("decodes the strategy into instructions that carry the policy hash and the addendum terms", async () => {
     const policy = await compiled("wildcat-credit");

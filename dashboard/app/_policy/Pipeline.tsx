@@ -7,7 +7,8 @@ import { factKind, FACT_KIND_LABEL } from "@/lib/facts";
 import { short } from "@/lib/format";
 import { actionLabel, EFFECT_LABEL, EFFECT_SENTENCE, factLabel, termLabel, venueLabel } from "@/lib/labels";
 import type { Condition, PolicyData, Rule, Term } from "@/lib/types";
-import { ClauseTableBadge, EffectChip, HexCopy, toneOf } from "../_components/common";
+import { claimsFor, confidenceLabel } from "@/lib/verification";
+import { ClauseTableBadge, EffectChip, Glyph, HexCopy, toneOf } from "../_components/common";
 import { Evaluator, type EvaluatorProps } from "./Evaluator";
 
 /** A pipeline step. With `folded`, it renders closed with that one-line summary and opens on click. */
@@ -57,18 +58,47 @@ function Step({
   );
 }
 
+function ClaimVerdicts({ policy, reference }: { policy: PolicyData; reference: string }) {
+  const claims = claimsFor(policy.verification, reference);
+  if (!claims.length) return null;
+  const score = policy.verification?.confidence.byRef[reference];
+  return (
+    <ul className="claims" aria-label="What the deliberation established">
+      {claims.map((claim) => (
+        <li
+          key={claim.key}
+          title={claim.verdicts
+            .map((v) => `${v.agent}: ${v.verdict}${v.reason ? ` — ${v.reason}` : ""}`)
+            .join("\n")}
+        >
+          <Glyph state={claim.score === 1 ? "true" : claim.score === 0 ? "false" : "unknown"} />{" "}
+          <span>{claim.claim}</span>{" "}
+          <span className="meta">{claim.verdicts.map((v) => `${v.verdict} by ${v.agent}`).join(", ")}</span>
+        </li>
+      ))}
+      {score !== undefined && (
+        <li className="meta">
+          confidence {score.toFixed(2)} ({confidenceLabel(score)})
+        </li>
+      )}
+    </ul>
+  );
+}
+
 function QuoteStep({
   policy,
   quote,
   clause,
   locations,
   tone,
+  reference,
 }: {
   policy: PolicyData;
   quote: string;
   clause: string;
   locations: Rule["quotes"];
   tone: string;
+  reference: string;
 }) {
   const first = locations[0];
   const verbatim = first && policy.text.slice(first.start, first.end) === quote;
@@ -98,6 +128,7 @@ function QuoteStep({
           {verbatim ? "✓ verbatim" : "✗ not found in the text"}
         </span>
       </div>
+      <ClaimVerdicts policy={policy} reference={reference} />
     </Step>
   );
 }
@@ -335,6 +366,7 @@ function RuleSteps({
         clause={rule.source.clause}
         locations={rule.quotes}
         tone={tone}
+        reference={`rule:${rule.id}`}
       />
 
       <Step n={2} title="What it means" tone={tone}>
@@ -412,6 +444,7 @@ function TermSteps({ policy, term }: { policy: PolicyData; term: Term }) {
         clause={term.source.clause}
         locations={term.quotes}
         tone={tone}
+        reference={`term:${term.name}`}
       />
       <Step n={2} title="The value" tone={tone}>
         <p className="plain-head">

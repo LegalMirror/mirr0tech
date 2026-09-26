@@ -11,6 +11,7 @@ import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { buildOnchainPolicy } from '../src/policy/onchain.js';
 import { auditEvents } from '../src/audit-events.js';
+import { deliberateExtraction } from '../src/noolog/deliberate.js';
 import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -406,6 +407,8 @@ export async function exportProfile(spec) {
   const compiled = compilePolicy(envelope, config, document, { demo: true });
   const onchain = buildOnchainPolicy(envelope.ast);
   if (onchain.clauseTableHash !== compiled.policy.clauseTableHash) throw new Error('On-chain policy disagrees with the compiled policy');
+  // The extraction goes through a Noolog deliberation: agents check every claim against the text.
+  const { finalResult: _finalResult, ...verification } = await deliberateExtraction({ profile: spec.profile, envelope, document });
 
   // Per-part display text, and each part's offset inside the bundled normalized text.
   const parts = [];
@@ -462,6 +465,7 @@ export async function exportProfile(spec) {
     demo: compiled.policy.demo,
     config,
     extraction: envelope.extraction,
+    verification,
     factOrder: onchain.facts,
     actionOrder: onchain.actions,
     text: document.text,

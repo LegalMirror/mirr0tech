@@ -63,6 +63,10 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 
 Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
 
+## How we used Noolog
+
+An extraction is a set of claims about a document; a model can make them up. `src/noolog/` submits the candidate extraction and the document as a deliberation job (`POST /deliberation`, agents `extractor` and `critic`), polls `/result`, then reads `/details` and `/references`: every claim (each rule's quote and facts, each term, each open item) carries the evaluators' verdicts (`verified | contested | unverified | wrong`), a refined proposal wins, and the report becomes `verification` in the policy export. The dashboard shows it on the intro (claims verified, confidence), under every sentence (verdict per claim) and in Provenance (job, agents, rounds, convergence). With no `NOOLOG_API_KEY` the in-process mock (`src/noolog/mock.js`) serves the same routes and status codes with a mechanical critic (verbatim check, fact schema check, open items unverified); `test/noolog.test.js` runs the whole loop over HTTP and shows a forged quote refuted and dropped.
+
 ## How we used Curvegrid MultiBaas
 
 `src/multibaas.js` uploads every contract's ABI and bytecode under a label and a policy-hash version (`policy-<hash8>`), aliases and links each address (`attestor`, `fund_hook`, `role_provider`, `swapvm_router`, …), so MultiBaas indexes `Attested`/`Revoked`/`Overridden`, `CredentialDecision`, `PolicyChecked`, Aqua's `Pushed`/`Pulled` and the router's `Swapped`. The stack API serves them at `GET /v1/stack/events` and the audit screen reads that. `npm run deploy:sepolia` deploys and registers; `test/multibaas.test.js` covers it against a fake client.

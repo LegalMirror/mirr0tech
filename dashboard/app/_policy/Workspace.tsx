@@ -6,6 +6,7 @@ import type { Facts } from "@/lib/evaluate";
 import { useResource } from "@/lib/hooks";
 import { effectiveFacts } from "@/lib/parties";
 import { actionLabel, EFFECT_LABEL, termLabel } from "@/lib/labels";
+import { verificationSentence } from "@/lib/verification";
 import { pipelineRefs, ruleRef, termRef } from "@/lib/segments";
 import type { PolicyData } from "@/lib/types";
 import { short } from "@/lib/format";
@@ -22,6 +23,14 @@ function Intro({ policy }: { policy: PolicyData }) {
         Act {policy.act} · {policy.parties.map((party) => `${party.name} (${party.role})`).join(" · ")} →{" "}
         {policy.venue}
       </div>
+      {policy.verification && (
+        <div className="meta verified-line">
+          <span className={`chip chip-${policy.verification.confidence.overall >= 0.9 ? "ok" : "review"}`}>
+            ✓ extraction verified by deliberation
+          </span>{" "}
+          {verificationSentence(policy.verification)}
+        </div>
+      )}
     </div>
   );
 }
@@ -60,6 +69,18 @@ function Provenance({ policy }: { policy: PolicyData }) {
           {policy.extraction.provider}
           {policy.demo && " · demo build, unresolved terms allowed"}
         </dd>
+        {policy.verification && (
+          <>
+            <dt>deliberation</dt>
+            <dd>
+              Noolog job <code>{policy.verification.jobId}</code>
+              {policy.verification.mock ? " (mock orchestrator, no model)" : ""} · agents{" "}
+              {policy.verification.agents.join(", ")} · {policy.verification.rounds} rounds · winner{" "}
+              {policy.verification.winner?.agent} (score {policy.verification.winner?.score?.toFixed(2)}) ·
+              convergence {policy.verification.convergence?.toFixed(2)}
+            </dd>
+          </>
+        )}
         <dt>deployed</dt>
         <dd>
           <Deployed profile={policy.profile} />

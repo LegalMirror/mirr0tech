@@ -1948,3 +1948,16 @@ blockquote.why {
   max-width: 100%;
   height: auto;
 }
+
+.claims {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+.claims li {
+  padding: 1px 0;
+}
+.verified-line {
+  margin-top: 4px;
+}

@@ -169,6 +169,7 @@ The compiler is a resolver over a library of audited components. Each declares `
 | `src/worldid.js` | World ID verifier, mock proofs, `HumanRegistry` |
 | `src/agreements.js`, `src/agreements-api.js` | agreement store + lifecycle + AST graph; `/v1/agreements*`, `/v1/status` |
 | `src/payments.js` | payment rail webhook: signature check, `depositConfirmed`, mint under policy or hold |
+| `src/multibaas.js`, `src/multibaas-signer.js` | MultiBaas registration + event index; the operator key as a Cloud Wallet (HSM) signer, `SIGNER=multibaas` |
 | `src/solc.js` | compiler bundles, one compile path for the build script and the runtime deploy |
 | `src/venues.js`, `src/venues-api.js`, `src/dashboard-api.js` | stack service, `/v1/stack/*`, dashboard adapter |
 | `src/app.js`, `src/server.js` | Express app, auth, error envelope |

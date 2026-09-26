@@ -2,7 +2,7 @@
 // queries cover every mirr0tech contract: the attestor's Attested/Revoked, the role provider's
 // CredentialDecision, the hook's PolicyChecked, Aqua's Pushed/Pulled and the router's Swapped.
 // MultiBaas only sees chains it supports, so this runs after a Sepolia (or other public) deploy.
-import { Configuration, ContractsApi, AddressesApi, EventsApi } from '@curvegrid/multibaas-sdk';
+import { Configuration, ContractsApi, AddressesApi, EventsApi, HsmApi } from '@curvegrid/multibaas-sdk';
 import { loadArtifacts } from './deploy.js';
 
 const label = (name) => `mirr0tech_${name.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase()}`;
@@ -10,7 +10,7 @@ const label = (name) => `mirr0tech_${name.replace(/([a-z0-9])([A-Z])/g, '$1_$2')
 export function multibaasClient({ url = process.env.MULTIBAAS_URL, apiKey = process.env.MULTIBAAS_API_KEY } = {}) {
   if (!url || !apiKey) throw new Error('Set MULTIBAAS_URL and MULTIBAAS_API_KEY');
   const configuration = new Configuration({ basePath: `${url.replace(/\/$/, '')}/api/v0`, accessToken: apiKey });
-  return { url, contracts: new ContractsApi(configuration), addresses: new AddressesApi(configuration), events: new EventsApi(configuration) };
+  return { url, contracts: new ContractsApi(configuration), addresses: new AddressesApi(configuration), events: new EventsApi(configuration), hsm: new HsmApi(configuration) };
 }
 
 // Everything in a deployment record, with the artifact each address was built from.
@@ -45,7 +45,8 @@ const tolerate = async (promise, accept = /already|exists|conflict/i) => {
 
 /// Uploads each contract (label + version + ABI + bytecode), aliases its address and links the two,
 /// so MultiBaas starts indexing that address's events under the contract's ABI.
-export async function syncDeployment(record, { client = multibaasClient(), startingBlock = 'earliest', log = () => {} } = {}) {
+// MultiBaas indexes from `startingBlock`: absolute, or relative to the head (`-50000` ≈ a week of Sepolia).
+export async function syncDeployment(record, { client = multibaasClient(), startingBlock = process.env.MULTIBAAS_STARTING_BLOCK ?? '-50000', log = () => {} } = {}) {
   const results = [];
   for (const entry of await deploymentContracts(record)) {
     const contractLabel = label(entry.name);
@@ -54,10 +55,11 @@ export async function syncDeployment(record, { client = multibaasClient(), start
       rawAbi: JSON.stringify(entry.artifact.abi), bin: entry.artifact.bytecode,
     }));
     const address = await tolerate(client.addresses.setAddress({ alias: entry.alias, address: entry.address }));
-    const link = await tolerate(client.contracts.linkAddressContract(entry.alias, { label: contractLabel, version: entry.version, startingBlock }));
+    // A plan caps linked contracts and log depth; a link the plan refuses is reported, not fatal.
+    const link = await tolerate(client.contracts.linkAddressContract(entry.alias, { label: contractLabel, version: entry.version, startingBlock }), /already|exists|conflict|plan/i);
     const outcome = { alias: entry.alias, address: entry.address, contract: contractLabel, version: entry.version,
-      created: !contract?.skipped, aliased: !address?.skipped, linked: !link?.skipped };
-    log(`${entry.alias.padEnd(22)} ${entry.address}  ${contractLabel}@${entry.version}${outcome.linked ? '' : ' (already linked)'}`);
+      created: !contract?.skipped, aliased: !address?.skipped, linked: !link?.skipped, ...(link?.skipped ? { note: link.skipped } : {}) };
+    log(`${entry.alias.padEnd(22)} ${entry.address}  ${contractLabel}@${entry.version}${outcome.linked ? '' : ` (${link.skipped})`}`);
     results.push(outcome);
   }
   return results;

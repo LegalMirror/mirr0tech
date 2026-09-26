@@ -19,8 +19,10 @@ export const DEMO_WALLETS = ['Investor', 'Stranger', 'Lender A', 'Lender B', 'Le
 
 export class VenueService {
   /// `auditPath` keeps the audit across restarts; without it the audit lives in memory only.
-  constructor({ provider, signer, record, multibaas = null, auditPath = null, worldId = null, log = () => {} }) {
-    Object.assign(this, { provider, signer, record, multibaas, auditPath, log, audit: [], orders: [] });
+  /// `policies` ({ rwa: { policy, clauseTable }, credit }) may be given for a venue over another
+  /// compiled agreement; otherwise the built artifacts' policies apply.
+  constructor({ provider, signer, record, multibaas = null, auditPath = null, worldId = null, policies = null, log = () => {} }) {
+    Object.assign(this, { provider, signer, record, multibaas, auditPath, log, policies, audit: [], orders: [] });
     this.worldId = worldId ?? { verifier: new WorldIdVerifier(), registry: new HumanRegistry(null) };
   }
 
@@ -33,7 +35,7 @@ export class VenueService {
   async init() {
     const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'PoolManager']);
     const credit = await loadArtifacts('wildcat-credit', ['PolicyOracle', 'MirrortechRoleProvider', 'MockWildcatMarket', 'MirrortechRouter', 'Aqua']);
-    this.policies = { rwa: { policy: rwa.policy, clauseTable: rwa.clauseTable }, credit: { policy: credit.policy, clauseTable: credit.clauseTable } };
+    this.policies ??= { rwa: { policy: rwa.policy, clauseTable: rwa.clauseTable }, credit: { policy: credit.policy, clauseTable: credit.clauseTable } };
     const at = (address, artifact, signer = this.signer) => new Contract(address, artifact.abi, signer);
     const r = this.record;
     this.c = {

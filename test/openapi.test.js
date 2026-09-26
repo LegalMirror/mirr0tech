@@ -12,7 +12,7 @@ test('the OpenAPI document describes every operation with a tag and responses, w
   for (const [route, methods] of Object.entries(document.paths)) {
     assert.match(route, /^\/(health|openapi\.json|v1\/|webhooks\/)/, route);
     for (const [method, operation] of Object.entries(methods)) {
-      assert.ok(['get', 'post', 'patch'].includes(method), `${method} ${route}`);
+      assert.ok(['get', 'post', 'put', 'patch'].includes(method), `${method} ${route}`);
       assert.ok(operation.summary && operation.tags?.length === 1 && tags.has(operation.tags[0]), `${method} ${route} is tagged`);
       assert.ok(Object.keys(operation.responses).some((code) => code.startsWith('2')), `${method} ${route} has a success response`);
       for (const [name] of (route.match(/\{(\w+)\}/g) ?? []).map((m) => [m.slice(1, -1)])) assert.ok(operation.parameters?.some((p) => p.name === name && p.in === 'path'), `${route} declares {${name}}`);

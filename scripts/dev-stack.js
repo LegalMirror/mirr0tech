@@ -52,7 +52,14 @@ const host = process.env.HOST ?? '127.0.0.1';
 const policyData = loadPolicyData();
 const agreements = await new Agreements({
   path: `${dataDir}/agreements-${record.chainId}.json`, log: (line) => console.log(`agreement ${line}`),
-  deployer: ({ sources }) => deployFund(signer, { record, sources, log: console.log }),
+  deployer: ({ sources }) => deployFund(venues.signer, { record, sources, log: console.log }),
+  // One venue per deployed agreement: its token, oracle and hook; the stack's attestor, sanctions oracle and pool manager.
+  venueFactory: ({ id, deployment, policy, clauseTable, credential, action }) => new VenueService({
+    provider, signer: venues.signer, multibaas, policies: { rwa: { policy, clauseTable }, credit: venues.policies.credit },
+    record: { ...record, rwa: { ...record.rwa, policyHash: policy.hash, clauseTableHash: clauseTable.clauseTableHash, oracle: deployment.oracle, token: deployment.token, hook: deployment.hook, hookSalt: deployment.hookSalt }, address: deployment.token, policyHash: policy.hash },
+    worldId: { verifier: new WorldIdVerifier({ credential, action }), registry: worldId.registry },
+    auditPath: `${dataDir}/audit-${record.chainId}-${id}.json`,
+  }).init(),
 }).init();
 const server = createApp(null, apiKey, venues, policyData, process.env.VIEWER_KEY ?? null, agreements).listen(Number(process.env.PORT ?? 3000), host, () =>
   console.log(`\nmirr0tech stack API: http://${host}:${server.address().port}/v1/stack (chain ${record.chainId}, bearer ${apiKey === 'local-dev-stack-operator-key-only' ? 'local-dev-stack-operator-key-only' : '<API_KEY>'})`));

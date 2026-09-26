@@ -11,6 +11,9 @@ The core loop as REST: **upload → generate → verify → compile → deploy**
 | POST | `/v1/agreements` | `{ name, documents: [{ name, text }] }` or `{ name, text, filename? }`; optional `profile` (default `rwa-secondary`), `config` | `201` summary in `extracting`; the run continues in the background |
 | GET | `/v1/agreements/:id` | — | summary + `export` (`null` until `verified`; then the `ui/policy-<profile>.json` shape: rules with `clauseId`, `dnf`, `quotes`; terms; unresolved; clauseTable; programs; coverage; verification; documents with display text) |
 | GET | `/v1/agreements/:id/ast` | — | `{ nodes, edges }` for the Contract-AST view; `409` until `compiled` |
+| GET | `/v1/agreements/:id/constraints` | — | `{ identity: { credential, actions, clause, quote } \| null }` |
+| PUT | `/v1/agreements/:id/constraints` | `{ identity: { credential?, actions?, quote?, clause? } \| null }` | the summary, recompiled (`compiled`, new `policyHash`, `deployment: null`); `400 QUOTE_NOT_FOUND` when the quote is not verbatim in the document |
+| * | `/v1/agreements/:id/stack/*` | as `/v1/stack/*` | the same venue routes over **this agreement's** token, oracle and hook (`wallets`, `explain`, `facts`, `worldid`, `rwa/mint`, `rwa/release`, `rwa/liquidity`, `rwa/swap`, `audit`, `events`); `409` until `deployed` |
 | POST | `/v1/agreements/:id/regenerate` | — | `202` summary in `extracting`; allowed from `verified`, `compiled`, `deployed`, `failed` |
 | POST | `/v1/agreements/:id/deploy` | — | `202` summary in `deploying`; `409` unless `compiled`; `503 NO_CHAIN` when the gateway has no signer |
 
@@ -20,6 +23,26 @@ AST graph: `nodes: [{ id, kind, label, status?, … }]`, `kind ∈ agreement | a
 
 Errors: `400 INVALID_BODY`, `400 UNKNOWN_PROFILE`, `400 INVALID_DOCUMENT` (unsupported extension, empty, over 2 MB), `401 UNAUTHORIZED`, `404 NOT_FOUND`, `409 INVALID_STATE` (wrong state, or a job already in flight), `413 BODY_TOO_LARGE`, `503 NO_CHAIN`. A background failure is on the record: `status: "failed"`, `error: <message>` for generation; a failed deploy returns to `compiled` with `error: "Deploy failed: …"`. A restart mid-job marks the record `failed` (`Interrupted while extracting`).
 
+## The flow
+
+One agreement, one issuer, one token: **login → upload → (the AST compiles) → put a World ID constraint on it → deploy → the policy-hooked pool is live**. The constraint step is the issuer's trust decision: which credential (`document` for KYC, `proof_of_human` where a person is enough, `selfie` for liveness), on which actions (`mint`, `transfer`, `burn`), anchored to the sentence of the agreement that asks for it. The rule and the credential are inside the policy hash, so the deployed token carries that choice; the gateway's verifier for that agreement accepts only that credential (`WRONG_CREDENTIAL` otherwise, the alternative path).
+
+`scripts/mirr0.js` (`npm run cli --` or `npx mirr0`) is the flow from a terminal; `test/chain/flow.test.js` runs it end to end on anvil:
+
+```sh
+mirr0 login http://127.0.0.1:3000 local-dev-stack-operator-key-only
+mirr0 upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL   # → agr_…  extracting
+mirr0 show agr_… --wait compiled && mirr0 ast agr_…
+mirr0 constrain agr_… --credential document --actions mint,transfer
+mirr0 deploy agr_… --wait                                             # oracle, token, hook, pool
+mirr0 facts agr_… Investor kycApproved=true amlApproved=true sanctionsClear=true
+mirr0 explain agr_… Investor                                          # refused — transfer-identity-verified
+mirr0 verify agr_… Investor                                           # World ID proof (mock without --proof)
+mirr0 fund agr_… Investor 10000 && mirr0 mint agr_… 10000 && mirr0 release agr_… Investor 5000
+mirr0 pool agr_… liquidity Investor && mirr0 pool agr_… swap Investor # through the hook
+mirr0 pool agr_… swap Stranger                                        # POLICY_REFUSED, with the sentence
+```
+
 ## Lifecycle
 
 ```mermaid
@@ -28,6 +51,8 @@ stateDiagram-v2
     uploaded --> extracting: deliberation started
     extracting --> verified: AST validated against the text, verdicts attached
     verified --> compiled: policyHash, clauseTableHash, DNF programs, Solidity, equivalence proof
+    compiled --> compiled: PUT /constraints (new hash)
+    deployed --> compiled: PUT /constraints (deploy again)
     compiled --> deploying: POST /deploy
     deploying --> deployed: oracle, token, hook, pool on chain
     deploying --> compiled: deploy error (error set)

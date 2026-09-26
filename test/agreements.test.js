@@ -137,3 +137,42 @@ test('records survive a restart; an interrupted job is reported, not resumed', a
   const third = await new Agreements({ path }).init();
   assert.ok(third.list().every((entry) => entry.status === 'failed' && /Interrupted/.test(entry.error)));
 });
+
+test('the issuer puts a World ID constraint on the agreement: credential and actions, quoting the sentence; the hash moves', async () => {
+  const agreements = new Agreements();
+  const record = await upload(agreements);
+  const before = agreements.constraints(record.id);
+  assert.deepEqual(before.identity.actions, ['mint', 'transfer']);
+  assert.equal(before.identity.credential, 'document');
+  assert.match(before.identity.quote, /Know-your-customer/);
+
+  const changed = await agreements.constrain(record.id, { identity: { credential: 'proof_of_human', actions: ['transfer', 'burn'] } });
+  assert.equal(changed.status, 'compiled');
+  assert.notEqual(changed.policyHash, record.policyHash, 'the credential and the rules are inside the hash');
+  const after = agreements.constraints(record.id);
+  assert.deepEqual(after.identity, { credential: 'proof_of_human', actions: ['transfer', 'burn'], clause: before.identity.clause, quote: before.identity.quote });
+  const rules = agreements.get(record.id).export.rules.filter((rule) => rule.id.endsWith('-identity-verified'));
+  assert.deepEqual(rules.map((rule) => rule.id), ['transfer-identity-verified', 'burn-identity-verified']);
+  assert.match(rules[0].rationale, /proof of human/);
+  assert.equal(agreements.get(record.id).history.filter((entry) => entry.status === 'compiled').length, 2);
+  const nodes = agreements.ast(record.id).nodes;
+  assert.equal(nodes.find((node) => node.id === 'rule:burn-identity-verified').status, 'unverified', 'a rule the issuer added has no verdict');
+  assert.notEqual(nodes.find((node) => node.id === 'rule:transfer-identity-verified').status, 'unverified', 'the deliberation\'s verdict on the sentence stands');
+
+  const lifted = await agreements.constrain(record.id, { identity: null });
+  assert.equal(agreements.constraints(record.id).identity, null);
+  assert.notEqual(lifted.policyHash, changed.policyHash);
+  await assert.rejects(agreements.constrain(record.id, { identity: { credential: 'document' } }), (error) => error.status === 400 && /quote/.test(error.message), 'no rule left to borrow the sentence from');
+  const restored = await agreements.constrain(record.id, { identity: { credential: 'document', actions: ['mint', 'transfer'], quote: before.identity.quote, clause: before.identity.clause } });
+  assert.deepEqual(agreements.constraints(record.id), before);
+  assert.notEqual(restored.policyHash, lifted.policyHash);
+
+  await assert.rejects(agreements.constrain(record.id, { identity: { credential: 'retina' } }), (error) => error.code === 'INVALID_BODY');
+  await assert.rejects(agreements.constrain(record.id, { identity: { actions: ['fly'] } }), (error) => error.code === 'INVALID_BODY');
+  await assert.rejects(agreements.constrain(record.id, { identity: { quote: 'not in the agreement' } }), (error) => error.code === 'QUOTE_NOT_FOUND');
+  await assert.rejects(agreements.constrain(record.id, { identity: [] }), (error) => error.code === 'INVALID_BODY');
+  agreements.regenerate(record.id);
+  await assert.rejects(agreements.constrain(record.id, { identity: null }), (error) => error.status === 409, 'not while a job runs');
+  await agreements.settled();
+  await assert.rejects(agreements.venue(record.id), (error) => error.status === 503, 'no chain here');
+});

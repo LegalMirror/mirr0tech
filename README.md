@@ -87,6 +87,20 @@ Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right g
 
 `deploy/` is a Coolify-shaped Compose stack (`anvil` + `api` + `dashboard`): [docs/deploy.md](docs/deploy.md). `.github/workflows/pages.yml` publishes the static dashboard to GitHub Pages on every push.
 
+### The flow from a terminal
+
+```sh
+npm run dev:stack &                      # anvil + the stack + the gateway on :3000
+npx mirr0 login http://127.0.0.1:3000 local-dev-stack-operator-key-only
+npx mirr0 upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL && npx mirr0 show <id> --wait compiled
+npx mirr0 constrain <id> --credential document --actions mint,transfer   # the World ID trust decision, in the hash
+npx mirr0 deploy <id> --wait                                             # oracle, token, hook, pool
+npx mirr0 verify <id> Investor && npx mirr0 fund <id> Investor 10000 && npx mirr0 mint <id> 10000 && npx mirr0 release <id> Investor 5000 && npx mirr0 pool <id> liquidity Investor
+npx mirr0 pool <id> swap Stranger                                        # refused, with the sentence
+```
+
+Every command is one call of the [agreements API](docs/AGREEMENTS_API.md); `GET /docs` is the Swagger UI over all of it.
+
 ### Sepolia
 
 Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json` is the record (`DEPLOYMENT_PATH=deployments/sepolia.json npm run dev:stack` serves it without redeploying). Policy hashes are the same bytes as the local build.

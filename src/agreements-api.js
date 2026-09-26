@@ -1,5 +1,6 @@
 // The agreement lifecycle over HTTP: upload, watch it generate and compile, see the tree, deploy.
 import { Router } from 'express';
+import { venueRoutes } from './venues-api.js';
 import { ensure } from './errors.js';
 import { MODEL } from './noolog/extract.js';
 import { compilerVersions } from './solc.js';
@@ -32,6 +33,17 @@ export function agreementRoutes(agreements, status) {
   }));
   router.get('/agreements/:id', wrap(200, (req) => agreements.get(req.params.id)));
   router.get('/agreements/:id/ast', wrap(200, (req) => agreements.ast(req.params.id)));
+  router.get('/agreements/:id/constraints', wrap(200, (req) => agreements.constraints(req.params.id)));
+  router.put('/agreements/:id/constraints', wrap(200, (req) => {
+    ensure(req.body && typeof req.body === 'object' && 'identity' in req.body, 400, 'INVALID_BODY', 'Expected fields: identity ({ credential, actions, quote?, clause? } or null)');
+    return agreements.constrain(req.params.id, req.body);
+  }));
+  // The deployed agreement's own venue: the stack routes, over its token, oracle and hook.
+  const venueRouters = new Map();
+  router.use('/agreements/:id/stack', (req, res, next) => agreements.venue(req.params.id).then((venue) => {
+    if (venueRouters.get(req.params.id)?.venue !== venue) venueRouters.set(req.params.id, { venue, routes: venueRoutes(venue) });
+    venueRouters.get(req.params.id).routes(req, res, next);
+  }).catch(next));
   router.post('/agreements/:id/regenerate', wrap(202, (req) => agreements.regenerate(req.params.id)));
   router.post('/agreements/:id/deploy', wrap(202, (req) => agreements.deploy(req.params.id)));
   return router;

@@ -9,12 +9,20 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
-import { validateAst } from './policy/schema.js';
+import { ACTIONS, validateAst } from './policy/schema.js';
+import { CREDENTIALS, DEFAULT_ACTION } from './worldid.js';
 import { extractWithNoolog } from './noolog/extract.js';
 import { PROFILES, exportCompiled } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
 
 export const STATES = ['uploaded', 'extracting', 'verified', 'compiled', 'deploying', 'deployed', 'failed'];
+// Why this credential is the minimum sufficient assurance, in the rule's own words.
+const IDENTITY_RATIONALE = {
+  document: 'KYC is an identity check, so the proportionate credential is a government document: a World ID Passport/NFC credential, verified by the gateway and bound to the wallet, satisfies it; its nullifier keeps one person from onboarding twice.',
+  proof_of_human: 'The agreement asks for a person behind the wallet, not who: a World ID proof of human, verified by the gateway and bound to the wallet, is the minimum sufficient credential; its nullifier keeps one person from onboarding twice.',
+  selfie: 'The agreement asks for a live person behind the wallet: a World ID selfie check, verified by the gateway and bound to the wallet, satisfies it; its nullifier keeps one person from onboarding twice.',
+};
+const isIdentityRule = (rule) => rule.id.endsWith('-identity-verified');
 const REGENERATE_FROM = ['verified', 'compiled', 'deployed', 'failed'];
 const now = () => new Date().toISOString();
 
@@ -56,8 +64,9 @@ export function astGraph({ title, rules, terms, unresolved, verification }) {
 
 export class Agreements {
   /// `extract` and `deployer` are injectable: the deliberation client and the chain deploy.
-  constructor({ path = null, extract = extractWithNoolog, deployer = null, log = () => {} } = {}) {
-    Object.assign(this, { path, extract, deployer, log, records: new Map(), exports: new Map(), jobs: new Map() });
+  /// `venueFactory` builds the operator service over one deployed agreement's token, oracle and hook.
+  constructor({ path = null, extract = extractWithNoolog, deployer = null, venueFactory = null, log = () => {} } = {}) {
+    Object.assign(this, { path, extract, deployer, venueFactory, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
   }
 
   async init() {
@@ -127,6 +136,7 @@ export class Agreements {
     ensure(!this.jobs.has(id), 409, 'INVALID_STATE', 'Agreement has a job in flight');
     const spec = PROFILES.find((entry) => entry.profile === record.profile);
     this.exports.delete(id);
+    this.venues.delete(id);
     this.transition(record, 'extracting', { error: null, extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null });
     const job = (async () => {
       try {
@@ -165,6 +175,60 @@ export class Agreements {
     return this.exports.get(id);
   }
 
+  /// The identity constraint the issuer put on the agreement: which World ID credential, on which actions.
+  constraints(id) {
+    const record = this.record(id);
+    ensure(record.envelope, 409, 'INVALID_STATE', `Agreement is ${record.status}; nothing compiled yet`);
+    const rules = record.envelope.ast.rules.filter(isIdentityRule);
+    return { identity: rules.length ? { credential: record.config.worldId?.credential ?? 'document', actions: rules.map((rule) => rule.action), clause: rules[0].source.clause, quote: rules[0].source.quote } : null };
+  }
+
+  /// Puts a World ID constraint on the agreement (or lifts it with `identity: null`): a `require
+  /// identityVerified` rule per action, quoting the sentence it enforces, and the credential in the
+  /// config. Both are inside the policy hash, so the agreement recompiles and must be deployed again.
+  async constrain(id, { identity } = {}) {
+    const record = this.record(id);
+    ensure(record.envelope && !this.jobs.has(id), 409, 'INVALID_STATE', `Agreement is ${record.status}`);
+    ensure(identity === null || (identity && typeof identity === 'object' && !Array.isArray(identity)), 400, 'INVALID_BODY', 'identity: { credential, actions, quote?, clause? } or null');
+    const document = this.document(record);
+    const ast = { ...record.envelope.ast, rules: record.envelope.ast.rules.filter((rule) => !isIdentityRule(rule)) };
+    const { worldId: _previous, ...config } = record.config;
+    if (identity) {
+      const { credential = 'document', actions = ['mint', 'transfer'] } = identity;
+      ensure(credential in CREDENTIALS, 400, 'INVALID_BODY', `credential must be one of ${Object.keys(CREDENTIALS).join(', ')}`);
+      ensure(Array.isArray(actions) && actions.length && actions.every((action) => ACTIONS.includes(action)), 400, 'INVALID_BODY', `actions must be among ${ACTIONS.join(', ')}`);
+      const current = this.constraints(id).identity;
+      const quote = identity.quote ?? current?.quote;
+      ensure(typeof quote === 'string' && quote.trim(), 400, 'INVALID_BODY', 'quote: the sentence of the agreement this constraint enforces');
+      ensure(document.text.includes(quote), 400, 'QUOTE_NOT_FOUND', 'The quote is not in the agreement verbatim');
+      const clause = identity.clause ?? current?.clause ?? 'Investor onboarding';
+      for (const action of [...new Set(actions)]) {
+        ast.rules.push({ id: `${action}-identity-verified`, action, effect: 'require', condition: { type: 'fact', name: 'identityVerified' }, source: { clause, quote }, rationale: IDENTITY_RATIONALE[credential] });
+      }
+      config.worldId = { credential, action: DEFAULT_ACTION };
+    }
+    validateAst(ast, document.text);
+    Object.assign(record, { envelope: { ...record.envelope, ast }, config });
+    this.exports.delete(id);
+    this.venues.delete(id);
+    const exported = this.export(id);
+    this.transition(record, 'compiled', { policyHash: exported.policyHash, clauseTableHash: exported.clauseTableHash, coverage: { total: exported.coverage.total, counts: exported.coverage.counts, rules: exported.coverage.rules, terms: exported.coverage.terms }, deployment: null, error: null });
+    await this.persist();
+    return summary(record);
+  }
+
+  /// The operator service over this agreement's deployment: facts, identity, release, the pool.
+  async venue(id) {
+    const record = this.record(id);
+    ensure(this.venueFactory, 503, 'NO_CHAIN', 'This gateway has no chain to operate on');
+    ensure(record.status === 'deployed', 409, 'INVALID_STATE', `Agreement is ${record.status}; the venue exists once deployed`);
+    if (!this.venues.has(id)) {
+      const compiled = compilePolicy(record.envelope, record.config, this.document(record), { demo: true });
+      this.venues.set(id, await this.venueFactory({ id, deployment: record.deployment, policy: compiled.policy, clauseTable: compiled.clauseTable, credential: record.config.worldId?.credential ?? 'document', action: record.config.worldId?.action ?? DEFAULT_ACTION }));
+    }
+    return this.venues.get(id);
+  }
+
   /// Token, oracle, hook and pool for this agreement, in the background; 409 unless compiled.
   deploy(id) {
     const record = this.record(id);
@@ -172,6 +236,7 @@ export class Agreements {
     ensure(record.status === 'compiled', 409, 'INVALID_STATE', `Agreement is ${record.status}; deploy needs compiled`);
     const document = this.document(record);
     const compiled = compilePolicy(record.envelope, record.config, document, { demo: true });
+    this.venues.delete(id);
     this.transition(record, 'deploying');
     const job = (async () => {
       try {

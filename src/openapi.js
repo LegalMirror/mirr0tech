@@ -73,13 +73,29 @@ export const schemas = {
     replay: { type: 'boolean', description: 'true when this event id had already settled' },
   }, ['id', 'type', 'paymentId', 'wallet', 'amount', 'status']),
   PaymentReceived: obj({ received: { type: 'boolean' }, ignored: str('Event type, when not a settling payment'), payment: { type: 'object' }, settlement: ref('Settlement') }, ['received']),
+  Constraints: obj({ identity: { type: ['object', 'null'], description: 'null lifts the constraint', properties: { credential: str('document | proof_of_human | selfie', { example: 'document' }), actions: { type: 'array', items: { type: 'string', enum: ['mint', 'burn', 'transfer'] }, example: ['mint', 'transfer'] }, quote: str('The sentence of the agreement this enforces, verbatim; defaults to the current constraint\'s'), clause: str('Where it is in the agreement') } } }),
   Facts: { type: 'object', additionalProperties: { type: 'boolean' }, description: 'Fact name → value; names come from the policy factOrder', example: { kycApproved: true, amlApproved: true, sanctionsClear: true } },
   Decision: obj({ wallet: str('Name'), address: str('Address'), action: str('Policy action'), allowed: { type: 'boolean' }, clauseId: { type: 'integer' }, clause: { type: ['object', 'null'], description: 'The deciding clause: ruleId, clause, quote' }, facts: { type: 'object' }, sanctioned: { type: 'boolean' }, screeningCurrent: { type: 'boolean' } }),
   AuditEntry: obj({ id: str('Entry id'), at: str('ISO time'), type: str('attest | worldid.verify | rwa.* | credit.* | payment.settle | sanction | override'), status: str('ok | refused | held'), txHash: { type: ['string', 'null'] }, refusal: { type: ['object', 'null'] } }, ['id', 'at', 'type', 'status']),
 };
 
+// The deployed agreement's own venue answers the same routes as the stack, over its token, oracle and hook.
+const VENUE_ROUTES = ['/wallets', '/wallets/{wallet}', '/wallets/{wallet}/explain', '/wallets/{wallet}/facts', '/worldid/context', '/wallets/{wallet}/worldid', '/wallets/{wallet}/sanction', '/wallets/{wallet}/fund', '/rwa/mint', '/rwa/release', '/rwa/pools', '/rwa/liquidity', '/rwa/swap', '/audit', '/events'];
+function agreementVenuePaths(paths, agreementId) {
+  return Object.fromEntries(VENUE_ROUTES.map((route) => [`/v1/agreements/{id}/stack${route}`, Object.fromEntries(Object.entries(paths[`/v1/stack${route}`]).map(([method, operation]) => [method, {
+    ...operation, tags: ['Agreements'], summary: `${operation.summary} (this agreement's venue)`, parameters: [agreementId, ...(operation.parameters ?? [])],
+    responses: { ...operation.responses, 409: error('The venue exists once the agreement is deployed') },
+  }]))]));
+}
+
 export function openapiDocument({ serverUrl = '/' } = {}) {
   const agreementId = { ...path('id'), description: 'Agreement id (agr_…)' };
+  const document = openapiBase(serverUrl, agreementId);
+  Object.assign(document.paths, agreementVenuePaths(document.paths, agreementId));
+  return document;
+}
+
+function openapiBase(serverUrl, agreementId) {
   return {
     openapi: '3.1.0',
     info: {
@@ -109,6 +125,14 @@ export function openapiDocument({ serverUrl = '/' } = {}) {
       },
       '/v1/agreements/{id}': { get: op('Agreements', 'One agreement with its compiled reading', { params: [agreementId], responses: { ...ok(ref('AgreementDetail')), 404: error('Unknown id') } }) },
       '/v1/agreements/{id}/ast': { get: op('Agreements', 'The tree: agreement → actions → rules → facts', { params: [agreementId], responses: { ...ok(ref('AstGraph')), 404: error('Unknown id'), 409: error('Not compiled yet') } }) },
+      '/v1/agreements/{id}/constraints': {
+        get: op('Agreements', 'The World ID constraint on the agreement', { params: [agreementId], responses: { ...ok(ref('Constraints')), 409: error('Nothing compiled yet') } }),
+        put: op('Agreements', 'Put a World ID constraint on the agreement, or lift it', {
+          description: 'Adds a `require identityVerified` rule per action, quoting the sentence it enforces, and records the credential in the config. Both are inside the policy hash: the agreement recompiles and must be deployed again. `identity: null` lifts it.',
+          params: [agreementId], body: ref('Constraints'),
+          responses: { ...ok(ref('Agreement'), 'Recompiled'), 400: error('INVALID_BODY or QUOTE_NOT_FOUND'), 409: error('A job is in flight') },
+        }),
+      },
       '/v1/agreements/{id}/regenerate': { post: op('Agreements', 'Run a new deliberation', { params: [agreementId], responses: { 202: json(ref('Agreement'), 'Extracting again; the earlier hash stays in history'), 404: error('Unknown id'), 409: error('A job is in flight, or the state does not allow it') } }) },
       '/v1/agreements/{id}/deploy': { post: op('Agreements', 'Deploy oracle, token, hook and pool for this agreement', { description: 'Compiles the generated Solidity at runtime and deploys on the chain the gateway signs on. 202 with `deploying`; poll for `deployed`.', params: [agreementId], responses: { 202: json(ref('Agreement'), 'Deploying'), 404: error('Unknown id'), 409: error('Deploy needs `compiled`'), 503: error('NO_CHAIN: no signer') } }) },
 

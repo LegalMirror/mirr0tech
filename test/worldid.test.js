@@ -43,3 +43,12 @@ test('the registry binds one human to one wallet and survives a restart', async 
   const reloaded = await new HumanRegistry(path).load();
   assert.equal(reloaded.walletOf(nullifier).toLowerCase(), A);
 });
+
+test('the agreement names the credential: a proof of another kind is refused in plain words', async () => {
+  const { WorldIdVerifier, mockProof } = await import('../src/worldid.js');
+  const wallet = '0x1111111111111111111111111111111111111111';
+  const human = new WorldIdVerifier({ credential: 'proof_of_human' });
+  await assert.rejects(human.verify(mockProof(wallet), wallet), (error) => error.code === 'WRONG_CREDENTIAL' && /proof of human/.test(error.message));
+  assert.equal((await human.verify(mockProof(wallet, { credential: 'proof_of_human' }), wallet)).success, true);
+  assert.equal((await new WorldIdVerifier().verify(mockProof(wallet), wallet)).success, true);
+});

@@ -13,7 +13,7 @@ import { VenueService } from '../src/onchain/venues.js';
 import { HumanRegistry, WorldIdVerifier } from '../src/worldid.js';
 import { createApp, loadPolicyData } from '../src/routes.js';
 import { WorldLogin } from '../src/world-login.js';
-import { stackRuntime, assertExpectedChain, reuseDeployment } from '../src/onchain/runtime-config.js';
+import { stackRuntime, assertExpectedChain, reuseDeployment, assertWritableDataDir } from '../src/onchain/runtime-config.js';
 
 const { apiKey, viewerKey, expectedChainId } = stackRuntime();
 const verifier = new WorldIdVerifier();
@@ -44,6 +44,7 @@ const record = reuse ? saved : (await deployStack(signer, { borrower: process.en
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const dataDir = process.env.DATA_DIR ?? 'generated';
+await assertWritableDataDir(dataDir);
 // Never mix forgeable demo bindings with a live RP's credential/action namespace.
 const registries = new Map();
 const identityFor = (verifier) => {

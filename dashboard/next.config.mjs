@@ -8,6 +8,9 @@ const nextConfig = {
   output: "export",
   // A project site on GitHub Pages lives under /<repo>; the static adapter reads the same prefix.
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
+  // Every route is a directory with index.html, so the router's RSC prefetch for "/" resolves to
+  // <basePath>/index.txt instead of a 404 at <basePath>.txt.
+  trailingSlash: true,
   // Keep static export tracing scoped to the dashboard within the pnpm workspace.
   outputFileTracingRoot: fileURLToPath(new URL(".", import.meta.url)),
 };

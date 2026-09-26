@@ -97,3 +97,7 @@ docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml u
 ```
 
 Its API uses port 3200. Never deploy that development override on a public server.
+
+## Troubleshooting
+
+- **`503 UNAVAILABLE: Demo state persistence failed; operator intervention required`** — the API could not write `DATA_DIR` (`/app/.data`) and closed public work; the log line `demo workspaces: cannot persist … EACCES` names the cause. It happens when the `api-data` volume was created by an older image and is root-owned. The image's entrypoint now starts as root, `chown`s the volume to `node`, and drops privileges, so a redeploy repairs it; the API also refuses to start when `DATA_DIR` is not writable (`DATA_DIR … is not writable (uid …)`), so the problem shows in the logs at boot instead of on the first upload. A one-off repair without redeploying: `docker run --rm -v <stack>_api-data:/d alpine chown -R 1000:1000 /d`. `GET /health` reports `demo: ok | broken`.

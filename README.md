@@ -1,18 +1,109 @@
 # mirr0tech
 
-**mirr0tech links a tokenized asset's off-chain legal clauses to the on-chain code that executes them.**
+**mirr0tech turns a legal agreement for a real-world asset into the smart contracts that enforce it.**
 
-A legal document goes in. Out comes a policy grounded in verbatim quotes, hashed to the document, and compiled into each venue the asset passes through: the token's issuance rules, the Uniswap v4 hook it trades through, the Wildcat role provider that admits lenders, the 1inch Aqua strategy that gives a lender an exit. Every on-chain refusal names its clause.
+Upload the agreement. mirr0tech extracts every rule with a verbatim quote, compiles the rules into Solidity, proves the compiled logic equals the reading, and deploys a permissioned token and a Uniswap v4 hook. Every on-chain refusal names the clause it enforces.
 
-ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Wildcat, 1inch, Uniswap, Securitize or BlackRock.
+ETHGlobal Tokyo 2026. Prototype, mock USD, not legal advice, no affiliation with Uniswap, Securitize or BlackRock.
 
-**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend uses placeholder World ID login, then connects to a quota-limited demo workspace—no manual operator/viewer keys. Wallet trading uses a separate verified-investor flow.
+**Frontend:** [legalmirror.github.io/mirr0tech](https://legalmirror.github.io/mirr0tech/) · **Backend:** [mir-api.peeramid.xyz](https://mir-api.peeramid.xyz/health). GitHub Pages serves the static workbench; the HTTPS API runs separately on Coolify. The frontend connects automatically to a quota-limited, anonymous demo workspace, so no API keys are needed.
 
 [![Overview](docs/img/overview.png)](https://legalmirror.github.io/mirr0tech/)
 
 [![Agreement](docs/img/agreement.png)](https://legalmirror.github.io/mirr0tech/agreement)
 
-## Run it
+## The problem
+
+Tokenizing a real-world asset is expensive, and most of the cost is people translating legal documents into code:
+
+- Platforms charge **$50,000 to $100,000 upfront**; Securitize's minimum engagement sits in that range.
+- A **$1M–$5M raise costs $75,000–$200,000 in total**; above $25M it can exceed $1M. Some platforms also take 6–10% of the raise plus a token allocation.
+- **Legal counsel is extra**: $30,000–$75,000 for a Reg D 506(c) offering, $100,000–$150,000 for Reg A+.
+- **Ongoing fees continue after issuance**: $5,000–$25,000 a year for a digital transfer agent, plus commissions on secondary trading.
+
+Source: [Tokenization platform fees](https://tokenizestartup.com/platforms/tokenization-platform-fees/).
+
+Only a handful of incumbent platforms can do this work today, because each deal needs paralegals to read the agreement and engineers to hand-write the contracts. Institutions and small businesses that hold high-value physical assets (a company holding graded Pokémon cards, for example) are priced out.
+
+## The solution
+
+mirr0tech replaces that manual translation:
+
+1. **AI reads the agreement.** A [Noolog](docs/NOOLOG.md) deliberation between several models (Astra, Fable and GPT-OSS-Safeguard) proposes the rules. Each rule must quote the document verbatim, and the models cross-check each other's claims.
+2. **The rules become an abstract syntax tree (AST).** The AST is the backend's source of truth: the API, the dashboard and the compiler all read it.
+3. **The AST compiles to Solidity** and deploys on chain as a permissioned token and a Uniswap v4 hook.
+4. **Formal verification stops hallucinations reaching the chain.** The compiler checks that the on-chain logic matches the reference interpreter on every possible input, and refuses to emit contracts otherwise. A quote that isn't in the document is rejected, and a human approves the policy before it's frozen and hashed on chain.
+
+**Why now:** LLMs can finally read long legal text reliably enough to propose rules, and formal verification makes it cheap to check every proposal mechanically instead of trusting it.
+
+The LLM only proposes. It never runs at transaction time: the chain enforces a frozen, hashed policy, and changing one word of the agreement changes the hash.
+
+## The demo
+
+The Securitize/BlackRock transfer-agent agreement compiles into a permissioned fund token and a Uniswap v4 hook.
+
+1. The issuer uploads the agreement. The workbench shows each clause next to the rule it produced.
+2. The issuer chooses which actions require a verified identity (for example `mint` and `transfer`) and which World ID credential counts.
+3. The token and hook deploy. Shares mint to custody.
+4. An investor verifies with World ID. Shares release to their wallet, and they can add liquidity and swap through the hooked pool.
+5. Anyone may create a pool, but a pool without the hook can't take the token (`NoPolicyDoor`). A stranger in the hooked pool is refused with *"Exhibit A — Investor Onboarding"* quoted.
+
+## How we used World ID
+
+**The event that needs trust:** a wallet receiving newly issued fund shares, or trading them. The agreement's Exhibit A says only onboarded investors may hold the fund, so before shares leave custody the chain needs evidence that a real, document-verified person stands behind the receiving wallet.
+
+**Why the document credential is the minimum sufficient assurance:** the agreement requires identity documents at onboarding, so a passport-backed credential (`passport` preset, credential 9303) matches that requirement without disclosing the investor's name, number or nationality. The issuer can choose a lighter credential (`proof_of_human`, `selfie`) for agreements that only need uniqueness or liveness. The choice is the issuer's and is bound to the policy hash.
+
+**How it works:**
+
+- **The issuer sets the permissions.** When constraining an agreement, the issuer picks the credential and the actions that require it, from `mint`, `burn`, `transfer`, `deposit` and `withdraw`. Each choice becomes an `identityVerified` rule in the policy, quoting the clause it enforces (`src/agreements.js:196-215`).
+- **The investor proves it.** IDKit requests that credential for the investor's wallet. `src/worldid.js` accepts only a matching, server-validated v4 result, then attests `identityVerified` for that wallet on chain. The nullifier is scoped per action, and the signal binds the proof to the wallet.
+- **The chain enforces it.** Every share movement asks the compiled policy first: `MirrorToken._update` checks the receiving wallet (`contracts/MirrorToken.sol:117`), and the hook checks every liquidity change and swap.
+
+**The two paths:**
+
+1. **Verified investor:** proves with World ID, then receives newly issued shares and trades them through the hooked pool.
+2. **Ineligible wallet:** has no World ID proof. Issuing shares to it reverts with `TransferRefused`, and its swap is refused before a transaction exists, quoting the clause (`transfer-identity-verified`). Cancelled, wrong-credential and rejected proofs create no fact, so they end on the same refusal.
+
+A World ID credential proves one onboarding condition. It is not a full KYC, AML, sanctions or accreditation decision; those facts stay separate in the policy.
+
+**Login:** the dashboard itself opens with World ID (`src/world-login.js`, [docs/WORLD_LOGIN.md](docs/WORLD_LOGIN.md)): mock by default, sandbox session proofs or staging simulator proofs by `WORLD_LOGIN_MODE`. Login proves a person, not a document; the wallet document check above stays separate.
+
+**Status:** the Sepolia attestations below come from mock proofs. A live World Sandbox proof has not been demonstrated yet.
+
+**Integration debrief.** Friction: IDKit needs an explicit preset and legacy (v3) policy; the RP context must be signed on the server; the v4 verify endpoint can return HTTP 200 with failed proof items inside, so status codes alone can't be trusted; the signal is optional in the SDK but mandatory for a wallet-bound gate. The one improvement with the greatest impact would be a complete server-side example that validates the per-credential result, the wallet signal, cancellation and retry, and durable nullifier binding. Time to first live success: not yet measured. Full trust boundaries: [docs/WORLD_ID.md](docs/WORLD_ID.md).
+
+## How we used Uniswap v4
+
+- **`contracts/MirrorPolicyHook.sol`** implements `beforeAddLiquidity` (line 113), `beforeRemoveLiquidity` (line 122) and `beforeSwap` (line 131). Each calls `_enforce` (line 140), which evaluates the compiled policy for the beneficiary carried in `hookData`, since `sender` is always the router.
+- **The hook is the token's only door into Uniswap.** The hook sets a transient approval; `MirrorToken._update` (`contracts/MirrorToken.sol:106`) consumes it through `consumeApproval` (hook line 98) on every PoolManager transfer. A pool without the hook reverts with `NoPolicyDoor`.
+- **Address mining.** `src/policy/hookAddress.js` mines the hook address for its permission bits.
+- **Tests** run against the real `PoolManager` on Anvil: `test/chain/hook.test.js`, `test/chain/rwa-pool.test.js`.
+- **Deployed** on Sepolia against the canonical PoolManager (addresses below).
+
+Developer feedback: [FEEDBACK.md](FEEDBACK.md).
+
+## How we used Noolog
+
+Choose **Noolog** as the generation for an upload (`generation: "noolog"`, or `EXTRACTOR=noolog` as the default). `src/noolog/extract.js` submits the document to the orchestrator under the `legal_rwa_pro` policy (RwaCounsel, RwaScrivener and RwaCompliance), shows its progress line on the record while the seats deliberate (up to three rounds, about ten minutes each on the full agreement), then reads `/details` and `/references` for the verdicts and a confidence score. What the deployment cannot enforce is moved to `unresolved` before validation, so a live answer always compiles. Demo and OpenAI generations are unchanged. More: [docs/NOOLOG.md](docs/NOOLOG.md).
+
+## How we used Curvegrid MultiBaas
+
+The MultiBaas integration (contract registration under policy-hash versions, event indexing behind `GET /v1/stack/events`, and a Cloud Wallet signer) was built and exercised on Sepolia, but is **not in this branch**: the workspace rewrite removed `src/multibaas.js`, `scripts/multibaas-sync.js` and `src/multibaas-signer.js`. They remain in git history (merge of PR #5).
+
+## How it works
+
+```
+document ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, each with a verbatim quote
+         ─► DNF bitmasks per rule ─► equivalence proof vs the JS interpreter (all 3^k assignments)
+         ─► policyHash + clause-table hash ─► CompiledPolicy.sol
+```
+
+- **Three-valued facts.** A fact is true, false or not established. Unknown never satisfies a requirement, and an expired attestation makes every fact unknown. `contracts/PolicyEval.sol` and `src/policy/evaluate.js` decide identically or the compiler refuses to emit.
+- **Provenance on every revert.** `LegalClauseViolation(clauseId, policyHash)` names the clause; the clause table's hash is committed on chain, so a front end can't substitute the sentence.
+- **No generated code.** Extraction emits schema-validated JSON; the compiler writes bitmasks into fixed, audited templates.
+
+## Setup and testing
 
 Use **Node.js 22.13+** and **pnpm 10.29.2**. Both packages share `pnpm-lock.yaml`.
 
@@ -81,25 +172,6 @@ pnpm run test:chain:cashier     # real v4 custom-accounting tests on Anvil
 
 The cashier is locally tested, **not part of the existing published Sepolia deployment**. It constrains eligible execution through issuance/redemption backed by available mockUSD reserves; it does not guarantee a pinned AMM price or zero LP losses.
 
-## The demo
-
-**Act 1 — tokenize and trade.** The Securitize/BlackRock transfer-agent agreement compiles into a permissioned fund token and a Uniswap v4 hook. Shares mint to custody and release only to an onboarded investor. Anyone may create a pool; one without the hook cannot take the token (`NoPolicyDoor`), and a stranger in the hooked pool is refused with *"Exhibit A — Investor Onboarding"* quoted.
-
-**Act 2 — lend it out.** The Wildcat template Master Loan Agreement, the borrower's Lender Check Policy and a one-clause buyback addendum compile into a Wildcat `IRoleProvider` and a 1inch Aqua strategy. Lender A deposits; Lender B, uncountersigned, goes to review; Lender C, designated by the sanctions oracle, is denied with no override. The borrower ships a standing buyback to Aqua (virtual balance, no capital moves) whose program contains the agreement as an opcode. Lender A fills at the addendum's 0.96; a stranger is refused at quote time; a later designation makes the same strategy unfillable for that wallet and blocks its payment, nothing redeployed.
-
-## How it works
-
-```
-document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, each with a verbatim quote
-            ─► DNF bitmasks per rule ─► equivalence proof vs the JS interpreter (all 3^k assignments)
-            ─► policyHash + clause-table hash ─► CompiledPolicy.sol + program templates
-```
-
-- **Three-valued facts.** True, false, or not established. Unknown never satisfies a requirement, and an expired attestation makes every fact unknown, so screening is continuous. `contracts/PolicyEval.sol` and `src/policy/evaluate.js` decide identically or the compiler refuses to emit.
-- **Observable vs attested.** Sanctions come from the oracle the agreement names, the market's term state from the market; the compliance function attests the rest into `PolicyAttestor` with an expiry. `PolicyOracle` assembles both for every venue.
-- **Provenance on every revert.** `LegalClauseViolation(clauseId, policyHash)` / `CounterpartyRefused(subject, clauseId, policyHash)`; the clause table's hash is committed on chain, so the sentence a front end shows cannot be substituted.
-- **No generated code.** Extraction emits schema-validated JSON; the compiler emits bitmasks into fixed templates; one audited evaluator serves every policy.
-
 ## Venues
 
 | Venue | Contract | The agreement there |
@@ -120,10 +192,6 @@ document(s) ─► normalize + SHA-256 ─► AST { rules, terms, unresolved }, 
 - **Executed.** `test/chain/swapvm.test.js`, `scripts/demo-golden.js`: `ship` → `quote` → `swap` (`pull`/`push`) → refusals → cap, deadline → `dock`; the auction quotes at open, midway and near close, fills, expires.
 
 Feedback: the instruction/router split made an opcode a 40-line job, and `quote()` running the full program statically is what makes pre-trade compliance possible. Friction: `StaticBalances` cannot follow Aqua-preloaded balances (hence `FixedRateBalances`); the full `Opcodes` router plus anything exceeds EIP-170, so `LimitOpcodes`; contracts are not on npm, so `vendor/`; SDK opcode numbering (44) differs from `release/1.1` (46).
-
-## How we used World ID
-
-Sandbox World ID session proofs gate application login. The separate document-verification trust moment is access to issuance, transfer and the cashier. The issuer selects the credential required by the agreement and binds that choice to its policy hash. IDKit requests that credential for the selected wallet; `src/worldid.js` requires a matching, server-validated v4 result before attesting `identityVerified`. A Passport/NFC credential is evidence for a document-based onboarding condition, **not a full KYC/AML, sanctions or accreditation decision**, and those facts remain separate. The workbench shows the exact clause, remaining requirements, cancellation/rejection and a fresh access decision after the receipt. Mock and live proof namespaces are separated. Real World verification still requires registered credentials and a user-completed proof; local demonstrations do not establish live-provider success. [Trust boundaries and integration debrief](docs/WORLD_ID.md).
 
 ## Legal document extraction
 
@@ -151,7 +219,7 @@ For a standalone Coolify API resource, use [deploy/Dockerfile.api](deploy/Docker
 # Keep Terminal 1's local dev:stack process above running; use Terminal 3 for these calls.
 node scripts/mirr0.js login http://127.0.0.1:3000 local-dev-stack-operator-key-only
 node scripts/mirr0.js upload test/human_contracts/ea026411904ex10-9.htm --name BUIDL
-# Replace <id> below with the returned agreement id; do not enter the angle brackets literally.
+# Replace <id> with the returned agreement id.
 node scripts/mirr0.js show <id> --wait compiled
 node scripts/mirr0.js constrain <id> --credential document --actions mint,transfer
 node scripts/mirr0.js deploy <id> --wait
@@ -160,14 +228,24 @@ node scripts/mirr0.js fund <id> Investor 10000
 node scripts/mirr0.js mint <id> 10000
 node scripts/mirr0.js release <id> Investor 5000
 node scripts/mirr0.js pool <id> liquidity Investor
-node scripts/mirr0.js pool <id> swap Stranger  # refused with the sentence
+node scripts/mirr0.js pool <id> swap Stranger  # refused, with the clause quoted
 ```
 
-Every command is one call of the [agreements API](docs/AGREEMENTS_API.md); `GET /docs` is the Swagger UI over all of it.
+Each command is one call of the [agreements API](docs/AGREEMENTS_API.md). `GET /docs` serves the Swagger UI.
 
-### Sepolia
+### Against Sepolia and World Sandbox
 
-Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json` is the record. Use the **Existing Sepolia stack + World Sandbox** launch command above to serve it without redeploying. Policy hashes are the same bytes as the local build.
+Set `RPC_URL`, an authorized `DEPLOYER_PRIVATE_KEY`, a private `API_KEY`, and `WORLD_APP_ID`, `WORLD_RP_ID`, `WORLD_RP_SIGNING_KEY`, `WORLD_ACTION`, `WORLD_ENVIRONMENT=sandbox`, `WORLD_CREDENTIAL=document` in the server environment or a local `.env` (never in frontend build variables). Then:
+
+```sh
+EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json DATA_DIR=.data/sepolia SEED=false npm run dev:stack
+```
+
+This reuses the existing contracts and doesn't redeploy. Hosted deployment (Coolify, Docker, GitHub Pages): [deploy/README.md](deploy/README.md), [docs/deploy.md](docs/deploy.md).
+
+## Sepolia
+
+`deployments/sepolia.json` is the record.
 
 | Contract | Address |
 | --- | --- |
@@ -179,37 +257,31 @@ Both acts run on Sepolia against the canonical venues; `deployments/sepolia.json
 | MirrorPolicyHook | [`0x8218A26F0f3c145D99f673Fc98A362D83c554a80`](https://sepolia.etherscan.io/address/0x8218A26F0f3c145D99f673Fc98A362D83c554a80) |
 | MirrorLiquidityRouter | [`0xdCF15E8b14BA3D38D1b024783F656a79d40015eD`](https://sepolia.etherscan.io/address/0xdCF15E8b14BA3D38D1b024783F656a79d40015eD) |
 | Uniswap v4 PoolManager (canonical) | [`0xE03A1074c86CFeDd5C142C4F04F1a1536e203543`](https://sepolia.etherscan.io/address/0xE03A1074c86CFeDd5C142C4F04F1a1536e203543) |
-| PolicyOracle (credit) | [`0x0d1Bf438432997f0ccd18E80B45510d7064389cD`](https://sepolia.etherscan.io/address/0x0d1Bf438432997f0ccd18E80B45510d7064389cD) |
-| MirrortechRoleProvider | [`0x91f3F5c3d452C0F53319387AcdF311Cc4d28a76F`](https://sepolia.etherscan.io/address/0x91f3F5c3d452C0F53319387AcdF311Cc4d28a76F) |
-| MockWildcatMarket | [`0x172a0577Be38DE23a91274e149957e8d109daB44`](https://sepolia.etherscan.io/address/0x172a0577Be38DE23a91274e149957e8d109daB44) |
-| MirrortechRouter (SwapVM + PolicyGuard) | [`0x71b61324b041c8469602dB051Fea7534024fe0f6`](https://sepolia.etherscan.io/address/0x71b61324b041c8469602dB051Fea7534024fe0f6) |
-| 1inch Aqua (canonical) | [`0x1111113ccf1426a8e30e2bff5e005d929bf6a90a`](https://sepolia.etherscan.io/address/0x1111113ccf1426a8e30e2bff5e005d929bf6a90a) |
 
-One agreement through the whole flow on Sepolia, from the CLI (`agr_1b8a5c438bb1`, policy `0xf16e378c…`, constraint: document credential on mint and transfer): PolicyOracle [`0x86d395Ce77889AdfC129647c7FA1f8e94A54b207`](https://sepolia.etherscan.io/address/0x86d395Ce77889AdfC129647c7FA1f8e94A54b207) · CompiledMirrorToken [`0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE`](https://sepolia.etherscan.io/address/0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE) · MirrorPolicyHook [`0x326B840E25bdf27B16da9e4619741c691Ec4CA80`](https://sepolia.etherscan.io/address/0x326B840E25bdf27B16da9e4619741c691Ec4CA80) · pool `0xc0f46419…` on the canonical PoolManager.
-[oracle](https://sepolia.etherscan.io/tx/0x570f2dc8e60367a47d8962973c968461685b53f0b503ca9406c379e22eef2a71) · [token](https://sepolia.etherscan.io/tx/0x412d8f2e80e6f696774e6dcfca1c743e30494df713ccc15216ccf797180846f5) · [hook at its mined address](https://sepolia.etherscan.io/tx/0xea934fac812b501abcfa1da0e752203cfaadb3e6d3dde82946d2c2e4ac2a97d8) · [pool initialized](https://sepolia.etherscan.io/tx/0x4b874bbdb139aaeb582fb4c60de1c3897a8ff1e60d8c32cf26d42fb5748e675f) ·
-[World ID proof attested](https://sepolia.etherscan.io/tx/0xdf388b7126c413370e3598a7282712278775e6c86f87bc9fbece5c3ce5f092fa) · [shares released](https://sepolia.etherscan.io/tx/0x8cbca868a253007f4dc0ce01890c3aacecca431a7988749e636297c3210f6c6f) · [liquidity through the hook](https://sepolia.etherscan.io/tx/0xa2417ada901ed5fdfefca1d9606f9c80026cb3c1e8332bb5267b1f4f24d1c854) · [swap](https://sepolia.etherscan.io/tx/0x7a8a5f04961153ff52e309e05110fd03996867d10ea192128d8f9ea28717b17e) · the stranger's swap refused with the sentence (`transfer-identity-verified`, no transaction) ·
-a signed payment [minted](https://sepolia.etherscan.io/tx/0x515fe4165d9570985482d98f6f4244821dd47e1cf61afb6e6a24736dcab88a4f) and [released 125.50 shares](https://sepolia.etherscan.io/tx/0x42c6907716445d9c4893cae4456f5704cb58366acb3f6f9a7c3afb2790a93099) to the investor; the stranger's payment was held (`subscription-documents`). `deployments/sepolia-agreements.json` is the agreement store (copy it to `generated/agreements-11155111.json` to serve it again) and `deployments/sepolia-agreement-audit.json` its audit.
+**One agreement through the whole flow**, from the CLI (`agr_1b8a5c438bb1`, policy `0xf16e378c…`, document credential required on mint and transfer): PolicyOracle [`0x86d395Ce77889AdfC129647c7FA1f8e94A54b207`](https://sepolia.etherscan.io/address/0x86d395Ce77889AdfC129647c7FA1f8e94A54b207) · CompiledMirrorToken [`0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE`](https://sepolia.etherscan.io/address/0xD29Da36A18A24895dB595d9AEdde43F26a3B91dE) · MirrorPolicyHook [`0x326B840E25bdf27B16da9e4619741c691Ec4CA80`](https://sepolia.etherscan.io/address/0x326B840E25bdf27B16da9e4619741c691Ec4CA80) · pool `0xc0f46419…` on the canonical PoolManager.
 
-Golden path on Sepolia, as the audit records it:
-[identity verified with a World ID document](https://sepolia.etherscan.io/tx/0xbfa9779df88b5aeb5b7587a5a2ad6368226ebd045757dcd80f0889b57861b748) ·
-[shares released to the verified investor](https://sepolia.etherscan.io/tx/0x3baa0a49d05a385f88584ddfd6eb80d12def27226a683811d773171d7704f1cf) ·
-[hooked pool created](https://sepolia.etherscan.io/tx/0x168ee3e5a5f60e2c1f4eae9abadcc4a50517af35cf6deec20120a8bdcc3622f3) on the canonical PoolManager ·
-[liquidity through the hook](https://sepolia.etherscan.io/tx/0x5c29af26ac59903924890347f0902ee4773d9e8a6f1bc2cb0b304d51a077ad88) ·
-[swap](https://sepolia.etherscan.io/tx/0xc315cb93ce6eb203e612a7caf0e55d7d8acbfaef90da73b3fb1870f22d777ad6) ·
-[Lender A admitted and deposits](https://sepolia.etherscan.io/tx/0x35f150eb239754991595604735eebdf34cd8bd47ba7597415580b19e12c40c89) ·
-[buyback shipped to the canonical Aqua](https://sepolia.etherscan.io/tx/0xf732931467f914badca599ffc884bef8379ccd5e8903ed68b1b24a8ada615c6f) ·
-[Lender A fills through SwapVM + PolicyGuard](https://sepolia.etherscan.io/tx/0x5564bf23bfa078e91e1b9178bf78e3e3507db7361abb963e99e7c5444c2f0467).
+[oracle](https://sepolia.etherscan.io/tx/0x570f2dc8e60367a47d8962973c968461685b53f0b503ca9406c379e22eef2a71) · [token](https://sepolia.etherscan.io/tx/0x412d8f2e80e6f696774e6dcfca1c743e30494df713ccc15216ccf797180846f5) · [hook at its mined address](https://sepolia.etherscan.io/tx/0xea934fac812b501abcfa1da0e752203cfaadb3e6d3dde82946d2c2e4ac2a97d8) · [pool initialized](https://sepolia.etherscan.io/tx/0x4b874bbdb139aaeb582fb4c60de1c3897a8ff1e60d8c32cf26d42fb5748e675f) · [World ID attestation (mock proof)](https://sepolia.etherscan.io/tx/0xdf388b7126c413370e3598a7282712278775e6c86f87bc9fbece5c3ce5f092fa) · [shares released](https://sepolia.etherscan.io/tx/0x8cbca868a253007f4dc0ce01890c3aacecca431a7988749e636297c3210f6c6f) · [liquidity through the hook](https://sepolia.etherscan.io/tx/0xa2417ada901ed5fdfefca1d9606f9c80026cb3c1e8332bb5267b1f4f24d1c854) · [swap](https://sepolia.etherscan.io/tx/0x7a8a5f04961153ff52e309e05110fd03996867d10ea192128d8f9ea28717b17e) · the stranger's swap refused with the clause (`transfer-identity-verified`, no transaction) · a signed payment [minted](https://sepolia.etherscan.io/tx/0x515fe4165d9570985482d98f6f4244821dd47e1cf61afb6e6a24736dcab88a4f) and [released 125.50 shares](https://sepolia.etherscan.io/tx/0x42c6907716445d9c4893cae4456f5704cb58366acb3f6f9a7c3afb2790a93099) to the investor; the stranger's payment was held (`subscription-documents`).
+
+`deployments/sepolia-agreements.json` is the agreement store (copy it to `generated/agreements-11155111.json` to serve it again) and `deployments/sepolia-agreement-audit.json` its audit.
 
 ## Limits
 
-Screening, countersignature, AML/KYC and solvency are attested, not proved; a policy hash is no evidence that anyone was screened correctly. The sanctions oracle and the Wildcat market are mocks with the real interfaces (the real market is mainnet-only). Fact bitmaps are readable per wallet. The fund token is non-rebasing because Uniswap v4 does not support rebasing balances. Not legal advice; no real counterparty.
+- Screening, AML/KYC and solvency are attested, not proved. A policy hash is no evidence that anyone was screened correctly.
+- The sanctions oracle is a mock with the real interface.
+- World ID proofs on Sepolia are mocks so far (see above).
+- Fact bitmaps are readable per wallet.
+- The fund token is non-rebasing, because Uniswap v4 doesn't support rebasing balances.
+- The NAV cashier ([docs/CASHIER.md](docs/CASHIER.md)) is tested locally and not deployed on Sepolia.
+- Not legal advice; no real counterparty.
 
 ## Team
 
-⚠️ To be filled in before submission: names and handles.
+- **Lam Trinh**: product and pitch. X: [@LamTGlobal](https://x.com/LamTGlobal)
+- **Tims Pecerskis**: engineering. X: [@iampeersky](https://x.com/iampeersky)
+- **Jseam**: engineering. X: [@henlojseam](https://x.com/henlojseam)
 
 ## Licenses
 
-First-party code is unlicensed (`UNLICENSED`); no license is granted. Earlier releases remain under their original licenses, and previously granted rights are not retroactively withdrawn.
+First-party code is released under the [MIT License](LICENSE), including the Solidity the compiler generates.
 
-Dependencies, vendored code, and reproduced interfaces retain their original licenses and notices. `vendor/` (git-ignored, fetched by `pnpm run vendor`) holds 1inch SwapVM and Aqua under their source-available Degensoft licenses; the router is a modified redeployment as the hackathon rules permit. `contracts/wildcat/IRoleProvider.sol` reproduces Wildcat's MIT-licensed interface.
+Third-party code is not covered: dependencies, sources fetched into `vendor/` (git-ignored, via `npm run vendor`) and reproduced interfaces keep their original licenses and notices, as stated in each file's header.

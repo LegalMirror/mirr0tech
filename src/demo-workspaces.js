@@ -1,6 +1,6 @@
 // An anonymous capability grants only its own agreement lifecycle, never an operator venue.
 import { createHash, randomBytes } from 'node:crypto';
-import { mkdir, open, readFile, rename } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { draftFor } from './agreements.js';
 import { AppError, ensure } from './errors.js';
@@ -48,6 +48,8 @@ export class DemoWorkspaces {
   init() {
     this.ready ??= (async () => {
       if (this.path) {
+        // A crash between write and rename leaves a temporary file; a run as another user leaves one this user cannot open.
+        await unlink(`${this.path}.tmp`).catch((error) => { if (error.code !== 'ENOENT') console.error(`demo workspaces: cannot remove stale ${this.path}.tmp: ${error.code ?? error.message}`); });
         try {
           const state = JSON.parse(await readFile(this.path, 'utf8'));
           this.validateState(state);
@@ -97,6 +99,8 @@ export class DemoWorkspaces {
     this.pending++;
     const job = this.queue.then(async () => {
       await this.init();
+      // A failed persist closes public work; the next request tries the disk once more before refusing.
+      if (this.broken) await this.persist().catch(() => {});
       unavailable(!this.broken, 'Demo state persistence failed; operator intervention required');
       this.prune();
       return handler();
@@ -113,11 +117,20 @@ export class DemoWorkspaces {
       const file = await open(temporary, 'w', 0o600);
       try { await file.writeFile(JSON.stringify(this.state)); await file.sync(); } finally { await file.close(); }
       await rename(temporary, this.path);
+      this.broken = false;
+    } catch (error) {
+      this.broken = true;
+      // The operator needs the cause in the logs: which path, which error.
+      console.error(`demo workspaces: cannot persist ${this.path}: ${error.code ?? error.message}`);
+      throw new AppError(503, 'UNAVAILABLE', 'Demo state persistence failed; no further public work is allowed');
+    }
+    // The directory entry's durability is best effort: some volume filesystems refuse fsync on a directory.
+    try {
       const directory = await open(dirname(this.path), 'r');
       try { await directory.sync(); } finally { await directory.close(); }
-    } catch {
-      this.broken = true;
-      throw new AppError(503, 'UNAVAILABLE', 'Demo state persistence failed; no further public work is allowed');
+    } catch (error) {
+      if (!this.warnedDirectorySync) console.warn(`demo workspaces: directory fsync unavailable for ${dirname(this.path)}: ${error.code ?? error.message}`);
+      this.warnedDirectorySync = true;
     }
   }
 

@@ -1,7 +1,20 @@
 #!/bin/sh
-# Seeding is opt-in local development only. In the remote path Node is the main process,
-# so startup failures exit immediately instead of hiding behind a readiness polling loop.
+# Runs as root once so the mounted data directory is writable by `node` (a named volume made by an
+# older image is root-owned), then re-executes itself as `node`. With arguments it runs them; with
+# none it starts the API and, in local development only, seeds it.
 set -e
+DATA_DIR="${DATA_DIR:-/app/.data}"
+if [ "$(id -u)" = "0" ]; then
+  mkdir -p "$DATA_DIR"
+  chown -R node:node "$DATA_DIR"
+  if command -v setpriv >/dev/null 2>&1; then
+    exec setpriv --reuid=node --regid=node --init-groups sh "$0" "$@"
+  fi
+  exec su -s /bin/sh node -c 'exec sh "$0" "$@"' -- "$0" "$@"
+fi
+if [ "$#" -gt 0 ]; then
+  exec "$@"
+fi
 if [ "${SEED:-false}" != "true" ]; then
   exec node scripts/dev-stack.js
 fi

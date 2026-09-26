@@ -68,7 +68,8 @@ function PriceCurve({
         <circle cx={x(at)} cy={y(now)} r={4} fill="var(--flame)" />
       </svg>
       <figcaption className="meta">
-        {floor} at open → {ceiling} at hour {windowHours} · now {now.toFixed(4)} after {at} h
+        {floor.toFixed(2)} at open → {ceiling.toFixed(2)} at hour {windowHours} · now {now.toFixed(4)} after{" "}
+        {at} h
       </figcaption>
     </figure>
   );

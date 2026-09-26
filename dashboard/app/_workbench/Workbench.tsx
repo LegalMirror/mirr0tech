@@ -20,6 +20,7 @@ import { LegalAstView } from "./LegalAstView";
 import { GraphPane, HumanView, SourceCards } from "./PolicyPanes";
 import { ApiView, DeployView } from "./ServiceViews";
 import { IdentityView } from "./IdentityView";
+import { JobProgress } from "./JobProgress";
 import { AnalysisView } from "./AnalysisView";
 import { SwapView } from "./SwapView";
 import { MintView } from "./MintView";
@@ -466,28 +467,15 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
                   ? "This contract needs attention."
                   : "Your contract is becoming a policy."}
               </h2>
-              {record.status !== "failed" && record.progress?.percent != null ? (
-                <div className="wb-progress" role="progressbar" aria-valuenow={record.progress.percent} aria-valuemin={0} aria-valuemax={100}>
-                  <div className="wb-progress-track">
-                    <div className="wb-progress-fill" style={{ width: `${record.progress.percent}%` }} />
-                  </div>
-                  <p>
-                    <strong>{record.progress.percent}%</strong>
-                    {record.progress.confidence != null && (
-                      <>
-                        {" "}
-                        · confidence so far <strong>{record.progress.confidence.toFixed(2)}</strong>
-                      </>
-                    )}
-                  </p>
-                  <p className="wb-muted">Several legal models are reading the agreement and checking each other&apos;s claims.</p>
-                </div>
+              {record.status !== "failed" ? (
+                <>
+                  <JobProgress progress={record.progress} />
+                  {record.progress && (
+                    <p className="wb-muted">Several legal models are reading the agreement and checking each other&apos;s claims.</p>
+                  )}
+                </>
               ) : (
-                <p>
-                  {record.status === "failed"
-                    ? "Review the gateway error above, then regenerate when its cause is resolved."
-                    : "The gateway is extracting, checking and compiling your source. This view polls automatically; you can keep working."}
-                </p>
+                <p>Review the gateway error above, then regenerate when its cause is resolved.</p>
               )}
               <button onClick={state.refresh}>Refresh status</button>
             </div>

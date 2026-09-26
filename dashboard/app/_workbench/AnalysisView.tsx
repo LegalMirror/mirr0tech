@@ -7,6 +7,7 @@ import { inFlight } from "@/lib/agreements";
 import { Evidence } from "./PolicyPanes";
 import { Icon, Notice } from "./ui";
 import { ConfidenceSummary } from "./ConfidenceSummary";
+import { JobProgress } from "./JobProgress";
 import { verdictsOf } from "@/lib/confidence";
 
 export function AnalysisView({
@@ -56,7 +57,9 @@ export function AnalysisView({
                   ? "Historical simulated analysis"
                   : report?.mock === false
                     ? "Historical extraction report"
-                    : "Awaiting analysis report"}
+                    : inFlight(record.status)
+                      ? "Analysing"
+                      : "Awaiting analysis report"}
         </span>
         <span>{sample ? "No live job history" : record.status}</span>
       </div>
@@ -76,12 +79,7 @@ export function AnalysisView({
           </li>
         ))}
       </ol>
-      {!sample && inFlight(record.status) && (
-        <Notice>
-          The gateway job is running; this view polls automatically. It may finish between polls. No
-          fabricated token stream, agent messages or elapsed-time estimates are shown.
-        </Notice>
-      )}
+      {!sample && inFlight(record.status) && <JobProgress progress={record.progress} />}
       {record.error && <Notice error>{record.error}</Notice>}
       {record.extraction?.analysisMode === "light" && (
         <Notice>

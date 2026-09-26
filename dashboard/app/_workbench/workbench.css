@@ -409,23 +409,6 @@
   border-radius: 50%;
   background: var(--cyan);
 }
-.wb-view-note {
-  padding: 31px 10px 20px;
-}
-.wb-view-note p {
-  margin: 11px 0 14px;
-  color: #a0acb9;
-  font-size: 11px;
-  line-height: 1.8;
-}
-.wb-note-diagram {
-  color: #7bb8bc;
-  font-size: 17px;
-}
-.wb-note-diagram span {
-  color: #38474e;
-  font-size: 10px;
-}
 .wb-services {
   margin-top: auto;
   border-top: 1px solid #27323a;

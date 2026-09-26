@@ -261,17 +261,6 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
             </button>
           ))}
         </nav>
-        <div className="wb-view-note">
-          <span className="wb-eyebrow">TRACEABLE BY DESIGN</span>
-          <p>
-            From the words you sign
-            <br />
-            to the rules that run.
-          </p>
-          <span className="wb-note-diagram" aria-hidden="true">
-            ≡ <span>────</span> ⌘ <span>────</span> ◇
-          </span>
-        </div>
         <section className="wb-services" aria-label="Actual gateway status">
           <span className="wb-eyebrow">ENVIRONMENT</span>
           <div>

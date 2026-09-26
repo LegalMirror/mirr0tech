@@ -21,7 +21,7 @@ Upload: the document's `name` extension picks the reader (`.txt`, `.md`, `.htm`,
 
 AST graph: `nodes: [{ id, kind, label, status?, … }]`, `kind ∈ agreement | action | rule | fact | term | unresolved`; rule and term nodes carry `status ∈ verified | contested | unverified` and `confidence` from the verification report, rules also `effect`, `clauseId`, `clause`; `edges: [{ from, to }]` run agreement → action → rule → fact, agreement → term, agreement → unresolved.
 
-Errors: `400 INVALID_BODY`, `400 UNKNOWN_PROFILE`, `400 INVALID_DOCUMENT` (unsupported extension, empty, over 2 MB), `401 UNAUTHORIZED`, `404 NOT_FOUND`, `409 INVALID_STATE` (wrong state, or a job already in flight), `413 BODY_TOO_LARGE`, `503 NO_CHAIN`. A background failure is on the record: `status: "failed"`, `error: <message>` for generation; a failed deploy returns to `compiled` with `error: "Deploy failed: …"`. A restart mid-job marks the record `failed` (`Interrupted while extracting`).
+Errors: `400 INVALID_BODY`, `400 UNKNOWN_PROFILE`, `400 INVALID_DOCUMENT` (unsupported extension, empty, over 2 MB), `401 UNAUTHORIZED`, `404 NOT_FOUND`, `409 INVALID_STATE` (wrong state, or a job already in flight), `409 UNSUPPORTED_PROFILE` (the credit profile has no token to deploy per agreement), `413 BODY_TOO_LARGE`, `503 NO_CHAIN`. A background failure is on the record: `status: "failed"`, `error: <message>` for generation; a failed deploy returns to `compiled` with `error: "Deploy failed: …"`. A restart mid-job marks the record `failed` (`Interrupted while extracting`).
 
 ## The flow
 

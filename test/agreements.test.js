@@ -176,3 +176,14 @@ test('the issuer puts a World ID constraint on the agreement: credential and act
   await agreements.settled();
   await assert.rejects(agreements.venue(record.id), (error) => error.status === 503, 'no chain here');
 });
+
+test('a credit-profile agreement compiles but has no token to deploy per agreement', async () => {
+  const agreements = new Agreements({ deployer: async () => { throw new Error('must not be called'); } });
+  const names = ['wildcat-mla.md', 'lender-check-policy.md', 'buyback-addendum.md'];
+  const documents = await Promise.all(names.map(async (name) => ({ name, text: await readFile(`test/human_contracts/${name}`, 'utf8') })));
+  const record = await upload(agreements, { name: 'MLA', documents, profile: 'wildcat-credit' });
+  assert.equal(record.status, 'compiled', record.error ?? '');
+  assert.equal(record.source.parts.length, 3);
+  assert.throws(() => agreements.deploy(record.id), (error) => error.code === 'UNSUPPORTED_PROFILE');
+  assert.equal(agreements.get(record.id).status, 'compiled');
+});

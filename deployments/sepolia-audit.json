@@ -314,5 +314,22 @@
       "amountOut": "96015.241421",
       "price": 0.96015241421
     }
+  },
+  {
+    "id": "0x477741b251b033f5",
+    "at": "2026-09-26T01:25:45.027Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "kycApproved": true,
+      "amlApproved": true,
+      "subscriptionAccepted": true,
+      "issuerAuthorized": true,
+      "offeringCompliant": true,
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0x7af83b46736f7de99adb9f1dbfae88e6a64a67b041b3ae6be75984a4fcae7f66"
   }
 ]

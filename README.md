@@ -29,10 +29,11 @@ mirr0tech replaces that manual translation:
 2. **The rules become an abstract syntax tree (AST).** The AST is the backend's source of truth: the API, the dashboard and the compiler all read it.
 3. **The AST compiles to Solidity** and deploys on chain as a permissioned token and a Uniswap v4 hook.
 4. **Formal verification + Noolog stops hallucinations reaching the chain.** The compiler checks that the on-chain logic matches the reference interpreter on every possible input, and refuses to emit contracts otherwise, while Collective mind of Astra, Fable and Safeguard rail-guards ensure more then +80% boost above typical LLM. A quote that isn't in the document is rejected, and a human approves the policy before it's frozen and hashed on chain.
+5. System provisions ability for executives not simply sign-off using **World ID** legal document mirrored as smart contract RWA tokenisation, but have robust, compliant and audit-tracable AI + HITL system integrated on background from noolog
 
-**Why now:** LLMs can finally read long legal text reliably enough to propose rules, and formal verification makes it cheap to check every proposal mechanically instead of trusting it.
+**Why now:** AI can finally read long legal text reliably enough to propose rules, and formal verification makes it cheap to check every proposal mechanically instead of trusting it.
 
-The LLM only proposes. It never runs at transaction time: the chain enforces a frozen, hashed policy, and changing one word of the agreement changes the hash.
+The AI only proposes. It never runs at transaction time: the chain enforces a frozen, hashed policy, and changing one word of the agreement changes the hash.
 
 ## The demo
 

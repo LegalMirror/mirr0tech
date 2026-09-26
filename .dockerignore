@@ -8,3 +8,10 @@ generated
 .data
 .git
 *.log
+.env
+.env.*
+**/.env
+**/.env.*
+**/.npm-cache
+**/*.pem
+**/*.key

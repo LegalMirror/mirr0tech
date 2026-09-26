@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useState, useSyncExternalStore, type CSSProperties } from "react";
 import { canRegenerate, deployBlocked, inFlight, type Constraints } from "@/lib/agreements";
-import { getServerSession, getSession, subscribeSession, type GatewaySession } from "@/lib/session";
+import {
+  getServerSession,
+  getSession,
+  hasGatewaySession,
+  subscribeSession,
+  type GatewaySession,
+} from "@/lib/session";
 import { verificationLabel } from "@/lib/workbench";
 import { short } from "@/lib/format";
 import { ConnectionDialog, UploadDialog } from "./Forms";
@@ -31,7 +37,7 @@ export function Workbench() {
 }
 
 function SessionWorkbench({ session }: { session: GatewaySession }) {
-  const [sample, setSample] = useState(!session.url);
+  const [sample, setSample] = useState(!hasGatewaySession(session));
   const state = useWorkbench(session, sample);
   const { data, client, status } = state;
   const [view, setView] = useState<View>("ast");
@@ -194,7 +200,9 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <small>
                 {session.url
                   ? sample
-                    ? "Gateway set · viewing samples"
+                    ? hasGatewaySession(session)
+                      ? "Gateway set · viewing samples"
+                      : "API configured · add key"
                     : session.operatorKey
                       ? "Operator · session only"
                       : "Viewer · read only"
@@ -369,8 +377,8 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
               <strong>Sample workspace.</strong> Real compiler export; not a live upload, model run, or
               deployment.
             </span>
-            <button onClick={() => (session.url ? setSample(false) : setConnectionOpen(true))}>
-              {session.url ? "Return to gateway" : "Connect gateway"}
+            <button onClick={() => (hasGatewaySession(session) ? setSample(false) : setConnectionOpen(true))}>
+              {hasGatewaySession(session) ? "Return to gateway" : "Connect gateway"}
               <Icon name="arrow" size={14} />
             </button>
           </div>
@@ -572,7 +580,7 @@ function SessionWorkbench({ session }: { session: GatewaySession }) {
       {uploadOpen && (
         <UploadDialog
           onClose={() => setUploadOpen(false)}
-          writable={writable}
+          writable={!sample && !!session.operatorKey}
           status={status}
           onUpload={async (upload) => {
             const result = await client.upload(upload);

@@ -36,7 +36,7 @@ export function WorldIdWidget({
             ? proofOfHuman({ signal: wallet.toLowerCase() })
             : selfieCheck({ signal: wallet.toLowerCase() })
       }
-      environment={context.environment as "production" | "staging"}
+      environment={context.environment as "production" | "staging" | "sandbox"}
       open
       onOpenChange={(open) => {
         if (!open) onClose();

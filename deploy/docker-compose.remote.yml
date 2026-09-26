@@ -1,0 +1,60 @@
+# Coolify: repository root as base directory, this file as the Compose location.
+# Remote operator demo on Sepolia. The proxy terminates HTTPS; no host RPC/API ports.
+# Required values fail before creating containers. Never supply signing keys as build args.
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.api
+    command: ["node", "scripts/dev-stack.js"]
+    expose: ["3200"]
+    restart: unless-stopped
+    init: true
+    volumes:
+      - api-data:/app/.data
+    environment:
+      NODE_ENV: production
+      PORT: "3200"
+      HOST: 0.0.0.0
+      EXPECTED_CHAIN_ID: "11155111"
+      RPC_URL: ${RPC_URL:?Set a Sepolia HTTPS RPC URL}
+      API_KEY: ${API_KEY:?Set a unique operator key of at least 24 characters}
+      VIEWER_KEY: ${VIEWER_KEY:-}
+      DEPLOYER_PRIVATE_KEY: ${DEPLOYER_PRIVATE_KEY:?Set the authorized testnet operator key as a runtime secret}
+      DEPLOYMENT_PATH: deployments/sepolia.json
+      DATA_DIR: /app/.data
+      AUDIT_PATH: /app/.data/audit-11155111.json
+      SEED: "false"
+      WORLD_APP_ID: ${WORLD_APP_ID:?Set the registered World development app id}
+      WORLD_RP_ID: ${WORLD_RP_ID:?Set the matching World RP id}
+      WORLD_RP_SIGNING_KEY: ${WORLD_RP_SIGNING_KEY:?Set the RP signing key as a runtime secret}
+      WORLD_ACTION: ${WORLD_ACTION:-onboard-investor}
+      WORLD_CREDENTIAL: document
+      WORLD_ENVIRONMENT: ${WORLD_ENVIRONMENT:-staging}
+      # Empty means the existing deterministic mock Noolog adapter; proof verification is NOT mocked.
+      NOOLOG_API_KEY: ${NOOLOG_API_KEY:-}
+      MULTIBAAS_URL: ${MULTIBAAS_URL:-}
+      MULTIBAAS_API_KEY: ${MULTIBAAS_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3200/health').then(async r=>{const b=await r.json();process.exit(r.ok&&b.stack?.chainId===11155111?0:1)}).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 8
+
+  dashboard:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.dashboard
+      args:
+        SOURCE_COMMIT: ${SOURCE_COMMIT:-}
+        NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL:?Set the public HTTPS API origin}
+    expose: ["3100"]
+    restart: unless-stopped
+    init: true
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  api-data:

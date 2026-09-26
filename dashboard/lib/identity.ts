@@ -58,7 +58,7 @@ export function contextIssue(context: WorldIdContext, expected: Credential, now 
   if (context.credential !== expected)
     return "The gateway requests a different credential than this policy. Refresh the agreement; do not substitute a weaker credential.";
   if (context.mock === true) return null;
-  if (context.mock !== false || !["staging", "production"].includes(context.environment))
+  if (context.mock !== false || !["staging", "sandbox", "production"].includes(context.environment))
     return "The verifier mode or environment is not supported by this installed IDKit. Ask the operator to check the World configuration.";
   if (
     !context.app_id?.startsWith("app_") ||

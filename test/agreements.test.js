@@ -177,6 +177,35 @@ test('the issuer puts a World ID constraint on the agreement: credential and act
   await assert.rejects(agreements.venue(record.id), (error) => error.status === 503, 'no chain here');
 });
 
+test('the configured World action is hashed for new agreements and passed to their verifier', async () => {
+  const agreements = new Agreements({
+    worldIdAction: 'humanity',
+    deployer: async () => ({ testOnly: true }),
+    venueFactory: async ({ action }) => ({ action }),
+  });
+  const record = await upload(agreements);
+  assert.equal(record.export.config.worldId.action, 'humanity');
+  await agreements.constrain(record.id, { identity: { credential: 'document' } });
+  assert.equal(agreements.get(record.id).export.config.worldId.action, 'humanity');
+  agreements.deploy(record.id);
+  await agreements.settled();
+  agreements.worldIdAction = 'changed-on-restart';
+  assert.equal((await agreements.venue(record.id)).action, 'humanity', 'runtime settings cannot reinterpret an already hashed action');
+});
+
+test('updating an old agreement to the registered action changes its hash and requires redeployment', async () => {
+  const agreements = new Agreements({ worldIdAction: 'onboard-investor' });
+  const record = await upload(agreements);
+  agreements.record(record.id).status = 'deployed';
+  agreements.record(record.id).deployment = { testOnly: true };
+  agreements.worldIdAction = 'humanity';
+  const changed = await agreements.constrain(record.id, { identity: { credential: 'document' } });
+  assert.equal(changed.status, 'compiled');
+  assert.equal(changed.deployment, null);
+  assert.notEqual(changed.policyHash, record.policyHash);
+  assert.equal(agreements.get(record.id).export.config.worldId.action, 'humanity');
+});
+
 test('a credit-profile agreement compiles but has no token to deploy per agreement', async () => {
   const agreements = new Agreements({ deployer: async () => { throw new Error('must not be called'); } });
   const names = ['wildcat-mla.md', 'lender-check-policy.md', 'buyback-addendum.md'];

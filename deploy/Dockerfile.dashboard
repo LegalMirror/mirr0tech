@@ -1,6 +1,6 @@
 # Coolify: Build Pack = Dockerfile, Dockerfile location `deploy/Dockerfile.dashboard`, Base directory `/`.
-# `next build` inlines NEXT_PUBLIC_* at build time: set NEXT_PUBLIC_GATEWAY_URL (the API's public
-# URL) and NEXT_PUBLIC_GATEWAY_KEY as build args in the Coolify project, and rebuild when they change.
+# `next build` inlines NEXT_PUBLIC_* at build time. Only the public API URL belongs here;
+# credentials are entered into session memory through the workbench's Connect dialog.
 ARG NODE_VERSION=22-bookworm-slim
 
 FROM node:${NODE_VERSION} AS build
@@ -15,8 +15,7 @@ COPY . .
 RUN sh scripts/vendor.sh
 ARG SOURCE_COMMIT
 ARG NEXT_PUBLIC_GATEWAY_URL
-ARG NEXT_PUBLIC_GATEWAY_KEY
-ENV SOURCE_COMMIT=$SOURCE_COMMIT NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL NEXT_PUBLIC_GATEWAY_KEY=$NEXT_PUBLIC_GATEWAY_KEY
+ENV SOURCE_COMMIT=$SOURCE_COMMIT NEXT_PUBLIC_GATEWAY_URL=$NEXT_PUBLIC_GATEWAY_URL
 RUN npm --prefix dashboard run build
 
 FROM node:${NODE_VERSION} AS runner

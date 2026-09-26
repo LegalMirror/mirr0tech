@@ -1,9 +1,6 @@
-# Production compose for Coolify (Docker Compose deployment, dedicated project).
-#
-# No host ports: Coolify's proxy reaches the services on the project network via `expose`.
-# Configuration is environment — set it in the Coolify project (see .env.coolify.example).
-# The chain is a throwaway anvil: a restart redeploys both acts and reseeds the story. Point
-# RPC_URL at Sepolia (with DEPLOYER_PRIVATE_KEY and the canonical AQUA) to keep state instead.
+# Local/demo base: combine with docker-compose.local.yml (including its development mode).
+# For remote Coolify deployments use docker-compose.remote.yml, not this permissive demo stack.
+# The chain is a throwaway Anvil; a restart can invalidate persisted agreement deployments.
 name: mirr0tech
 
 networks:
@@ -53,7 +50,7 @@ services:
       args:
         SOURCE_COMMIT: ${SOURCE_COMMIT:-}
         NEXT_PUBLIC_GATEWAY_URL: ${NEXT_PUBLIC_GATEWAY_URL}
-        NEXT_PUBLIC_GATEWAY_KEY: ${NEXT_PUBLIC_GATEWAY_KEY:-local-dev-stack-operator-key-only}
+
     networks: [mirr0tech]
     expose: ["3100"]
     restart: unless-stopped

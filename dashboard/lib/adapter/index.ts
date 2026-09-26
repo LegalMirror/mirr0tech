@@ -1,6 +1,6 @@
 import { gatewaySource } from "./gateway";
 import { staticSource } from "./static";
-import { getSession, subscribeSession } from "../session";
+import { getSession, hasGatewaySession, subscribeSession } from "../session";
 import type { DataSource } from "./types";
 
 export type { DataSource } from "./types";
@@ -10,7 +10,7 @@ export function selectSource(env: { gatewayUrl?: string } = {}): DataSource {
 }
 
 const gateway = gatewaySource(() => getSession().url);
-const current = () => (getSession().url ? gateway : staticSource);
+const current = () => (hasGatewaySession(getSession()) ? gateway : staticSource);
 // The older dashboard routes share the workbench's in-memory connection, without persisting keys.
 export const source: DataSource = {
   get kind() {

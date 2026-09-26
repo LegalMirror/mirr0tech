@@ -11,6 +11,10 @@ let session = initial;
 const listeners = new Set<() => void>();
 export const getSession = () => session;
 export const getServerSession = () => initial;
+// A public URL is configuration, not authentication. Keep visitors on readable samples until
+// they explicitly connect with a key instead of polling protected endpoints anonymously.
+export const hasGatewaySession = (value: GatewaySession) =>
+  !!(value.url && (value.viewerKey.trim() || value.operatorKey.trim()));
 export function subscribeSession(listener: () => void) {
   listeners.add(listener);
   return () => {

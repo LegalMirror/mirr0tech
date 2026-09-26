@@ -80,6 +80,7 @@ describe("World ID trust boundaries", () => {
   });
   it("refuses incomplete live setup, expired requests and mismatched policy credentials", () => {
     expect(contextIssue(context, "document")).toBeNull();
+    expect(contextIssue({ ...context, environment: "sandbox", action: "humanity" }, "document")).toBeNull();
     expect(contextIssue(context, "proof_of_human")).toMatch(/different credential/);
     expect(
       contextIssue({ ...context, rp_context: { ...context.rp_context, signature: "0xmock" } }, "document")
@@ -90,9 +91,10 @@ describe("World ID trust boundaries", () => {
     expect(contextIssue({ ...context, environment: "unknown" }, "document")).toMatch(/not supported/);
     expect(contextIssue({ ...context, mock: true, environment: "mock" }, "document")).toBeNull();
   });
-  it("never infers real identity verification from a demo or staging context", () => {
+  it("never infers real identity verification from a demo, staging or sandbox context", () => {
     expect(verifierLabel({ ...context, mock: true })).toBe("Demo verifier");
     expect(verifierLabel({ ...context, environment: "staging" })).toContain("test environment");
+    expect(verifierLabel({ ...context, environment: "sandbox" })).toContain("test environment");
     expect(verifierLabel(context)).toBe("Production verifier configured");
     expect(verifierLabel(null)).toBe("Verifier not checked");
     expect(CREDENTIAL_COPY.document.limit).toMatch(

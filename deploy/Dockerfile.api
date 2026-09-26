@@ -1,7 +1,6 @@
 # Coolify: Build Pack = Dockerfile, Dockerfile location `deploy/Dockerfile.api`, Base directory `/`.
-# Serves the stack API (/v1/stack, /v1/policy, /v1/lenders, /v1/audit). On boot it deploys both acts
-# to RPC_URL (the `anvil` service by default) or reuses DEPLOYMENT_PATH, seeds the golden-path state,
-# and keeps the audit under DATA_DIR (a volume) so a restart does not lose the timeline.
+# Remote startup reuses the committed Sepolia deployment; it does not deploy or seed a new stack.
+# Keep runtime secrets in Coolify and mount DATA_DIR so agreements, audits and bindings persist.
 ARG NODE_VERSION=22-bookworm-slim
 
 # ── foundry (anvil is only needed when no RPC_URL is given) ────────────────
@@ -22,13 +21,15 @@ RUN sh scripts/vendor.sh \
 # ── run ─────────────────────────────────────────────────────────────────────
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
-ENV NODE_ENV=production PORT=3200 HOST=0.0.0.0
+ENV NODE_ENV=production PORT=3200 HOST=0.0.0.0 \
+    EXPECTED_CHAIN_ID=11155111 DEPLOYMENT_PATH=deployments/sepolia.json \
+    DATA_DIR=/app/.data SEED=false
 COPY --from=foundry /usr/local/bin/anvil /usr/local/bin/anvil
 COPY --from=build --chown=node:node /app /app
 RUN chmod +x deploy/api-entrypoint.sh && mkdir -p /app/.data && chown node:node /app/.data
 USER node
 EXPOSE 3200
-# Readiness, not liveness: Coolify swaps traffic when /health answers, i.e. after the deployment.
+# Coolify swaps traffic only once the API has finished binding the existing stack.
 HEALTHCHECK --interval=10s --timeout=3s --start-period=120s --retries=12 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3200)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3200)+'/health',{signal:AbortSignal.timeout(2000)}).then(r=>{if(!r.ok)console.error('health HTTP',r.status);process.exit(r.ok?0:1)}).catch(e=>{console.error('health request failed:',e.cause?.code||e.name);process.exit(1)})"
 CMD ["sh", "deploy/api-entrypoint.sh"]

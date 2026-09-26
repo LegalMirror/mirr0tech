@@ -3,6 +3,7 @@ import {
   gatewayRequest,
   gatewayUrl,
   getSession,
+  hasGatewaySession,
   setSession,
   subscribeSession,
   type GatewaySession,
@@ -39,6 +40,17 @@ describe("session-only gateway authentication", () => {
     expect(write).not.toHaveBeenCalled();
     expect(heard).toHaveBeenCalledTimes(2);
     stop();
+  });
+  it("keeps a preconfigured public API in sample mode until a key is entered", () => {
+    const configured = { url: "https://mir-api.peeramid.xyz", viewerKey: "", operatorKey: "", revision: 0 };
+    setSession(configured);
+    expect(getSession().url).toBe("https://mir-api.peeramid.xyz");
+    expect(hasGatewaySession(getSession())).toBe(false);
+    expect(source.kind).toBe("static");
+    expect(hasGatewaySession({ ...configured, viewerKey: "   " })).toBe(false);
+    expect(hasGatewaySession({ ...configured, viewerKey: "viewer-test" })).toBe(true);
+    expect(hasGatewaySession({ ...configured, operatorKey: "operator-test" })).toBe(true);
+    expect(hasGatewaySession({ ...configured, url: "", operatorKey: "operator-test" })).toBe(false);
   });
   it("uses the viewer key for GET and the operator key only for writes", async () => {
     const fetch = vi.fn(async () => new Response("{}"));

@@ -47,6 +47,20 @@ describe("IDKit boundary", () => {
       expect(widget.props.allow_legacy_proofs).toBe(false);
     }
   );
+  it("passes sandbox and the registered action to IDKit without substituting staging or a default action", () => {
+    renderToStaticMarkup(
+      createElement(WorldIdWidget, {
+        context: { ...context, environment: "sandbox", action: "humanity" },
+        wallet,
+        onProof: vi.fn(),
+        onClose: vi.fn(),
+        onError: vi.fn(),
+      })
+    );
+    expect(widget.props.environment).toBe("sandbox");
+    expect(widget.props.action).toBe("humanity");
+    expect(widget.props.allow_legacy_proofs).toBe(false);
+  });
   it("forwards the full result unchanged and never treats onSuccess as an attestation", async () => {
     const onProof = vi.fn(async (_proof: unknown) => {});
     const onClose = vi.fn();

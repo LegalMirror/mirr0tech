@@ -66,8 +66,9 @@ export function astGraph({ title, rules, terms, unresolved, verification }) {
 export class Agreements {
   /// `extract` and `deployer` are injectable: the deliberation client and the chain deploy.
   /// `venueFactory` builds the operator service over one deployed agreement's token, oracle and hook.
-  constructor({ path = null, extract = extractWithNoolog, deployer = null, venueFactory = null, log = () => {} } = {}) {
-    Object.assign(this, { path, extract, deployer, venueFactory, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
+  constructor({ path = null, extract = extractWithNoolog, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
+    ensure(typeof worldIdAction === 'string' && worldIdAction.trim(), 500, 'CONFIG', 'WORLD_ACTION must not be empty');
+    Object.assign(this, { path, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
   }
 
   async init() {
@@ -119,10 +120,16 @@ export class Agreements {
     ensure(spec, 400, 'UNKNOWN_PROFILE', `Unknown profile ${profile}`);
     let document;
     try { document = bundleDocuments(documents.map((part) => documentFrom(part.name, part.text))); } catch (error) { throw new AppError(400, 'INVALID_DOCUMENT', error.message); }
+    let deploymentConfig = config ?? JSON.parse(await readFile(spec.config, 'utf8'));
+    // Bind a configured non-default RP action before hashing a new policy. Old records keep their
+    // historical action until an explicit constraint update produces a new deployment.
+    if (profile !== 'wildcat-credit' && deploymentConfig.worldId?.action === undefined && this.worldIdAction !== DEFAULT_ACTION) {
+      deploymentConfig = { ...deploymentConfig, worldId: { credential: 'document', ...deploymentConfig.worldId, action: this.worldIdAction } };
+    }
     const record = {
       id: `agr_${randomBytes(6).toString('hex')}`, name, profile, status: 'uploaded', createdAt: now(), updatedAt: now(),
       source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, ...(document.parts ? { parts: document.parts } : {}) },
-      documents, config: config ?? JSON.parse(await readFile(spec.config, 'utf8')),
+      documents, config: deploymentConfig,
       extraction: null, envelope: null, verification: null, policyHash: null, clauseTableHash: null, coverage: null, deployment: null, error: null, history: [],
     };
     this.records.set(record.id, record);
@@ -206,7 +213,7 @@ export class Agreements {
       for (const action of [...new Set(actions)]) {
         ast.rules.push({ id: `${action}-identity-verified`, action, effect: 'require', condition: { type: 'fact', name: 'identityVerified' }, source: { clause, quote }, rationale: IDENTITY_RATIONALE[credential] });
       }
-      config.worldId = { credential, action: DEFAULT_ACTION };
+      config.worldId = { credential, action: this.worldIdAction };
     }
     validateAst(ast, document.text);
     Object.assign(record, { envelope: { ...record.envelope, ast }, config });

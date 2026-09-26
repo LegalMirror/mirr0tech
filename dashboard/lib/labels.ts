@@ -20,7 +20,7 @@ export const FACT_LABEL: Record<string, string> = {
   screeningCurrent: "Screening is up to date",
   openTermState: "Market is open",
   borrowerOverride: "Borrower override in place",
-  identityVerified: "Identity verified (World ID document)",
+  identityVerified: "World ID credential fact attested",
 };
 export const factLabel = (name: string) => FACT_LABEL[name] ?? name;
 

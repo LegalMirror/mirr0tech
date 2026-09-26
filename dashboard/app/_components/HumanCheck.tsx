@@ -1,92 +1,166 @@
 "use client";
 
-import dynamic from "next/dynamic";
-import { useState } from "react";
-import { passport, proofOfHuman, selfieCheck } from "@worldcoin/idkit";
+import { useRef, useState } from "react";
 import { source } from "@/lib/adapter";
 import { mockProof } from "@/lib/worldid";
+import {
+  CREDENTIAL_COPY,
+  IDENTITY_PRIVACY,
+  contextIssue,
+  identityFailure,
+  verifierLabel,
+} from "@/lib/identity";
 import type { Party, ProfileId, WorldIdContext } from "@/lib/types";
+import { WorldIdWidget } from "./WorldIdWidget";
 
-// The IDKit widget only when an app is registered; it is client-only.
-const IDKitRequestWidget = dynamic(() => import("@worldcoin/idkit").then((m) => m.IDKitRequestWidget), {
-  ssr: false,
-});
-
-/**
- * "Verify with World ID" for a wallet: the KYC identity step of Exhibit A. With a registered app the
- * World ID widget asks for the configured credential (a passport by default) and the proof goes to
- * the gateway; without one, a mock proof is submitted so the flow still runs.
- * `asParty` submits the proof of another wallet's human: the one-human-one-wallet refusal.
- */
+/** Classic profile screens share IDKit, but never treat its completion callback as authorization. */
 export function HumanCheck({
   profile,
   party,
   asParty,
+  service = source,
 }: {
   profile: ProfileId;
   party: Party;
   asParty?: Party;
+  service?: Pick<typeof source, "worldIdContext" | "verifyHuman">;
 }) {
   const [context, setContext] = useState<WorldIdContext | null>(null);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  if (party.facts.identityVerified === true && !asParty) return null;
-
-  const submit = async (proof: unknown) => {
+  const [consent, setConsent] = useState(false);
+  const [message, setMessage] = useState("");
+  const [result, setResult] = useState("");
+  const submitted = useRef(false);
+  if (party.facts.identityVerified === true && !asParty && !result) return null;
+  async function prepare() {
     setBusy(true);
-    setError(null);
+    setMessage("");
+    setConsent(false);
+    setResult("");
     try {
-      await source.verifyHuman(profile, party.id, proof);
-    } catch (e) {
-      setError((e as Error).message);
+      const ctx = await service.worldIdContext();
+      const issue = contextIssue(ctx, ctx.credential);
+      if (issue) throw new Error(issue);
+      if (asParty && !ctx.mock)
+        throw new Error(
+          "Another wallet's proof can only be simulated in demo mode. A live proof must come from the required credential holder and be bound to this wallet."
+        );
+      setContext(ctx);
+    } catch (error) {
+      setMessage(identityFailure(error).detail);
     } finally {
       setBusy(false);
     }
-  };
-  const start = async () => {
+  }
+  async function submit(proof: unknown) {
     setBusy(true);
-    setError(null);
+    submitted.current = true;
     try {
-      const ctx = await source.worldIdContext();
-      if (ctx.mock) await submit(await mockProof(party.address, ctx.action, (asParty ?? party).address));
-      else setContext(ctx);
-    } catch (e) {
-      setError((e as Error).message);
+      const updated = await service.verifyHuman(profile, party.id, proof);
+      if (
+        updated.address.toLowerCase() !== party.address.toLowerCase() ||
+        updated.facts.identityVerified !== true
+      )
+        throw new Error(
+          "The gateway has not returned an identity fact for this wallet. Refresh access before retrying."
+        );
+      setResult(
+        context?.mock
+          ? "Demo identity fact recorded—not real credential verification."
+          : "The gateway returned the identity fact. Other policy requirements still apply; inspect refreshed access."
+      );
+      setContext(null);
+    } catch (error) {
+      setMessage(identityFailure(error).detail);
+      throw error;
     } finally {
       setBusy(false);
+      setOpen(false);
     }
-  };
+  }
+  async function start() {
+    if (!context || !consent) return;
+    const issue = contextIssue(context, context.credential);
+    if (issue) {
+      setMessage(issue);
+      return;
+    }
+    submitted.current = false;
+    setMessage("");
+    if (context.mock) {
+      try {
+        await submit(
+          await mockProof(party.address, context.action, (asParty ?? party).address, context.credential)
+        );
+      } catch {
+        /* error is displayed; no false success */
+      }
+    } else setOpen(true);
+  }
+  function close() {
+    setOpen(false);
+    if (!submitted.current)
+      setMessage("Request cancelled. No new access was granted by this browser. You can retry.");
+  }
   return (
     <span className="human-check">
-      <button
-        className="btn-sm"
-        disabled={busy}
-        onClick={start}
-        title="World ID document credential (Passport/NFC), bound to this wallet"
-      >
-        {asParty ? `Use ${asParty.name.split(" — ")[0]}'s proof` : "Verify with World ID"}
+      <button className="btn-sm" disabled={busy || open} onClick={prepare}>
+        {asParty ? `Demo: use ${asParty.name.split(" — ")[0]}'s proof` : "Review World ID check"}
       </button>
-      {error && <span className="meta error"> {error}</span>}
-      {context && !context.mock && (
-        <IDKitRequestWidget
-          app_id={context.app_id as `app_${string}`}
-          action={context.action}
-          rp_context={context.rp_context}
-          allow_legacy_proofs
-          preset={
-            context.credential === "proof_of_human"
-              ? proofOfHuman({ signal: party.address })
-              : context.credential === "selfie"
-                ? selfieCheck({ signal: party.address })
-                : passport({ signal: party.address })
-          }
-          environment={context.environment as "production" | "staging"}
-          open
-          onOpenChange={(open: boolean) => !open && setContext(null)}
-          handleVerify={async (result: unknown) => {
-            await submit({ ...(result as object), action: context.action });
+      {message && (
+        <span className="meta error" role="alert">
+          {" "}
+          {message}
+        </span>
+      )}
+      {result && (
+        <span className="meta" role="status">
+          {" "}
+          {result}
+        </span>
+      )}
+      {context && (
+        <span className="human-check-review">
+          <strong>
+            {verifierLabel(context)} · {CREDENTIAL_COPY[context.credential].label}
+          </strong>
+          <code>{party.address}</code>
+          <span>{CREDENTIAL_COPY[context.credential].limit}</span>
+          <span>{IDENTITY_PRIVACY}</span>
+          <label>
+            <input
+              type="checkbox"
+              checked={consent}
+              disabled={busy || open}
+              onChange={(event) => setConsent(event.target.checked)}
+            />{" "}
+            I confirm this wallet and credential.
+          </label>
+          <button disabled={!consent || busy || open} onClick={start}>
+            {busy ? "Waiting for gateway…" : context.mock ? "Run demo proof" : "Continue with World ID"}
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              close();
+              setContext(null);
+            }}
+          >
+            Cancel
+          </button>
+        </span>
+      )}
+      {context && open && !context.mock && (
+        <WorldIdWidget
+          context={context}
+          wallet={party.address}
+          onProof={submit}
+          onClose={close}
+          onError={(code) => {
+            if (!submitted.current) setMessage(identityFailure(code).detail);
+            setOpen(false);
           }}
-          onSuccess={() => setContext(null)}
         />
       )}
     </span>

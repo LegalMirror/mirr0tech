@@ -7,8 +7,9 @@ import { dirname } from 'node:path';
 import { Contract, MaxUint256, Wallet, ZeroHash, id, keccak256, formatUnits, parseEther, parseUnits, toUtf8Bytes } from 'ethers';
 import { loadArtifacts } from './deploy.js';
 import { decodeRefusal } from './refusal.js';
+import { decodeCashierRefusal } from './policy/cashier-refusal.js';
 import { loadOpcodes, buildBuybackProgram, buildDutchBuybackProgram, buildAquaOrder, encodeOrder, buildTakerData, buybackTermsFrom, disassemble } from './policy/programs.js';
-import { AppError } from './errors.js';
+import { AppError, ensure } from './errors.js';
 import { indexedEvents } from './multibaas.js';
 import { HumanRegistry, WorldIdError, WorldIdVerifier } from './worldid.js';
 
@@ -36,6 +37,7 @@ export class VenueService {
     const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'PoolManager']);
     const credit = await loadArtifacts('wildcat-credit', ['PolicyOracle', 'MirrortechRoleProvider', 'MockWildcatMarket', 'MirrortechRouter', 'Aqua']);
     this.policies ??= { rwa: { policy: rwa.policy, clauseTable: rwa.clauseTable }, credit: { policy: credit.policy, clauseTable: credit.clauseTable } };
+    ensure(Boolean(this.policies.rwa.policy.cashier) === Boolean(this.record.rwa.cashier?.enabled), 503, 'CASHIER_BINDING_MISMATCH', 'Preserve deployment.router and deployment.cashier in the per-agreement venue record');
     this.artifacts = { rwa: rwa.artifacts, credit: credit.artifacts };
     this.bind(this.signer);
     this.wallets = { Operator: await this.signer.getAddress() };
@@ -47,6 +49,7 @@ export class VenueService {
     }
     this.opcodes = loadOpcodes();
     if (this.auditPath) this.audit = await readFile(this.auditPath, 'utf8').then(JSON.parse, () => []);
+    ensure(this.worldId.verifier.mock || this.worldId.registry.path, 503, 'WORLD_REGISTRY_REQUIRED', 'Live World ID requires durable credential-scoped binding storage');
     await this.worldId.registry.load();
     return this;
   }
@@ -56,8 +59,9 @@ export class VenueService {
     const { rwa, credit } = this.artifacts;
     this.c = {
       attestor: at(r.attestor, rwa.PolicyAttestor), sanctions: at(r.sanctions, rwa.MockSanctionsOracle), usdc: at(r.usdc, rwa.MockERC20),
-      token: at(r.rwa.token, rwa.CompiledMirrorToken), hook: at(r.rwa.hook, rwa.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.PolicyOracle),
-      poolManager: at(r.rwa.poolManager, rwa.PoolManager), v4Router: at(r.rwa.router, rwa.MirrorLiquidityRouter),
+      token: at(r.rwa.token, rwa.CompiledMirrorToken), hook: at(r.rwa.hook, r.rwa.cashier ? { abi: r.rwa.cashier.hookAbi } : rwa.MirrorPolicyHook), rwaOracle: at(r.rwa.oracle, rwa.PolicyOracle),
+      poolManager: at(r.rwa.poolManager, rwa.PoolManager), v4Router: at(r.rwa.router, r.rwa.cashier ? { abi: r.rwa.cashier.routerAbi } : rwa.MirrorLiquidityRouter),
+      ...(r.rwa.cashier ? { cashierAsset: at(r.rwa.cashier.asset, rwa.MockERC20) } : {}),
       roleProvider: at(r.credit.roleProvider, credit.MirrortechRoleProvider), market: at(r.credit.market, credit.MockWildcatMarket),
       aqua: at(r.credit.aqua, credit.Aqua), swapRouter: at(r.credit.router, credit.MirrortechRouter),
     };
@@ -142,12 +146,18 @@ export class VenueService {
       const result = await action();
       const receipt = result?.wait ? await result.wait() : null;
       if (receipt) await this.settled(receipt.blockNumber);
+      if (receipt && type === 'rwa.cashier.swap') {
+        const executed = receipt.logs.filter((log) => log.address.toLowerCase() === this.record.rwa.router.toLowerCase())
+                  .map((log) => { try { return this.c.v4Router.interface.parseLog(log); } catch { return null; } }).find((event) => event?.name === 'Executed');
+        if (executed) Object.assign(entry, { actualRoute: ['auto', 'amm', 'cashier'][Number(executed.args.route)], amountOut: formatUnits(executed.args.amountOut, 6) });
+      }
       Object.assign(entry, { status: 'ok', txHash: receipt?.hash ?? null, ...(receipt ? {} : { result }) });
       this.audit.push(entry);
       await this.persist();
       return entry;
     } catch (error) {
-      const refusal = decodeRefusal(error, this.policy(details.policy ?? 'credit').clauseTable);
+      const table = this.policy(details.policy ?? 'credit').clauseTable;
+      const refusal = decodeCashierRefusal(error, table) ?? decodeRefusal(error, table);
       Object.assign(entry, { status: 'refused', refusal: refusal ? { ...refusal, subject: refusal.subject ? this.name(refusal.subject) : null } : null, message: error.shortMessage ?? error.message });
       this.audit.push(entry);
       await this.persist();
@@ -184,7 +194,22 @@ export class VenueService {
   // ---- facts -----------------------------------------------------------------------------------
   /// Replaces the wallet's facts, except `identityVerified`: only a World ID proof sets it, so a
   /// plain attestation that does not mention it keeps it.
+  async attestationWindow(kind, address, days, preserve = false) {
+    ensure(Number.isInteger(days) && days > 0 && days <= 90, 400, 'INVALID_VALIDITY', 'Attestation validity must be 1 to 90 whole days');
+    const now = (await this.provider.getBlock('latest')).timestamp;
+    let expiresAt = now + days * 86400;
+    if (preserve) {
+      const previous = Number(await this.c.attestor.expiresAt(address, this.policy(kind).policy.hash));
+      if (previous > now) expiresAt = Math.min(expiresAt, previous);
+    }
+    return { now, expiresAt };
+  }
+  checkAttestedFacts(facts) {
+    ensure(facts && typeof facts === 'object' && !Array.isArray(facts), 400, 'INVALID_FACTS', 'facts must be an object');
+    ensure(facts.identityVerified !== true, 403, 'WORLD_PROOF_REQUIRED', 'Only a server-verified World ID proof may grant identityVerified');
+  }
   async attest(kind, wallet, facts, days = 30) {
+    this.checkAttestedFacts(facts);
     const address = this.address(wallet);
     const { policy } = this.policy(kind);
     if (!('identityVerified' in facts) && policy.factOrder.includes('identityVerified')) {
@@ -193,27 +218,31 @@ export class VenueService {
       if (wasKnown & bit & wasValue) facts = { ...facts, identityVerified: true };
     }
     const { known, value } = this.pack(kind, facts);
-    const now = (await this.provider.getBlock('latest')).timestamp;
-    return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, now + days * 86400));
+    const { now, expiresAt } = await this.attestationWindow(kind, address, days, facts.identityVerified === true);
+    return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, expiresAt));
   }
   /// Adds facts to what is already attested instead of replacing the set.
   async attestMerged(kind, wallet, facts, days = 30) {
+    this.checkAttestedFacts(facts);
     const address = this.address(wallet);
     const { known, value } = this.pack(kind, facts);
     const { policy } = this.policy(kind);
-    const now = (await this.provider.getBlock('latest')).timestamp;
+    const { now, expiresAt } = await this.attestationWindow(kind, address, days, true);
     return this.run('attest', { policy: kind, wallet: this.name(address), facts }, async () => {
       const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
-      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, now + days * 86400);
+      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, expiresAt);
     });
   }
   /// A World ID credential proof for `wallet`: verified, its nullifier bound to this wallet, then
   /// attested as `identityVerified` under the fund policy so every venue reads it.
   async verifyHuman(wallet, proof, days = 30) {
     const address = this.address(wallet);
+    const { now, expiresAt } = await this.attestationWindow('rwa', address, days, true);
+    let verification;
     let nullifier;
     try {
-      ({ nullifier } = await this.worldId.verifier.verify(proof, address));
+      verification = await this.worldId.verifier.verify(proof, address);
+      ({ nullifier } = verification);
       await this.worldId.registry.bind(nullifier, address);
     } catch (error) {
       if (!(error instanceof WorldIdError)) throw error;
@@ -223,10 +252,10 @@ export class VenueService {
     }
     const { policy } = this.policy('rwa');
     const { known, value } = this.pack('rwa', { identityVerified: true });
-    const now = (await this.provider.getBlock('latest')).timestamp;
-    return this.run('worldid.verify', { policy: 'rwa', wallet: this.name(address), nullifier: `${nullifier.slice(0, 10)}…`, facts: { identityVerified: true } }, async () => {
+    const { credential, action, environment, mock } = verification;
+    return this.run('worldid.verify', { policy: 'rwa', wallet: this.name(address), credential, action, environment, mock, expiresAt, nullifier: `${nullifier.slice(0, 10)}…`, facts: { identityVerified: true } }, async () => {
       const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
-      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, now + days * 86400);
+      return this.c.attestor.attest(address, policy.hash, wasKnown | known, (wasValue & ~known) | value, now, expiresAt);
     });
   }
   async revoke(kind, wallet, facts) {
@@ -255,6 +284,10 @@ export class VenueService {
     for (const spender of [this.record.rwa.router, this.record.credit.market, this.record.credit.router, this.record.credit.aqua]) {
       await (await this.c.usdc.connect(signer).approve(spender, MaxUint256)).wait();
     }
+    if (this.c.cashierAsset) {
+      await (await this.c.cashierAsset.mint(address, parseUnits(amount, 6))).wait();
+      await (await this.c.cashierAsset.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
+    }
     await (await this.c.token.connect(signer).approve(this.record.rwa.router, MaxUint256)).wait();
     await (await this.c.market.connect(signer).approve(this.record.credit.router, MaxUint256)).wait();
     return { wallet: this.name(address), funded: amount };
@@ -263,6 +296,7 @@ export class VenueService {
   /// The same payment id settles once (`ok` or `held`); a refusal holds the money and records the
   /// sentence; a chain error is `failed` and the rail's retry tries again.
   async settlePayment({ id: paymentId, wallet, amount, reference = null }) {
+    ensure(!this.record.rwa.cashier, 409, 'CASHIER_PAYMENT_UNSUPPORTED', 'Cashier subscriptions require bounded mockUSD settlement; the legacy one-USD-per-share webhook cannot issue this token');
     const seen = this.audit.find((entry) => entry.type === 'payment.settle' && entry.paymentId === paymentId && entry.status !== 'failed');
     if (seen) return { ...seen, replay: true };
     const address = this.address(wallet);
@@ -292,22 +326,85 @@ export class VenueService {
     return this.run('rwa.release', { policy: 'rwa', wallet: this.name(address), amount }, () => this.c.token.release(id(`release:${Date.now()}`), address, parseUnits(amount, 6)));
   }
   poolKey(hooked) {
-    const [currency0, currency1] = BigInt(this.record.rwa.token) < BigInt(this.record.usdc) ? [this.record.rwa.token, this.record.usdc] : [this.record.usdc, this.record.rwa.token];
+    if (this.record.rwa.cashier) {
+      ensure(this.record.rwa.poolKey, 503, 'CASHIER_BINDING_MISMATCH', 'Cashier venue requires the deployed pool key');
+      return { ...this.record.rwa.poolKey, hooks: hooked ? this.record.rwa.hook : '0x0000000000000000000000000000000000000000' };
+    }
+    const asset = this.record.rwa.cashier?.asset ?? this.record.usdc;
+    const [currency0, currency1] = BigInt(this.record.rwa.token) < BigInt(asset) ? [this.record.rwa.token, asset] : [asset, this.record.rwa.token];
     return { currency0, currency1, fee: 3000, tickSpacing: TICK_SPACING, hooks: hooked ? this.record.rwa.hook : '0x0000000000000000000000000000000000000000' };
   }
   async createPool(wallet, hooked) {
     const signer = await this.signerFor(wallet);
-    return this.run('rwa.pool.create', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () => this.c.poolManager.connect(signer).initialize(this.poolKey(hooked), SQRT_PRICE_1_1));
+    return this.run('rwa.pool.create', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () => this.c.poolManager.connect(signer).initialize(this.poolKey(hooked), this.record.rwa.cashier?.initialSqrtPriceX96 ?? SQRT_PRICE_1_1));
   }
   async addLiquidity(wallet, hooked) {
     const signer = await this.signerFor(wallet);
+    const key = this.poolKey(hooked);
+    // A full-range demo position covers arbitrary deployed NAVs without assuming tick zero.
+    const position = this.record.rwa.cashier
+      ? { tickLower: Math.ceil(-887272 / key.tickSpacing) * key.tickSpacing, tickUpper: Math.floor(887272 / key.tickSpacing) * key.tickSpacing, liquidityDelta: 10n ** 9n, salt: id('position') }
+      : { tickLower: -TICK_SPACING, tickUpper: TICK_SPACING, liquidityDelta: 10n ** 12n, salt: id('position') };
     return this.run('rwa.pool.addLiquidity', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () =>
-      this.c.v4Router.connect(signer).modifyLiquidity(this.poolKey(hooked), { tickLower: -TICK_SPACING, tickUpper: TICK_SPACING, liquidityDelta: 10n ** 12n, salt: id('position') }));
+      this.c.v4Router.connect(signer).modifyLiquidity(key, position));
   }
   async swap(wallet, hooked) {
+    ensure(!this.record.rwa.cashier, 400, 'BOUNDED_ORDER_REQUIRED', 'Use /rwa/cashier/swap with amount, minOut and deadline for this agreement');
     const signer = await this.signerFor(wallet);
     return this.run('rwa.pool.swap', { policy: 'rwa', wallet: this.name(this.address(wallet)), hooked }, () =>
       this.c.v4Router.connect(signer).swap(this.poolKey(hooked), { zeroForOne: true, amountSpecified: -1000n, sqrtPriceLimitX96: SQRT_PRICE_1_1 - 1000n }));
+  }
+
+  requireCashier() {
+    ensure(this.record.rwa.cashier?.enabled, 409, 'NO_CASHIER', 'This agreement did not opt in to the DEMO NAV cashier');
+    return this.record.rwa.cashier;
+  }
+  cashierAmount(amount) {
+    ensure(typeof amount === 'string' && amount.length <= 40 && /^(0|[1-9][0-9]*)(\.[0-9]{1,6})?$/.test(amount), 400, 'INVALID_AMOUNT', 'Use a positive decimal string with at most six decimals');
+    const units = parseUnits(amount, 6);
+    ensure(units > 0n && units < 2n ** 127n, 400, 'INVALID_AMOUNT', 'Amount must fit a positive int128');
+    return units;
+  }
+  async cashierState() {
+    const cashier = this.requireCashier();
+    return { demo: true, policyHash: this.policy('rwa').policy.hash, ...this.policy('rwa').policy.cashier,
+      hook: this.record.rwa.hook, router: this.record.rwa.router, asset: cashier.asset, poolKey: this.poolKey(true),
+      reserve: formatUnits(await this.c.cashierAsset.balanceOf(this.record.rwa.hook), 6),
+      totalSupply: formatUnits(await this.c.token.totalSupply(), 6), maxSupply: formatUnits(await this.c.token.maxSupply(), 6),
+      routes: ['auto', 'amm', 'cashier'], limitations: 'Fixed DEMO NAV; prefunded reserve only; no universal arbitrage or LP-loss guarantee. Quote is not an execution guarantee.' };
+  }
+  async cashierQuote({ buy, amount }) {
+    this.requireCashier();
+    ensure(typeof buy === 'boolean', 400, 'INVALID_BODY', 'buy must be boolean');
+    const units = this.cashierAmount(amount);
+    let out;
+    try { out = await this.c.hook.quote(buy, units); } catch (error) {
+      const refusal = decodeCashierRefusal(error, this.policy('rwa').clauseTable);
+      if (!refusal) throw error;
+      throw new AppError(403, 'POLICY_REFUSED', refusal.description, { refusal });
+    }
+    return { kind: 'nav-only', executable: null, buy, amount, amountOut: formatUnits(out, 6),
+      policyHash: this.policy('rwa').policy.hash, termsHash: this.policy('rwa').policy.cashier.termsHash };
+  }
+  async cashierSwap(wallet, { buy, amount, minOut, deadline, route = 'auto' }) {
+    this.requireCashier();
+    ensure(typeof buy === 'boolean' && ['auto', 'amm', 'cashier'].includes(route), 400, 'INVALID_BODY', 'buy must be boolean; route is auto, amm or cashier');
+    ensure(Number.isSafeInteger(deadline) && deadline > 0, 400, 'INVALID_BODY', 'deadline must be a positive Unix timestamp in seconds');
+    const units = this.cashierAmount(amount);
+    const minimum = this.cashierAmount(minOut);
+    const signer = await this.signerFor(wallet);
+    const key = this.poolKey(true);
+    const zeroForOne = (key.currency0.toLowerCase() === this.record.rwa.cashier.asset.toLowerCase()) === buy;
+    return this.run('rwa.cashier.swap', { policy: 'rwa', wallet: this.name(this.address(wallet)), buy, amount, minOut, deadline, route }, () =>
+      this.c.v4Router.connect(signer).swap(key, { zeroForOne, amountSpecified: -units,
+        sqrtPriceLimitX96: zeroForOne ? 4295128740n : 1461446703485210103287273052203988822378723970341n }, minimum, deadline, ['auto', 'amm', 'cashier'].indexOf(route)));
+  }
+  async cashierPrefund(wallet, amount) {
+    this.requireCashier();
+    const units = this.cashierAmount(amount);
+    const signer = await this.signerFor(wallet);
+    return this.run('rwa.cashier.prefund', { policy: 'rwa', wallet: this.name(this.address(wallet)), amount }, () =>
+      this.c.cashierAsset.connect(signer).transfer(this.record.rwa.hook, units));
   }
 
   // ---- Act 2 -------------------------------------------------------------------------------------

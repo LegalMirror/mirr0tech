@@ -1,54 +1,103 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { HumanRegistry, WorldIdError, WorldIdVerifier, mockProof } from '../src/worldid.js';
+import { Wallet, getBytes, verifyMessage } from 'ethers';
+import { computeRpSignatureMessage } from '@worldcoin/idkit-core/signing';
+import { passport, proofOfHuman, selfieCheck } from '@worldcoin/idkit-core';
+import { WorldIdError, WorldIdVerifier, mockProof } from '../src/worldid.js';
 
 const A = '0x00000000000000000000000000000000000000aa';
 const B = '0x00000000000000000000000000000000000000bb';
+const local = { rpId: null, appId: null, signingKeyHex: null, environment: 'staging', credential: 'document', action: 'onboard-investor' };
+const errorCode = (code) => (error) => error instanceof WorldIdError && error.code === code;
 
-test('without an rp id the verifier hands out a mock context and accepts well-formed mock proofs only', async () => {
-  const verifier = new WorldIdVerifier({ rpId: null });
+// Isolate configuration tests from operator credentials; never use real secrets in this suite.
+test.beforeEach((t) => {
+  const previous = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'test';
+  t.after(() => { if (previous === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous; });
+});
+
+test('unconfigured local mode is visibly simulated, with deterministic explicit fixtures', async () => {
+  const verifier = new WorldIdVerifier(local);
   const context = await verifier.context();
   assert.equal(context.mock, true);
+  assert.equal(context.environment, 'mock');
   assert.equal(context.action, 'onboard-investor');
+  assert.equal(context.allow_legacy_proofs, false);
   assert.match(context.rp_context.nonce, /^0x[0-9a-f]{64}$/);
-  const ok = await verifier.verify(mockProof(A));
-  assert.equal(ok.success, true);
-  assert.equal(ok.nullifier, mockProof(A).responses[0].nullifier, 'the mock nullifier is deterministic per wallet');
-  await assert.rejects(verifier.verify({ protocol_version: '2.0' }), (e) => e instanceof WorldIdError && e.code === 'INVALID_PROOF');
-  await assert.rejects(verifier.verify(mockProof(A, { action: 'other' })), /expected onboard-investor/);
-});
-
-test('with an rp id the verifier posts to the Developer Portal and maps its answer', async () => {
-  const calls = [];
-  const fetchImpl = async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return { ok: true, json: async () => ({ success: true, nullifier: '0xabc', action: 'onboard-investor', environment: 'staging' }) }; };
-  const verifier = new WorldIdVerifier({ rpId: 'rp_test', environment: 'staging', fetchImpl });
+  assert.equal(context.rp_context.signature, '0xmock');
   const result = await verifier.verify(mockProof(A));
-  assert.equal(calls[0].url, 'https://developer.world.org/api/v4/verify/rp_test');
-  assert.equal(calls[0].body.environment, 'staging');
-  assert.equal(result.nullifier, '0xabc');
-  const failing = new WorldIdVerifier({ rpId: 'rp_test', fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ success: false, code: 'all_verifications_failed', detail: 'invalid proof' }) }) });
-  await assert.rejects(failing.verify(mockProof(A)), (e) => e.code === 'INVALID_PROOF' && /invalid proof/.test(e.message));
+  assert.deepEqual(result, { success: true, nullifier: mockProof(A).responses[0].nullifier, action: context.action, credential: 'document', environment: 'mock', mock: true });
+  await assert.rejects(verifier.verify({ protocol_version: '2.0' }), errorCode('INVALID_PROOF'));
+  await assert.rejects(verifier.verify(mockProof(A, { action: 'other' })), /expected onboard-investor/);
+  const notMock = mockProof(A);
+  notMock.responses[0].identifier = 'passport';
+  await assert.rejects(verifier.verify(notMock), /explicitly simulated/);
+  const wrongEnvironment = { ...mockProof(A), environment: 'production' };
+  await assert.rejects(verifier.verify(wrongEnvironment), /explicitly simulated/);
 });
 
-test('the registry binds one human to one wallet and survives a restart', async () => {
-  const path = join(await mkdtemp(join(tmpdir(), 'mirr0tech-humans-')), 'humans.json');
-  const registry = await new HumanRegistry(path).load();
-  const nullifier = mockProof(A).responses[0].nullifier;
-  await registry.bind(nullifier, A);
-  await registry.bind(nullifier, A.toUpperCase().replace('0X', '0x'));
-  await assert.rejects(registry.bind(nullifier, B), (e) => e.code === 'HUMAN_ALREADY_BOUND' && e.status === 409);
-  const reloaded = await new HumanRegistry(path).load();
-  assert.equal(reloaded.walletOf(nullifier).toLowerCase(), A);
+test('explicit local fixtures retain named wallets and same-nullifier reuse for the denied demo', async () => {
+  const verifier = new WorldIdVerifier({ ...local, mock: true });
+  const result = await verifier.verify(mockProof('Investor'), B);
+  assert.equal(result.mock, true);
+  assert.equal(result.nullifier, mockProof('Investor').responses[0].nullifier);
+  assert.equal((await verifier.verify(mockProof(A, { nullifier: '0xAB' }))).nullifier, `0x${'ab'.padStart(64, '0')}`);
 });
 
-test('the agreement names the credential: a proof of another kind is refused in plain words', async () => {
-  const { WorldIdVerifier, mockProof } = await import('../src/worldid.js');
-  const wallet = '0x1111111111111111111111111111111111111111';
-  const human = new WorldIdVerifier({ credential: 'proof_of_human' });
-  await assert.rejects(human.verify(mockProof(wallet), wallet), (error) => error.code === 'WRONG_CREDENTIAL' && /proof of human/.test(error.message));
-  assert.equal((await human.verify(mockProof(wallet, { credential: 'proof_of_human' }), wallet)).success, true);
-  assert.equal((await new WorldIdVerifier().verify(mockProof(wallet), wallet)).success, true);
+test('the agreement selects the credential; no silent credential downgrade', async () => {
+  const human = new WorldIdVerifier({ ...local, credential: 'proof_of_human' });
+  await assert.rejects(human.verify(mockProof(A), A), (error) => error.code === 'WRONG_CREDENTIAL' && /proof of human/.test(error.message));
+  for (const credential of ['document', 'proof_of_human', 'selfie']) {
+    const verifier = new WorldIdVerifier({ ...local, credential });
+    assert.equal((await verifier.verify(mockProof(A, { credential }), A)).credential, credential);
+  }
+});
+
+test('partial, blank, disabled-mock or production configuration never falls back to mock', () => {
+  for (const config of [
+    { appId: 'app_test' }, { signingKeyHex: 'bad' }, { rpId: '' }, { appId: '' },
+    { mock: false }, { mock: 'false' }, { mock: true, rpId: 'rp_test' },
+    { environment: 'production' }, { environment: 'production', mock: true },
+    { credential: 'toString' }, { environment: 'unknown' }, { action: '' },
+    { timeoutMs: 0 }, { timeoutMs: -1 }, { timeoutMs: 1.5 }, { timeoutMs: 120001 }, { timeoutMs: NaN },
+  ]) assert.throws(() => new WorldIdVerifier({ ...local, ...config }), errorCode('CONFIG'));
+  process.env.NODE_ENV = 'production';
+  assert.throws(() => new WorldIdVerifier(local), errorCode('CONFIG'));
+  assert.throws(() => new WorldIdVerifier({ ...local, mock: true }), errorCode('CONFIG'));
+});
+
+test('live context fails without an app or a usable RP signing key, never returns a mock signature', async () => {
+  for (const config of [
+    {}, { appId: 'app_test' }, { appId: 'rp_test', signingKeyHex: '01'.repeat(32) },
+    { appId: 'app_test', signingKeyHex: 'bad' }, { appId: 'app_test', signingKeyHex: '00'.repeat(32) },
+  ]) {
+    const verifier = new WorldIdVerifier({ ...local, rpId: 'rp_test', ...config });
+    assert.equal(verifier.mock, false);
+    await assert.rejects(verifier.context(), errorCode('CONFIG'));
+  }
+});
+
+test('live context uses the installed SDK signing format and exposes public material only', async () => {
+  // Public test key, never an operator key or a funded wallet.
+  const key = '0x' + '01'.repeat(32);
+  const verifier = new WorldIdVerifier({ ...local, rpId: 'rp_test', appId: 'app_test', signingKeyHex: key });
+  const context = await verifier.context();
+  assert.equal(context.mock, false);
+  assert.equal(context.environment, 'staging');
+  assert.equal(context.allow_legacy_proofs, false);
+  assert.equal(context.rp_context.expires_at - context.rp_context.created_at, 300);
+  assert.match(context.rp_context.signature, /^0x[0-9a-f]{130}$/);
+  assert.equal(JSON.stringify(context).includes(key.slice(2)), false);
+  assert.deepEqual(Object.keys(context.rp_context).sort(), ['created_at', 'expires_at', 'nonce', 'rp_id', 'signature']);
+  const { nonce, created_at, expires_at, signature } = context.rp_context;
+  const message = computeRpSignatureMessage(getBytes(nonce), created_at, expires_at, context.action);
+  assert.equal(verifyMessage(message, signature), new Wallet(key).address);
+  assert.notEqual((await verifier.context()).rp_context.nonce, nonce);
+});
+
+test('installed IDKit v4 presets accept the wallet as signal, without legacy remapping', () => {
+  assert.deepEqual(passport({ signal: A }), { type: 'Passport', signal: A });
+  assert.deepEqual(proofOfHuman({ signal: A }), { type: 'ProofOfHuman', signal: A });
+  assert.deepEqual(selfieCheck({ signal: A }), { type: 'SelfieCheck', signal: A });
 });

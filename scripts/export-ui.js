@@ -9,7 +9,6 @@ import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
 import { compilePolicy } from '../src/policy/compile.js';
-import { buildOnchainPolicy } from '../src/policy/onchain.js';
 import { auditEvents } from '../src/audit-events.js';
 import { extractWithNoolog } from '../src/noolog/extract.js';
 import { buildAquaOrder, buildBuybackProgram, buildDutchBuybackProgram, buybackTermsFrom, encodeOrder, encoders, loadOpcodes } from '../src/policy/programs.js';
@@ -414,7 +413,7 @@ export async function exportProfile(spec) {
 /// as uploaded (one per part), so the display text keeps its line structure.
 export function exportCompiled({ profile, act = null, label = null, venue = null, document, raws, envelope, verification, config }) {
   const compiled = compilePolicy(envelope, config, document, { demo: true });
-  const onchain = buildOnchainPolicy(envelope.ast);
+  const onchain = compiled.onchain;
   if (onchain.clauseTableHash !== compiled.policy.clauseTableHash) throw new Error('On-chain policy disagrees with the compiled policy');
 
   // Per-part display text, and each part's offset inside the bundled normalized text.
@@ -448,7 +447,9 @@ export function exportCompiled({ profile, act = null, label = null, venue = null
       quotes: locate(rule.source.quote),
     };
   });
-  const terms = ast.terms.map((term) => ({ ...term, quotes: locate(term.source.quote) }));
+  const terms = ast.terms.map((term) => ({ ...term,
+    ...(clauseOf.has(`term:${term.name}`) ? { clauseId: clauseOf.get(`term:${term.name}`) } : {}),
+    quotes: locate(term.source.quote) }));
   const unresolved = ast.unresolved.map((entry) => ({ ...entry, anchor: anchorFor(entry.clause, parts) }));
   for (const item of [...rules, ...terms]) if (!item.quotes.length) throw new Error(`Quote not located: ${item.id ?? item.name}`);
 
@@ -470,6 +471,7 @@ export function exportCompiled({ profile, act = null, label = null, venue = null
     equivalenceChecks: compiled.equivalenceChecks,
     demo: compiled.policy.demo,
     config,
+    cashier: compiled.policy.cashier ?? null,
     extraction: envelope.extraction,
     verification,
     factOrder: onchain.facts,

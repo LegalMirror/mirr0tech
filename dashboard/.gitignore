@@ -1,6 +1,7 @@
 .next/
 out/
 node_modules/
+.npm-cache/
 coverage/
 next-env.d.ts
 *.tsbuildinfo

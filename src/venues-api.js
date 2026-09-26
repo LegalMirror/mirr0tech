@@ -25,6 +25,13 @@ export function venueRoutes(venues) {
   router.post('/rwa/pools', wrap(async (req) => venues.createPool(field(req.body, 'wallet'), field(req.body, 'hooked', 'boolean'))));
   router.post('/rwa/liquidity', wrap(async (req) => venues.addLiquidity(field(req.body, 'wallet'), field(req.body, 'hooked', 'boolean'))));
   router.post('/rwa/swap', wrap(async (req) => venues.swap(field(req.body, 'wallet'), field(req.body, 'hooked', 'boolean'))));
+  router.get('/rwa/cashier', wrap(async () => venues.cashierState()));
+  router.post('/rwa/cashier/quote', wrap(async (req) => venues.cashierQuote({ buy: field(req.body, 'buy', 'boolean'), amount: field(req.body, 'amount') })));
+  router.post('/rwa/cashier/swap', wrap(async (req) => venues.cashierSwap(field(req.body, 'wallet'), {
+    buy: field(req.body, 'buy', 'boolean'), amount: field(req.body, 'amount'), minOut: field(req.body, 'minOut'),
+    deadline: field(req.body, 'deadline', 'number'), route: req.body.route ?? 'auto',
+  })));
+  router.post('/rwa/cashier/prefund', wrap(async (req) => venues.cashierPrefund(field(req.body, 'wallet'), field(req.body, 'amount'))));
 
   router.post('/credit/deposit', wrap(async (req) => venues.deposit(field(req.body, 'wallet'), field(req.body, 'amount'))));
   router.post('/credit/withdraw', wrap(async (req) => venues.withdraw(field(req.body, 'wallet'), field(req.body, 'amount'))));

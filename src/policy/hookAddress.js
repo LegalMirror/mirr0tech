@@ -11,9 +11,11 @@ export const FLAGS = {
   beforeAddLiquidity: 1n << 11n, afterAddLiquidity: 1n << 10n,
   beforeRemoveLiquidity: 1n << 9n, afterRemoveLiquidity: 1n << 8n,
   beforeSwap: 1n << 7n, afterSwap: 1n << 6n,
+  beforeSwapReturnsDelta: 1n << 3n,
 };
 
 export const MIRROR_HOOK_FLAGS = FLAGS.beforeAddLiquidity | FLAGS.beforeRemoveLiquidity | FLAGS.beforeSwap;
+export const CASHIER_HOOK_FLAGS = MIRROR_HOOK_FLAGS | FLAGS.beforeSwapReturnsDelta;
 
 /// Finds a salt whose CREATE2 address carries exactly the permission bits the hook declares.
 export function mineHookAddress(initCode, flags = MIRROR_HOOK_FLAGS, { deployer = DETERMINISTIC_DEPLOYER, limit = 500_000 } = {}) {

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
 import {Simulator} from "@1inch/solidity-utils/contracts/mixins/Simulator.sol";

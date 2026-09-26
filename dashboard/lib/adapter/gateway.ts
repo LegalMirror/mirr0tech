@@ -11,25 +11,20 @@ import type {
   WorldIdContext,
 } from "../types";
 import type { DataSource } from "./types";
+import { gatewayRequest, getSession } from "../session";
 
-export function gatewaySource(baseUrl: string, apiKey = process.env.NEXT_PUBLIC_GATEWAY_KEY): DataSource {
+export function gatewaySource(baseUrl: string | (() => string), apiKey?: string): DataSource {
   const listeners = new Set<() => void>();
   const call = async <T>(path: string, init: RequestInit = {}): Promise<T> => {
-    const response = await fetch(`${baseUrl.replace(/\/$/, "")}${path}`, {
-      ...init,
-      headers: {
-        "content-type": "application/json",
-        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
-        ...(init.method && init.method !== "GET" ? { "idempotency-key": crypto.randomUUID() } : {}),
-        ...init.headers,
+    return gatewayRequest<T>(
+      {
+        ...getSession(),
+        url: typeof baseUrl === "function" ? baseUrl() : baseUrl,
+        ...(apiKey ? { viewerKey: apiKey, operatorKey: apiKey } : {}),
       },
-    });
-    if (!response.ok) {
-      // The gateway explains refusals in plain words; surface that, or the status when there is none.
-      const body = await response.json().catch(() => null);
-      throw new Error(body?.error?.message ?? `${init.method ?? "GET"} ${path}: ${response.status}`);
-    }
-    return (await response.json()) as T;
+      path,
+      init
+    );
   };
   const mutate = async <T>(path: string, method: string, body?: unknown): Promise<T> => {
     const result = await call<T>(path, {

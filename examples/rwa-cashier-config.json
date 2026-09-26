@@ -1,0 +1,21 @@
+{
+  "name": "Mirrortech DEMO NAV Share",
+  "symbol": "mNAV",
+  "decimals": 6,
+  "maxSupply": "1000000000000",
+  "custody": "backend",
+  "currency": "USD",
+  "priceModel": "fixed-nav",
+  "profile": "rwa-secondary",
+  "secondaryVenue": "uniswap-v4",
+  "cashier": { "enabled": true, "pool": { "fee": 3000, "tickSpacing": 60 } },
+  "assumptions": [
+    "DEMO ONLY: the separately supplied NAV cashier addendum, not the base BUIDL document, authorizes these economics.",
+    "NAV, distinct subscription/redemption fees and cap are read from the explicit DEMO addendum. No economic value in this config overrides that evidence.",
+        "The AMM fee and tick spacing are deployment settings bound into the compiled policy, not inferred terms of the base agreement.",
+    "Only six-decimal non-rebasing, non-fee-on-transfer mockUSD is supported. Redemption is limited by prefunded available reserves.",
+    "Issuer authorization, offering compliance, subscription acceptance, funding confirmation, redemption authorization, KYC, AML and World ID are operator/gateway attestations.",
+    "Actual cashier subscriptions additionally settle mockUSD on chain; custodial issuance remains privileged and is not automatically reserve-backed.",
+    "The NAV band is not a theorem about all arbitrage or LP losses. Transaction ordering, gas, eligibility, NAV and reserve assumptions remain material."
+  ]
+}

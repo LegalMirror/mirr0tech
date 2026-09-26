@@ -9,6 +9,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { bundleDocuments, documentFrom } from './policy/document.js';
 import { compilePolicy } from './policy/compile.js';
+import { cashierFixture } from './policy/cashier.js';
 import { ACTIONS, validateAst } from './policy/schema.js';
 import { CREDENTIALS, DEFAULT_ACTION } from './worldid.js';
 import { extractWithNoolog } from './noolog/extract.js';
@@ -33,8 +34,8 @@ const summary = ({ documents, envelope, verification, config, ...record }) => ({
 
 /// The hand-authored reading of a demo agreement, when its quotes hold in this document. It is the
 /// draft a deliberation starts from; the mock cannot read a document without one.
-export function draftFor(spec, document) {
-  try { return validateAst(spec.fixture(document).ast, document.text); } catch { return null; }
+export function draftFor(spec, document, config = {}) {
+  try { return validateAst((config.cashier?.enabled ? cashierFixture(document) : spec.fixture(document)).ast, document.text); } catch { return null; }
 }
 
 const factsOf = (node) => (node.type === 'fact' ? [node.name] : node.children ? node.children.flatMap(factsOf) : factsOf(node.child));
@@ -141,7 +142,7 @@ export class Agreements {
     const job = (async () => {
       try {
         const document = this.document(record);
-        const draft = draftFor(spec, document);
+        const draft = draftFor(spec, document, record.config);
         if (!draft && !process.env.NOOLOG_API_KEY) throw new Error('Reading a new document needs the model: set NOOLOG_API_KEY. Without it only the demo agreements can be generated.');
         const { envelope, verification } = await this.extract({ profile: record.profile, document, draft });
         this.transition(record, 'verified', { envelope, verification, extraction: envelope.extraction });
@@ -241,7 +242,7 @@ export class Agreements {
     this.transition(record, 'deploying');
     const job = (async () => {
       try {
-        const deployment = await this.deployer({ policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity } });
+        const deployment = await this.deployer({ policyHash: compiled.policy.hash, name: record.name, sources: { compiledPolicy: compiled.compiledPolicy, token: compiled.solidity, ...(compiled.compiledCashierTerms ? { cashierTerms: compiled.compiledCashierTerms, cashier: compiled.cashier } : {}) } });
         this.transition(record, 'deployed', { deployment });
       } catch (error) {
         this.transition(record, 'compiled', { error: `Deploy failed: ${error.message}` });

@@ -3,7 +3,8 @@ import { mkdir, writeFile, copyFile } from 'node:fs/promises';
 import { compileBundle } from '../src/solc.js';
 
 const policy = JSON.parse(readFileSync('generated/policy.json', 'utf8'));
-const profile = policy.profile;
+// Keep optional cashier artifacts separate from the default secondary stack.
+const profile = policy.cashier ? 'rwa-cashier' : policy.profile;
 // The resolved components say which contracts to build and with which compiler.
 const manifest = JSON.parse(readFileSync('generated/components.json', 'utf8'));
 if (manifest.policyHash !== policy.hash) throw new Error('generated/components.json is stale; rerun the compiler');
@@ -28,4 +29,5 @@ for (const bundle of ['core', 'swapvm', 'uniswap-v4']) {
 // The artifact directory is self-contained: the policy and clause table travel with the bytecode.
 await copyFile('generated/policy.json', `artifacts/${profile}/policy.json`);
 await copyFile('generated/clause-table.json', `artifacts/${profile}/clause-table.json`);
+if (policy.cashier) await writeFile(`artifacts/${profile}/cashier-config.json`, JSON.stringify(policy.cashier, null, 2));
 console.log(`Compiled ${built.join(', ')} → artifacts/${profile}/`);

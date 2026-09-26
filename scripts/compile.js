@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { readDocuments } from '../src/policy/document.js';
 import { sampleFixture } from '../src/policy/fixture.js';
 import { mlaFixture } from '../src/policy/mla-fixture.js';
+import { cashierFixture } from '../src/policy/cashier.js';
 import { extractWithNoolog } from '../src/noolog/extract.js';
 import { compilePolicy } from '../src/policy/compile.js';
 import { astSchema } from '../src/policy/schema.js';
@@ -16,7 +17,9 @@ const credit = args.includes('--mla');
 const secondary = args.includes('--secondary');
 const paths = args.filter((arg) => !arg.startsWith('--'));
 
-const defaults = credit
+const defaults = args.includes('--cashier')
+  ? { profile: 'rwa-secondary', document: 'test/human_contracts/ea026411904ex10-9.htm,test/human_contracts/nav-cashier-addendum.md', config: 'examples/rwa-cashier-config.json', fixture: cashierFixture }
+  : credit
   ? { profile: 'wildcat-credit', document: 'test/human_contracts/wildcat-mla.md,test/human_contracts/lender-check-policy.md,test/human_contracts/buyback-addendum.md', config: 'examples/wildcat-config.json', fixture: mlaFixture }
   : secondary
     ? { profile: 'rwa-secondary', document: 'test/human_contracts/ea026411904ex10-9.htm', config: 'examples/rwa-secondary-config.json', fixture: (document) => sampleFixture(document, { secondary: true }) }
@@ -39,6 +42,10 @@ const files = {
   'components.json': JSON.stringify({ policyHash: result.policy.hash, profile: result.policy.profile, components: result.components }, null, 2),
 };
 if (result.solidity) files['CompiledMirrorToken.sol'] = result.solidity;
+if (result.compiledCashierTerms) {
+  files['CompiledCashierTerms.sol'] = result.compiledCashierTerms;
+  files['cashier-config.json'] = JSON.stringify(result.cashier, null, 2);
+}
 if (result.policy.ast.terms.some((term) => term.name === 'buybackPrice')) {
   const terms = buybackTermsFrom(result.policy);
   files['buyback-terms.json'] = JSON.stringify({ policyHash: result.policy.hash, ...terms }, (_key, value) => (typeof value === 'bigint' ? value.toString() : value), 2);

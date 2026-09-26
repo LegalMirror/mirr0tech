@@ -4,7 +4,7 @@
 import 'dotenv/config';
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { JsonRpcProvider, Wallet } from 'ethers';
+import { JsonRpcProvider, Wallet, keccak256, toUtf8Bytes } from 'ethers';
 import { deployStack, deployFund, ANVIL_DEV_KEY } from '../src/deploy.js';
 import { Agreements } from '../src/agreements.js';
 import { VenueService } from '../src/venues.js';
@@ -37,7 +37,15 @@ const record = saved?.chainId === Number(chainId) ? saved : (await deployStack(s
 await mkdir('generated', { recursive: true });
 await writeFile('generated/deployment.json', `${JSON.stringify(record, null, 2)}\n`);
 const dataDir = process.env.DATA_DIR ?? 'generated';
-const worldId = { verifier: new WorldIdVerifier(), registry: new HumanRegistry(`${dataDir}/humans-${record.chainId}.json`) };
+const verifier = new WorldIdVerifier();
+// Never mix forgeable demo bindings with a live RP's credential/action namespace.
+const registries = new Map();
+const identityFor = (verifier) => {
+  const scope = keccak256(toUtf8Bytes(JSON.stringify([verifier.mock, verifier.rpId, verifier.environment, verifier.action, verifier.credential])));
+  if (!registries.has(scope)) registries.set(scope, new HumanRegistry(`${dataDir}/humans-${record.chainId}-${scope}.json`));
+  return { verifier, registry: registries.get(scope) };
+};
+const worldId = identityFor(verifier);
 const venues = await new VenueService({ provider, signer, record, multibaas, worldId, auditPath: process.env.AUDIT_PATH ?? `${dataDir}/audit-${record.chainId}.json` }).init();
 const apiKey = process.env.API_KEY ?? 'local-dev-stack-operator-key-only';
 const host = process.env.HOST ?? '127.0.0.1';
@@ -48,8 +56,8 @@ const agreements = await new Agreements({
   // One venue per deployed agreement: its token, oracle and hook; the stack's attestor, sanctions oracle and pool manager.
   venueFactory: ({ id, deployment, policy, clauseTable, credential, action }) => new VenueService({
     provider, signer: venues.signer, multibaas, policies: { rwa: { policy, clauseTable }, credit: venues.policies.credit },
-    record: { ...record, rwa: { ...record.rwa, policyHash: policy.hash, clauseTableHash: clauseTable.clauseTableHash, oracle: deployment.oracle, token: deployment.token, hook: deployment.hook, hookSalt: deployment.hookSalt }, address: deployment.token, policyHash: policy.hash },
-    worldId: { verifier: new WorldIdVerifier({ credential, action }), registry: worldId.registry },
+    record: { ...record, rwa: { ...record.rwa, ...deployment, router: deployment.router ?? record.rwa.router, policyHash: policy.hash, clauseTableHash: clauseTable.clauseTableHash }, address: deployment.token, policyHash: policy.hash },
+    worldId: identityFor(new WorldIdVerifier({ credential, action })),
     auditPath: `${dataDir}/audit-${record.chainId}-${id}.json`,
   }).init(),
 }).init();

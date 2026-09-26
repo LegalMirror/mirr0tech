@@ -3,7 +3,8 @@
 // policies; everything policy-bound is deployed once per compiled profile.
 import { readFile } from 'node:fs/promises';
 import { AbiCoder, Contract, ContractFactory, concat, id, keccak256 } from 'ethers';
-import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER } from './policy/hookAddress.js';
+import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, CASHIER_HOOK_FLAGS } from './policy/hookAddress.js';
+import { cashierConstructorConfig, emitCashierTerms } from './policy/cashier.js';
 
 export const ANVIL_CHAIN_ID = 31337n;
 // Public anvil development key, never use for assets or a public chain.
@@ -91,14 +92,34 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
 const POOL_MANAGER_ABI = ['function initialize((address currency0, address currency1, uint24 fee, int24 tickSpacing, address hooks) key, uint160 sqrtPriceX96) returns (int24)'];
 const SQRT_PRICE_1_1 = 79228162514264337593543950336n;
 
+// Integer Q96 initialization at the document NAV; actual routing still compares executed fills.
+export function cashierInitialSqrtPrice(navMicroUsd, tokenIsCurrency0) {
+  const nav = BigInt(navMicroUsd);
+  if (nav <= 0n || nav >= 2n ** 128n) throw new Error('Invalid cashier NAV');
+  const ratioX192 = tokenIsCurrency0 ? (nav << 192n) / 1_000_000n : (1_000_000n << 192n) / nav;
+  let root = ratioX192;
+  let next = (root + 1n) / 2n;
+  while (next < root) { root = next; next = (root + ratioX192 / root) / 2n; }
+  return root;
+}
+
 /// Act 1 for one more agreement on a running stack: its own oracle, token and hook (compiled now,
 /// from the generated Solidity), and a policy-managed pool against the stack's mock USD on the shared
 /// PoolManager. Facts and sanctions stay on the stack's attestor and oracle.
 export async function deployFund(signer, { record, sources, log = () => {} }) {
   const { compileBundle } = await import('./solc.js');
-  const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy, 'generated/CompiledMirrorToken.sol': sources.token };
-  const core = await compileBundle('core', [['contracts/PolicyOracle.sol', 'PolicyOracle'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken']], { overrides });
-  const v4 = await compileBundle('uniswap-v4', [['contracts/MirrorPolicyHook.sol', 'MirrorPolicyHook']], { overrides });
+  const cashier = Boolean(sources.cashierTerms || sources.cashier);
+  if (cashier && (!sources.cashier || !sources.cashierTerms || sources.cashierTerms.trim() !== emitCashierTerms(sources.cashier).trim())) {
+    throw new Error('Cashier deployment requires compiler-authorized sources.cashier metadata and matching sources.cashierTerms');
+  }
+  const parameters = cashier ? cashierConstructorConfig(sources.cashier) : null;
+  const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy, 'generated/CompiledMirrorToken.sol': sources.token,
+    ...(cashier ? { 'generated/CompiledCashierTerms.sol': sources.cashierTerms } : {}) };
+  const core = await compileBundle('core', [['contracts/PolicyOracle.sol', 'PolicyOracle'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
+    ...(cashier ? [['contracts/test/MockUSD.sol', 'MockUSD']] : [])], { overrides });
+  const hookName = cashier ? 'MirrorCashierHook' : 'MirrorPolicyHook';
+  const v4 = await compileBundle('uniswap-v4', [[`contracts/${hookName}.sol`, hookName],
+    ...(cashier ? [['contracts/MirrorCashierRouter.sol', 'MirrorCashierRouter']] : [])], { overrides });
   const deployer = await signer.getAddress();
   const txs = {};
   const deploy = async (artifact, label, ...args) => {
@@ -111,15 +132,23 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
   const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
   const token = await deploy(core.CompiledMirrorToken, 'token', deployer, deployer);
   const [oracleAddress, tokenAddress] = await Promise.all([oracle.getAddress(), token.getAddress()]);
-  const initCode = concat([v4.MirrorPolicyHook.bytecode, AbiCoder.defaultAbiCoder().encode(['address', 'address', 'address', 'address'], [record.rwa.poolManager, oracleAddress, record.rwa.router, tokenAddress])]);
-  const mined = mineHookAddress(initCode);
+  // The legacy stack mock reports 18 decimals. Cashier settlement uses its own explicit six-decimal faucet token.
+  const asset = cashier ? await (await deploy(core.MockUSD, 'mockUSD')).getAddress() : record.usdc;
+  const router = cashier ? await (await deploy(v4.MirrorCashierRouter, 'router', record.rwa.poolManager, parameters)).getAddress() : record.rwa.router;
+  const args = [record.rwa.poolManager, oracleAddress, router, tokenAddress, ...(cashier ? [asset, parameters] : [])];
+  const initCode = (await new ContractFactory(v4[hookName].abi, v4[hookName].bytecode, signer).getDeployTransaction(...args)).data;
+  const mined = mineHookAddress(initCode, cashier ? CASHIER_HOOK_FLAGS : undefined);
   txs.hook = (await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait()).hash;
   log(`${'hook'.padEnd(24)} ${mined.address} (${mined.attempts} tries)`);
   txs.configure = (await (await token.configureSecondary(oracleAddress, mined.address)).wait()).hash;
-  const [currency0, currency1] = BigInt(tokenAddress) < BigInt(record.usdc) ? [tokenAddress, record.usdc] : [record.usdc, tokenAddress];
-  const poolKey = { currency0, currency1, fee: 3000, tickSpacing: 60, hooks: mined.address };
+  const [currency0, currency1] = BigInt(tokenAddress) < BigInt(asset) ? [tokenAddress, asset] : [asset, tokenAddress];
+  const poolSettings = cashier ? parameters.pool : { fee: 3000, tickSpacing: 60 };
+  const poolKey = { currency0, currency1, ...poolSettings, hooks: mined.address };
+  const initialSqrtPriceX96 = cashier ? cashierInitialSqrtPrice(parameters.navMicroUsd, currency0 === tokenAddress) : SQRT_PRICE_1_1;
   const poolManager = new Contract(record.rwa.poolManager, POOL_MANAGER_ABI, signer);
-  txs.pool = (await (await poolManager.initialize(poolKey, SQRT_PRICE_1_1)).wait()).hash;
-  const poolId = keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,address,uint24,int24,address)'], [[currency0, currency1, 3000, 60, mined.address]]));
-  return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, hook: mined.address, hookSalt: mined.salt, poolManager: record.rwa.poolManager, poolKey, poolId, txs, deployedAt: new Date().toISOString() };
+  txs.pool = (await (await poolManager.initialize(poolKey, initialSqrtPriceX96)).wait()).hash;
+  const poolId = keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,address,uint24,int24,address)'], [[currency0, currency1, poolSettings.fee, poolSettings.tickSpacing, mined.address]]));
+  return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, router,
+    ...(cashier ? { cashier: { ...sources.cashier, enabled: true, asset, initialSqrtPriceX96: initialSqrtPriceX96.toString(),
+      hookAbi: v4[hookName].abi, routerAbi: v4.MirrorCashierRouter.abi } } : {}), hook: mined.address, hookSalt: mined.salt, poolManager: record.rwa.poolManager, poolKey, poolId, txs, deployedAt: new Date().toISOString() };
 }

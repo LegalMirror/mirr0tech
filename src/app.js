@@ -24,7 +24,7 @@ export function createApp(service, apiKey, venues = null, policyData = null, vie
   app.set('json replacer', (_key, value) => (typeof value === 'bigint' ? value.toString() : value));
   // The dashboard is served from another origin (or another machine on the LAN); the bearer token is the gate.
   app.use((req, res, next) => {
-    res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key', 'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS' });
+    res.set({ 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key', 'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS' });
     if (req.method === 'OPTIONS') return res.sendStatus(204);
     next();
   });

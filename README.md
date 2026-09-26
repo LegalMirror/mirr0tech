@@ -23,6 +23,19 @@ npm run demo:golden                                                # both acts e
 npm run check                                                      # unit + chain tests, all three profiles
 ```
 
+## Workbench and NAV cashier
+
+The default dashboard is now the agreement workbench: upload → analysis → source-linked AST → World ID constraint → deploy. Start the gateway with `npm run dev:stack`, run `npm --prefix dashboard ci`, then `npm --prefix dashboard run dev`. Open port 3100 and enter the gateway URL and operator/viewer key in **Connect**; credentials remain in browser memory, not public build variables. The bundled document chooser uploads actual files through the Agreements API. Without `NOOLOG_API_KEY`, the existing mock adapter supplies deterministic analysis; provenance remains in the report.
+
+Opt into **NAV cashier addendum** when uploading the bundled fund agreement. The separately authored demo document supplies NAV, subscription/redemption fees and cap; pool fee and tick spacing are deployment settings. The compiler commits typed constructor parameters to the policy, and the hook/router verify them at deployment. See [cashier setup, API and limitations](docs/CASHIER.md).
+
+```sh
+npm run build:cashier          # optional standalone artifacts/rwa-cashier
+npm run test:chain:cashier     # real v4 custom-accounting tests on Anvil
+```
+
+The cashier is locally tested, **not part of the existing published Sepolia deployment**. It constrains eligible execution through issuance/redemption backed by available mockUSD reserves; it does not guarantee a pinned AMM price or zero LP losses.
+
 ## The demo
 
 **Act 1 — tokenize and trade.** The Securitize/BlackRock transfer-agent agreement compiles into a permissioned fund token and a Uniswap v4 hook. Shares mint to custody and release only to an onboarded investor. Anyone may create a pool; one without the hook cannot take the token (`NoPolicyDoor`), and a stranger in the hooked pool is refused with *"Exhibit A — Investor Onboarding"* quoted.
@@ -65,7 +78,7 @@ Feedback: the instruction/router split made an opcode a 40-line job, and `quote(
 
 ## How we used World ID
 
-Exhibit A of the fund agreement says onboarding starts with "Know-your-customer (KYC)… checks during onboarding of investors". KYC is an identity check, so the proportionate credential is a **Passport/NFC document**, not a proof of human; it compiles to the fact `identityVerified`, required to be issued shares and to enter the Uniswap pool. `src/worldid.js` verifies the proof with World (`POST /api/v4/verify/{rp_id}`, `rp_context` signed server-side), refuses a proof bound to another wallet, binds the nullifier so one person cannot onboard twice, and attests the fact with an expiry; every venue reads it like any other fact. The Investors screen opens the IDKit widget when an app is registered, a mock proof otherwise; "Use the Investor's proof" on the Stranger shows the refusal. Trust moment, credential choice, alternative paths and the integration debrief: [docs/WORLD_ID.md](docs/WORLD_ID.md).
+The trust moment is access to issuance, transfer and the cashier—not login. The issuer selects the credential required by the agreement and binds that choice to its policy hash. IDKit requests that credential for the selected wallet; `src/worldid.js` requires a matching, server-validated v4 result before attesting `identityVerified`. A Passport/NFC credential is evidence for a document-based onboarding condition, **not a full KYC/AML, sanctions or accreditation decision**, and those facts remain separate. The workbench shows the exact clause, remaining requirements, cancellation/rejection and a fresh access decision after the receipt. Mock and live proof namespaces are separated. Real World verification still requires registered credentials and a user-completed proof; local demonstrations do not establish live-provider success. [Trust boundaries and integration debrief](docs/WORLD_ID.md).
 
 ## How we used Noolog
 
@@ -81,7 +94,7 @@ Feedback: `createContract` / `setAddress` / `linkAddressContract` is the right g
 
 ## Dashboard and API
 
-`npm --prefix dashboard run dev` serves http://localhost:3100 on exported data; with `NEXT_PUBLIC_GATEWAY_URL` and `NEXT_PUBLIC_GATEWAY_KEY` it runs live against `npm run dev:stack` (anvil + operator API). The clause highlighter maps every paragraph to what it compiled to and walks a rule from quote to DNF to bytes to contract; the Lenders, Decisions, Exit and History screens drive the chain. Routes and repository map: [docs/API.md](docs/API.md).
+`npm --prefix dashboard run dev` serves http://localhost:3100. Connect the workbench to `npm run dev:stack` with session-memory credentials; do not put an operator key in `NEXT_PUBLIC_*`. The default view links clause cards to the AST graph and supports actual uploads, analysis, constraints and deployment. The previous overview and classic lender, exit and audit routes remain available. [Dashboard setup](dashboard/README.md) · [API](docs/API.md).
 
 ## Deploy
 
@@ -146,4 +159,6 @@ Screening, countersignature, AML/KYC and solvency are attested, not proved; a po
 
 ## Licenses
 
-Repository code: MIT. `vendor/` (git-ignored, fetched by `npm run vendor`) holds 1inch SwapVM and Aqua under their source-available Degensoft licenses; the router is a modified redeployment as the hackathon rules permit. `contracts/wildcat/IRoleProvider.sol` reproduces Wildcat's MIT-licensed interface.
+First-party code is unlicensed (`UNLICENSED`); no license is granted. Earlier releases remain under their original licenses, and previously granted rights are not retroactively withdrawn.
+
+Dependencies, vendored code, and reproduced interfaces retain their original licenses and notices. `vendor/` (git-ignored, fetched by `npm run vendor`) holds 1inch SwapVM and Aqua under their source-available Degensoft licenses; the router is a modified redeployment as the hackathon rules permit. `contracts/wildcat/IRoleProvider.sol` reproduces Wildcat's MIT-licensed interface.

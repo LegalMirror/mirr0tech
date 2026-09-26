@@ -1,13 +1,15 @@
 {
   "name": "@mirrortech/dashboard",
   "version": "0.1.0",
+  "license": "UNLICENSED",
   "private": true,
   "description": "mirr0tech compliance dashboard: legal clause to smart-contract highlighter, lenders, queue, exit and audit",
   "engines": {
     "node": ">=18.18"
   },
   "scripts": {
-    "export": "npm --prefix .. run ui:export --silent",
+    "demo:sync": "node scripts/sync-demo.mjs",
+    "export": "npm run demo:sync && npm --prefix .. run ui:export --silent",
     "dev": "npm run export && node scripts/build-info.mjs && next dev -p 3100",
     "build": "npm run export && node scripts/build-info.mjs && next build",
     "start": "npx --yes serve@14 out -l 3100",

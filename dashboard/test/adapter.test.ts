@@ -112,7 +112,7 @@ describe("gatewaySource", () => {
         return new Response(JSON.stringify({ ok: true }));
       })
     );
-    const gateway = gatewaySource("http://gw.test/");
+    const gateway = gatewaySource("http://gw.test/", "test-operator-key");
     const heard = vi.fn();
     gateway.subscribe(heard);
     await gateway.policy("wildcat-credit");
@@ -135,8 +135,8 @@ describe("gatewaySource", () => {
       "GET http://gw.test/v1/worldid/context",
       "POST http://gw.test/v1/lenders/investor/worldid?profile=rwa-secondary",
     ]);
-    const headers = calls[3].init.headers as Record<string, string>;
-    expect(headers["idempotency-key"]).toMatch(/[0-9a-f-]{36}/);
+    const headers = new Headers(calls[3].init.headers);
+    expect(headers.get("idempotency-key")).toMatch(/[0-9a-f-]{36}/);
     expect(JSON.parse(String(calls[3].init.body))).toEqual({ facts: { mlaCountersigned: true } });
     expect(heard).toHaveBeenCalledTimes(4);
   });

@@ -13,7 +13,12 @@ async function sha256Hex(text: string): Promise<string> {
 }
 
 /** A mock 4.0 uniqueness proof whose nullifier is the human behind `asWallet` (default: the wallet itself). */
-export async function mockProof(wallet: string, action: string, asWallet = wallet): Promise<ProofPayload> {
+export async function mockProof(
+  wallet: string,
+  action: string,
+  asWallet = wallet,
+  credential: "document" | "proof_of_human" | "selfie" = "document"
+): Promise<ProofPayload> {
   return {
     protocol_version: "4.0",
     nonce: await sha256Hex(`nonce:${wallet}`),
@@ -21,7 +26,7 @@ export async function mockProof(wallet: string, action: string, asWallet = walle
     responses: [
       {
         identifier: "mock",
-        issuer_schema_id: 1,
+        issuer_schema_id: { document: 9303, proof_of_human: 1, selfie: 11 }[credential],
         nullifier: await sha256Hex(`human:${asWallet.toLowerCase()}`),
         expires_at_min: 0,
         proof: ["0x1", "0x2", "0x3", "0x4", "0x5"],

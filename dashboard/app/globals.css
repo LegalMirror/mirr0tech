@@ -1979,8 +1979,22 @@ blockquote.why {
 .human-check {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
+.human-check-review {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  margin: 8px 0;
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.human-check-review label { display: flex; align-items: flex-start; gap: 8px; }
 .meta.error {
   color: var(--forbid);
 }

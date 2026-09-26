@@ -53,6 +53,14 @@ export const COMPONENTS = [
     clauseTemplate: 'Shares may be pooled or exchanged only at a venue that admits each counterparty under {{transferClause}} at the time of the transfer.',
   },
   {
+    id: 'v4-nav-cashier', version: '2.0.0', kind: 'venue', venue: 'uniswap-v4',
+    description: 'DEMO document-bound NAV issuance/redemption with separate fees, actual settlement, bounded AMM execution and prefunded reserves.',
+    clauseTemplate: 'Use the explicit sentence grammar in test/human_contracts/nav-cashier-addendum.md: NAV USD {{navUsd}} per six-decimal share, subscription fee {{subscriptionFeeBps}}bps added to NAV, distinct redemption fee {{redemptionFeeBps}}bps deducted from NAV, {{cashierSupplyCap}}-share cap, and arithmetically consistent payout factors. Quote terms and source clause ids are constructor parameters bound to a compiler commitment. These are not terms of the base BUIDL document.',
+    coversRule: byAction('mint', 'burn', 'transfer'),
+    coversTerm: byTerm('navUsd', 'subscriptionFeeBps', 'redemptionFeeBps', 'cashierSupplyCap', 'cashierExecution'),
+    contracts: [[CORE, 'contracts/test/MockUSD.sol', 'MockUSD'], [V4, 'contracts/MirrorCashierHook.sol', 'MirrorCashierHook'], [V4, 'contracts/MirrorCashierRouter.sol', 'MirrorCashierRouter'], [V4, 'node_modules/@uniswap/v4-core/src/PoolManager.sol', 'PoolManager']],
+  },
+  {
     id: 'wildcat-admission', version: '1.0.0', kind: 'venue', venue: 'wildcat',
     description: 'Wildcat role provider: deposit credentials, payment-time eligibility and transfer restriction from the agreement.',
     coversRule: byAction('deposit', 'withdraw', 'transfer'), coversTerm: () => false,
@@ -91,7 +99,8 @@ export const componentById = (id) => {
 // its action and every term needs a component that consumes it; otherwise compilation fails.
 export function resolveComponents(ast, config) {
   const profile = config.profile ?? 'custodial-rwa';
-  const ids = PROFILES[profile];
+  const base = PROFILES[profile];
+  const ids = config.cashier?.enabled && base ? [...base.filter((id) => id !== 'v4-transfer-gate'), 'v4-nav-cashier'] : base;
   if (!ids) throw new Error(`Unknown deployment profile: ${profile}`);
   const components = ids.map(componentById);
   const rules = {};

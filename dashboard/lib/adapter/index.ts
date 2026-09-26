@@ -1,15 +1,33 @@
 import { gatewaySource } from "./gateway";
 import { staticSource } from "./static";
+import { getSession, subscribeSession } from "../session";
 import type { DataSource } from "./types";
 
 export type { DataSource } from "./types";
 
-/** Static JSON by default; the operator gateway when NEXT_PUBLIC_GATEWAY_URL is set at build time. */
 export function selectSource(env: { gatewayUrl?: string } = {}): DataSource {
   return env.gatewayUrl ? gatewaySource(env.gatewayUrl) : staticSource;
 }
 
-export const source: DataSource = selectSource({ gatewayUrl: process.env.NEXT_PUBLIC_GATEWAY_URL });
-
-/** True when screens read the operator gateway rather than exported data and mock parties. */
-export const live = source.kind === "gateway";
+const gateway = gatewaySource(() => getSession().url);
+const current = () => (getSession().url ? gateway : staticSource);
+// The older dashboard routes share the workbench's in-memory connection, without persisting keys.
+export const source: DataSource = {
+  get kind() {
+    return current().kind;
+  },
+  profiles: () => current().profiles(),
+  policy: (...args) => current().policy(...args),
+  parties: (...args) => current().parties(...args),
+  audit: (...args) => current().audit(...args),
+  deployment: () => current().deployment(),
+  attest: (...args) => current().attest(...args),
+  resolve: (...args) => current().resolve(...args),
+  revoke: (...args) => current().revoke(...args),
+  worldIdContext: () => current().worldIdContext(),
+  verifyHuman: (...args) => current().verifyHuman(...args),
+  subscribe(listener) {
+    const stops = [gateway.subscribe(listener), staticSource.subscribe(listener), subscribeSession(listener)];
+    return () => stops.forEach((stop) => stop());
+  },
+};

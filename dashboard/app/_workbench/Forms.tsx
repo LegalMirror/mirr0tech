@@ -15,7 +15,19 @@ import {
 import type { PolicyData, ProfileId } from "@/lib/types";
 import { Icon, Modal, Notice } from "./ui";
 
-export function ConnectionDialog({ session, onClose }: { session: GatewaySession; onClose: () => void }) {
+export function SettingsDialog({
+  session,
+  sample,
+  status,
+  statusError,
+  onClose,
+}: {
+  session: GatewaySession;
+  sample: boolean;
+  status: StackStatus | null;
+  statusError: string;
+  onClose: () => void;
+}) {
   const [url, setUrl] = useState(session.url || "https://mir-api.peeramid.xyz");
   const [error, setError] = useState("");
   function connect(event: FormEvent) {
@@ -29,8 +41,71 @@ export function ConnectionDialog({ session, onClose }: { session: GatewaySession
     }
   }
   return (
-    <Modal title="Demo workspace connection" onClose={onClose}>
+    <Modal title="Settings" onClose={onClose}>
       <form className="wb-form" onSubmit={connect}>
+        <section className="wb-services" aria-label="Actual gateway status">
+          <span className="wb-eyebrow">ENVIRONMENT</span>
+          <div>
+            <i
+              className={`wb-state-dot ${!sample && status?.model.mode === "live" ? "wb-state-compiled" : "wb-state-sample"}`}
+            />
+            <span>
+              Model
+              <small>
+                {sample
+                  ? "Offline · export only"
+                  : status
+                    ? `${status.model.provider} · ${status.model.mode}`
+                    : "Not available"}
+              </small>
+              {!sample && status && <code>{status.model.model}</code>}
+            </span>
+          </div>
+          <div>
+            <i className={`wb-state-dot ${!sample && status ? "wb-state-compiled" : "wb-state-sample"}`} />
+            <span>
+              Compiler
+              <small>
+                {sample
+                  ? "Exported artifact"
+                  : status
+                    ? `Solidity ${status.compiler.solidity.core ?? "not reported"}`
+                    : "Not available"}
+              </small>
+              {!sample && status && (
+                <details>
+                  <summary>All compiler versions</summary>
+                  {Object.entries(status.compiler.solidity).map(([name, version]) => (
+                    <small key={name}>
+                      {name}: {version}
+                    </small>
+                  ))}
+                </details>
+              )}
+            </span>
+          </div>
+          <div>
+            <i
+              className={`wb-state-dot ${!sample && status?.chain ? "wb-state-compiled" : "wb-state-sample"}`}
+            />
+            <span>
+              Chain
+              <small>
+                {sample
+                  ? "Not connected"
+                  : status?.chain
+                    ? `Chain ${status.chain.chainId} · ${session.demoToken ? "demo gateway" : status.chain.deployer ? "signer configured" : "gateway target"}`
+                    : "No signer reported"}
+              </small>
+            </span>
+          </div>
+          {statusError && !sample && (
+            <p className="wb-service-error" role="status">
+              Status unavailable: {statusError}
+            </p>
+          )}
+        </section>
+        <span className="wb-eyebrow">CONNECTION</span>
         <p>
           Anyone can create demo contracts—no API key or World login is needed. The gateway issues an
           anonymous, isolated workspace for your own uploads.
@@ -41,11 +116,11 @@ export function ConnectionDialog({ session, onClose }: { session: GatewaySession
         </label>
         <Notice>
           {session.demoNotice ??
-            "Connect to create your scoped demo workspace. Exported samples remain available if the public demo API is not deployed yet."}
+            "Connect to create your demo workspace. Exported samples remain available if the public demo API is not deployed yet."}
         </Notice>
         <p className="wb-muted">
           The opaque demo token stays only in memory. Reloading, disconnecting, changing gateways or starting
-          a new workspace loses access to this workspace in the browser. No private existing agreements, admin
+          a new workspace loses access to this workspace in the browser. No private existing contracts, admin
           methods or wallet funds are exposed. Investor login is separate.
         </p>
         {session.demoExpiresAt && (
@@ -131,7 +206,7 @@ export function UploadDialog({
         mode === "demo"
           ? demoDocuments
           : mode === "paste"
-            ? [{ name: `agreement.${extension}`, text }]
+            ? [{ name: `contract.${extension}`, text }]
             : await Promise.all(files.map(async (file) => ({ name: file.name, text: await file.text() })));
       const upload: Upload = {
         name: name.trim(),
@@ -152,7 +227,7 @@ export function UploadDialog({
     <Modal title="Upload contracts" onClose={onClose} busy={busy}>
       <form className="wb-form" onSubmit={submit}>
         <p>
-          Start with the demo agreement, or bring your own documents. This submits a real upload to the
+          Start with the demo contract, or bring your own documents. This submits a real upload to the
           gateway; extraction, analysis and compilation happen there.
         </p>
         {!writable && (
@@ -181,13 +256,13 @@ export function UploadDialog({
           </Notice>
         )}
         <label>
-          Agreement name
+          Contract name
           <input
             required
             maxLength={demoWorkspace ? 120 : 200}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Fund subscription agreement"
+            placeholder="e.g. Fund subscription contract"
             autoFocus
           />
         </label>
@@ -201,7 +276,7 @@ export function UploadDialog({
             <option value="rwa-secondary">RWA · token + secondary trading</option>
             <option value="custodial-rwa">RWA · custodial mint / burn</option>
             <option value="wildcat-credit" disabled={demoWorkspace}>
-              Credit · existing stack venue (no per-agreement deploy)
+              Credit · existing stack venue (no per-contract deploy)
             </option>
           </select>
         </label>
@@ -218,7 +293,7 @@ export function UploadDialog({
         </div>
         {mode === "demo" ? (
           <div className="wb-demo-bundle">
-            <h3>BUIDL agreement → executable policy</h3>
+            <h3>BUIDL contract → executable policy</h3>
             <p>
               Use the recognized source to exercise the existing deterministic Noolog adapter when the gateway
               model is mock. This does not emulate live model reasoning in the browser.
@@ -259,7 +334,7 @@ export function UploadDialog({
             ))}
             {cashierDemo && bundle?.config && (
               <details>
-                <summary>rwa-cashier-config.json · compiler config, not an agreement</summary>
+                <summary>rwa-cashier-config.json · compiler config, not a contract</summary>
                 <a href={demoUrl("rwa-cashier-config.json")} download>
                   Download configuration ↗
                 </a>
@@ -282,13 +357,13 @@ export function UploadDialog({
               </select>
             </label>
             <label>
-              Agreement text
+              Contract text
               <textarea
                 rows={8}
                 required
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="Paste the full agreement, including the clauses to compile…"
+                placeholder="Paste the full contract, including the clauses to compile…"
               />
             </label>
           </>
@@ -303,7 +378,7 @@ export function UploadDialog({
               onChange={(e) => setFiles(Array.from(e.target.files ?? []))}
             />
             <span>
-              {files.map((file) => file.name).join(", ") || "Choose an agreement and optional addenda"}
+              {files.map((file) => file.name).join(", ") || "Choose a contract and optional addenda"}
             </span>
           </label>
         )}
@@ -369,7 +444,7 @@ export function ConstraintForm({
         <span className="wb-eyebrow">ISSUER POLICY</span>
         <h3>World ID constraint</h3>
         <p>
-          Choose the minimum credential your agreement requires. This is an issuer decision, not a substitute
+          Choose the minimum credential your contract requires. This is an issuer decision, not a substitute
           for AML, sanctions checks, or legal review.
         </p>
       </div>

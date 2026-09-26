@@ -30,9 +30,9 @@ export function ApiView({
   const path = `/v1/agreements/${encodeURIComponent(record.id)}`;
   const routes = [
     ["GET", "/v1/status", "Gateway model, compilers and signer"],
-    ["GET", "/v1/agreements", "Agreement summaries"],
+    ["GET", "/v1/agreements", "Contract summaries"],
     ["POST", "/v1/agreements", "Upload documents; starts generation"],
-    ["GET", path, "Agreement + compiled export"],
+    ["GET", path, "Contract + compiled export"],
     ["GET", `${path}/ast`, "Source-linked AST graph"],
     ["GET", `${path}/constraints`, "Current World ID policy"],
     ["PUT", `${path}/constraints`, "Recompile identity constraints"],
@@ -43,13 +43,13 @@ export function ApiView({
     <div className="wb-scroll-page">
       <div className="wb-section-heading">
         <span className="wb-eyebrow">DEVELOPER VIEW</span>
-        <h2>The same agreement, over HTTP.</h2>
+        <h2>The same contract, over HTTP.</h2>
         <p>Bearer authentication · JSON responses · asynchronous generation and deployment</p>
       </div>
       {sample ? (
         <Notice>
           Sample export. These are documented route shapes, not live responses. Connect a gateway to use this
-          agreement lifecycle.
+          contract lifecycle.
         </Notice>
       ) : (
         <Notice>
@@ -78,7 +78,7 @@ export function ApiView({
         ))}
       </div>
       <details>
-        <summary>{sample ? "Exported sample" : "Latest agreement response"} · JSON</summary>
+        <summary>{sample ? "Exported sample" : "Latest contract response"} · JSON</summary>
         <pre className="wb-json">{JSON.stringify(sample ? policy : record, null, 2)}</pre>
       </details>
     </div>
@@ -198,7 +198,7 @@ export function DeployView({
             </>
           ) : (
             <p className="wb-muted">
-              No current deployment reported for this agreement. An exported policy or successful compilation
+              No current deployment reported for this contract. An exported policy or successful compilation
               is not an on-chain deployment.
             </p>
           )}

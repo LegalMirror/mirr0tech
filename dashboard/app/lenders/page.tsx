@@ -65,7 +65,7 @@ function PartyCard({ policy, party, others }: { policy: PolicyData; party: Party
         </blockquote>
       )}
 
-      <ul className="facts-list" aria-label={credit ? "Facts the agreement reads" : "Onboarding facts"}>
+      <ul className="facts-list" aria-label={credit ? "Facts the contract reads" : "Onboarding facts"}>
         {shown.map(([name, value]) => (
           <li key={name} title={`${name} · ${FACT_KIND_LABEL[factKind(policy.profile, name)]}`}>
             <Glyph state={triState(value)} />
@@ -125,7 +125,7 @@ export default function LendersPage() {
   return (
     <>
       <PageHead title={credit ? "Who may lend" : "Who may hold"}>
-        Each wallet's standing under the agreement, decided the same way the chain decides it.
+        Each wallet's standing under the contract, decided the same way the chain decides it.
       </PageHead>
       {error && <Failed error={error} />}
       {(!policy.data || !parties.data) && !error && <Loading what="parties" />}

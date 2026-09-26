@@ -82,7 +82,7 @@ function ActCard({ act }: { act: ActData }) {
       )}
       <div className="row" style={{ marginTop: 10 }}>
         <button className="primary" onClick={() => open(summary.profile)}>
-          Open the agreement
+          Open the contract
         </button>
       </div>
     </section>
@@ -95,7 +95,7 @@ export default function OverviewPage() {
   return (
     <>
       <PageHead title="One asset, its whole legal life">
-        A legal agreement goes in. Out comes the code that admits, refuses and pays under it, with every
+        A legal contract goes in. Out comes the code that admits, refuses and pays under it, with every
         refusal naming its sentence. Act 1 tokenizes and trades a fund; Act 2 lends it out.
       </PageHead>
       {acts.error && <Failed error={acts.error} />}

@@ -265,7 +265,7 @@ export function DocumentPane({ policy, selected, hot, scrollKey, onHover, onSele
   return (
     <section className="card doc-card" aria-label="Source document">
       <div className="doc-head">
-        <h2>The agreement</h2>
+        <h2>The contract</h2>
       </div>
       <CoverageBar policy={policy} filter={filter} setFilter={setFilter} />
       <div className="doc-scroll" ref={scroller}>

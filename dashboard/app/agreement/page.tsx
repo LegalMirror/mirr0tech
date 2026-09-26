@@ -10,7 +10,7 @@ export default function PolicyPage() {
   return (
     <>
       <PageHead title="Which sentences run on-chain?">
-        The agreement, with every sentence that became an enforceable rule highlighted. Click one to see what
+        The contract, with every sentence that became an enforceable rule highlighted. Click one to see what
         it does and where it runs.
       </PageHead>
       {error && <Failed error={error} />}

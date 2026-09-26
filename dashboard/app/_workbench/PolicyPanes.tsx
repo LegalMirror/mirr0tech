@@ -166,7 +166,7 @@ export function GraphPane({
         </label>
         <select id="graph-scope" value={scope} onChange={(e) => setScope(e.target.value)}>
           <option value="selection">Selected action</option>
-          <option value="">Entire agreement</option>
+          <option value="">Entire contract</option>
           {policy.actionOrder.map((item) => (
             <option value={item} key={item}>
               {item}
@@ -219,11 +219,11 @@ export function GraphPane({
                 style={{ left: node.x, top: node.y, width: NODE_WIDTH, height: NODE_HEIGHT }}
                 aria-pressed={selected === node.id}
                 onClick={() => onSelect(node.id)}
-                title={`${node.kind}: ${node.label}${node.clause ? ` · ${node.clause}` : ""}`}
+                title={`${node.kind === "agreement" ? "contract" : node.kind}: ${node.label}${node.clause ? ` · ${node.clause}` : ""}`}
               >
                 <span className="wb-node-type">
                   <span className="wb-dot" />
-                  {node.kind}
+                  {node.kind === "agreement" ? "contract" : node.kind}
                   {node.effect && ` / ${node.effect}`}
                 </span>
                 <strong>{node.label}</strong>
@@ -287,7 +287,7 @@ export function HumanView({
   return (
     <div className="wb-human-view">
       <div className="wb-section-heading">
-        <span className="wb-eyebrow">THE ORIGINAL AGREEMENT</span>
+        <span className="wb-eyebrow">THE ORIGINAL CONTRACT</span>
         <h2>{policy.title}</h2>
         <p>
           {policy.coverage.counts.compiled} of {policy.coverage.total} paragraphs compiled ·{" "}
@@ -313,7 +313,7 @@ export function Evidence({ policy, sample }: { policy: PolicyData; sample: boole
     <div className="wb-evidence">
       <Notice>
         {verificationLabel(policy, sample)}. This is extraction evidence, not a legal opinion or a guarantee
-        that the entire agreement is enforced.
+        that the entire contract is enforced.
       </Notice>
       <dl className="wb-dl">
         <dt>Source SHA-256</dt>

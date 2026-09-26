@@ -39,7 +39,7 @@ The bypass posts `/chat/completions` with `response_format: { type: "json_object
 3. `GET /deliberation/{id}/result` every 2 s. Its `status` is a progress line — `running: round 2 — Starting` — that the agreement record shows as `progress` and `mirr0 show --wait` prints; `completed` carries `result`, the settled answer as a string. The answer is parsed as JSON (a code fence or leading prose is tolerated; prose alone is the error `The model answered prose instead of the policy JSON`).
 4. `GET /deliberation/{id}/details` (per-seat proposals, evaluations, claim assessments, round convergence) and `GET /deliberation/{id}/references` (the claim tree with verdicts) → `verificationFrom` builds the report: `claims[]`, `contested[]`, `confidence { overall, byRef, verified, total, counts }`.
 
-Budget: an account without credits answers `429 insufficient_quota` / `{"error":"Insufficient budget"}`; the agreement fails with `The model account is out of credits (429)`. A full agreement (≈80 KB request) takes minutes per round; a one-line question about ten seconds.
+Budget: an account without credits answers `429 insufficient_quota` / `{"error":"Insufficient budget"}`; the agreement fails with `The model account is out of credits (429)`. A full agreement (≈80 KB request) takes about ten minutes per round, up to three rounds; the client waits up to the policy's job timeout (an hour). A one-line question takes ten seconds to a minute.
 
 ## Client library (`src/noolog/client.js`)
 

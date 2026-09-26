@@ -88,8 +88,9 @@ export async function extractWithNoolog({ profile, document, draft = null, clien
     // The legal seats review a draft instead of answering; live, they read the document alone. The mock needs the draft.
     let jobId;
     try { ({ job_id: jobId } = await client.startDeliberation(deliberationRequest({ profile, document, draft: server ? draft : null, policyId }))); } catch (error) { throw budgetError(error); }
-    // A live deliberation with a legal seat list takes minutes; the mock answers at once.
-    const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 2000), timeoutMs: 15 * 60_000, onProgress });
+    // A live deliberation with a legal seat list takes ~10 minutes per round on a whole agreement; the
+    // wait matches the policy's own job timeout (an hour). The mock answers at once.
+    const state = await client.waitForResult(jobId, server ? { pollMs, onProgress } : { pollMs: Math.max(pollMs, 3000), timeoutMs: 60 * 60_000, onProgress });
     if (state.status !== 'completed') throw new Error(`Deliberation ${jobId} ended ${state.status}`);
     const ast = validateAst(parseAstText(state.result), document.text);
     const [details, references] = await Promise.all([client.details(jobId), client.references(jobId)]);

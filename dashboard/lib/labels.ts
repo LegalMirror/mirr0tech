@@ -64,6 +64,7 @@ export const EFFECT_SENTENCE: Record<Effect, string> = {
 /** Timeline event kinds as a reader would say them. */
 export const KIND_LABEL: Record<string, string> = {
   HumanVerified: "Identity verified",
+  PaymentSettled: "Payment settled",
   Attested: "Facts attested",
   Revoked: "Designated / revoked",
   CredentialDecision: "Deposit decision",

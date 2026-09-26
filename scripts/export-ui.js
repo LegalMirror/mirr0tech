@@ -405,6 +405,14 @@ export async function exportProfile(spec) {
   // The extraction is a Noolog deliberation over the document (the hand-authored reading is the draft it starts from).
   const { envelope, verification } = await extractWithNoolog({ profile: spec.profile, document, draft: spec.fixture(document).ast });
   const config = JSON.parse(await readFile(at(spec.config), 'utf8'));
+  const raws = await Promise.all(spec.documents.map(async (path) => ({ name: path.split('/').pop(), raw: await readFile(at(path), 'utf8') })));
+  return exportCompiled({ profile: spec.profile, act: spec.act, label: spec.label, venue: spec.venue, document, raws, envelope, verification, config });
+}
+
+/// Everything the reader needs about one compiled agreement: rules with their clause ids, DNF and
+/// located quotes, coverage per paragraph, the clause table and programs. `raws` are the documents
+/// as uploaded (one per part), so the display text keeps its line structure.
+export function exportCompiled({ profile, act = null, label = null, venue = null, document, raws, envelope, verification, config }) {
   const compiled = compilePolicy(envelope, config, document, { demo: true });
   const onchain = buildOnchainPolicy(envelope.ast);
   if (onchain.clauseTableHash !== compiled.policy.clauseTableHash) throw new Error('On-chain policy disagrees with the compiled policy');
@@ -412,13 +420,12 @@ export async function exportProfile(spec) {
   // Per-part display text, and each part's offset inside the bundled normalized text.
   const parts = [];
   let cursor = 0;
-  for (const path of spec.documents) {
-    const raw = await readFile(at(path), 'utf8');
-    const source = /\.html?$/i.test(path) ? convert(raw, HTML_OPTIONS) : raw;
+  for (const { name, raw } of raws) {
+    const source = /\.html?$/i.test(name) ? convert(raw, HTML_OPTIONS) : raw;
     const { display, text, map } = displayOf(source);
-    const meta = document.parts?.find((part) => path.endsWith(part.name)) ?? document;
-    if (document.text.slice(cursor, cursor + text.length) !== text) throw new Error(`Display text for ${path} does not normalize to the compiled text`);
-    parts.push({ name: path.split('/').pop(), sha256: meta.sha256, textSha256: meta.textSha256, start: cursor, end: cursor + text.length, display, map });
+    const meta = document.parts?.find((part) => part.name === name) ?? document;
+    if (document.text.slice(cursor, cursor + text.length) !== text) throw new Error(`Display text for ${name} does not normalize to the compiled text`);
+    parts.push({ name, sha256: meta.sha256, textSha256: meta.textSha256, start: cursor, end: cursor + text.length, display, map });
     cursor += text.length + 1;
   }
   if (cursor - 1 !== document.text.length) throw new Error('Part offsets do not add up to the bundled text');
@@ -455,7 +462,7 @@ export async function exportProfile(spec) {
 
   return {
     schemaVersion: 1,
-    profile: spec.profile, act: spec.act, label: spec.label, venue: spec.venue,
+    profile, act, label, venue,
     title: ast.title, parties: ast.parties,
     source: { name: document.name, sha256: document.sha256, textSha256: document.textSha256, parts: document.parts ?? null },
     policyHash: compiled.policy.hash,

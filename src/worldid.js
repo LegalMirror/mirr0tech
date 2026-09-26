@@ -19,10 +19,10 @@ const sha = (text) => `0x${createHash('sha256').update(text).digest('hex')}`;
 
 /// A proof shaped like the 4.0 uniqueness response, whose nullifier is derived from the wallet
 /// (a different human per wallet) unless one is given (the same human on a second wallet).
-export function mockProof(wallet, { action = DEFAULT_ACTION, nullifier = null } = {}) {
+export function mockProof(wallet, { action = DEFAULT_ACTION, nullifier = null, credential = 'document' } = {}) {
   return {
     protocol_version: '4.0', nonce: sha(`nonce:${wallet}`), action,
-    responses: [{ identifier: 'mock', issuer_schema_id: CREDENTIALS.document, nullifier: nullifier ?? sha(`human:${wallet.toLowerCase()}`), expires_at_min: 0,
+    responses: [{ identifier: 'mock', issuer_schema_id: CREDENTIALS[credential], nullifier: nullifier ?? sha(`human:${wallet.toLowerCase()}`), expires_at_min: 0,
       proof: ['0x1', '0x2', '0x3', '0x4', '0x5'], signal_hash: sha(`signal:${wallet.toLowerCase()}`) }],
   };
 }
@@ -59,6 +59,10 @@ export class WorldIdVerifier {
     if (wallet && !this.mock && response.signal_hash) {
       const { hashSignal } = await import('@worldcoin/idkit-core/hashing');
       if (String(response.signal_hash).toLowerCase() !== String(hashSignal(wallet)).toLowerCase()) throw new WorldIdError(400, 'INVALID_PROOF', 'The proof is bound to another wallet');
+    }
+    // The agreement names the credential; a proof of another kind is the alternative path, not an error of the user.
+    if (response.issuer_schema_id !== undefined && Number(response.issuer_schema_id) !== CREDENTIALS[this.credential]) {
+      throw new WorldIdError(400, 'WRONG_CREDENTIAL', `This agreement asks for a ${this.credential.replace(/_/g, ' ')} credential (schema ${CREDENTIALS[this.credential]}), the proof carries schema ${response.issuer_schema_id}`);
     }
     if (this.mock) {
       if (!/^0x[0-9a-f]{64}$/i.test(response.nullifier ?? '') || !response.proof) throw new WorldIdError(400, 'INVALID_PROOF', 'Mock proof needs a nullifier and a proof');

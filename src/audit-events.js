@@ -2,7 +2,7 @@
 // gateway and the static export (the Sepolia timeline shipped with the repo) render the same rows.
 const KIND = { 'custodial-rwa': 'rwa', 'rwa-secondary': 'rwa', 'wildcat-credit': 'credit' };
 const VENUE = { rwa: 'token / uniswap-v4', credit: 'wildcat / aqua' };
-const KINDS = { 'worldid.verify': 'HumanVerified', attest: 'Attested', override: 'Attested', revoke: 'Revoked', 'rwa.mint': 'Minted', 'rwa.release': 'PolicyChecked', 'rwa.pool.create': 'PolicyChecked',
+const KINDS = { 'payment.settle': 'PaymentSettled', 'worldid.verify': 'HumanVerified', attest: 'Attested', override: 'Attested', revoke: 'Revoked', 'rwa.mint': 'Minted', 'rwa.release': 'PolicyChecked', 'rwa.pool.create': 'PolicyChecked',
   'rwa.pool.addLiquidity': 'PolicyChecked', 'rwa.pool.swap': 'PolicyChecked', 'credit.deposit': 'CredentialDecision', 'credit.withdraw': 'CredentialDecision',
   'credit.buyback.ship': 'Shipped', 'credit.buyback.quote': 'PolicyChecked', 'credit.buyback.fill': 'Fill', 'credit.buyback.dock': 'Shipped' };
 
@@ -28,7 +28,7 @@ export function auditEvents(entries, profile, chainId) {
 const EXPLORER = { 11155111: 'https://sepolia.etherscan.io' };
 // The policy action each venue call is decided under; facts-only entries have none.
 const ACTION = {
-  'rwa.mint': 'mint', 'rwa.release': 'transfer', 'rwa.pool.create': 'transfer', 'rwa.pool.addLiquidity': 'transfer', 'rwa.pool.swap': 'transfer',
+  'payment.settle': 'mint', 'rwa.mint': 'mint', 'rwa.release': 'transfer', 'rwa.pool.create': 'transfer', 'rwa.pool.addLiquidity': 'transfer', 'rwa.pool.swap': 'transfer',
   'credit.deposit': 'deposit', 'credit.withdraw': 'withdraw', 'credit.buyback.ship': 'transfer', 'credit.buyback.quote': 'transfer', 'credit.buyback.fill': 'transfer', 'credit.buyback.dock': 'transfer',
 };
 
@@ -36,6 +36,8 @@ function summaryOf(entry) {
   switch (entry.type) {
     case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
     case 'worldid.verify': return `identity verified with a World ID document (nullifier ${entry.nullifier})`;
+    case 'signing.handover': return `operator roles handed to ${entry.to}`;
+    case 'payment.settle': return entry.status === 'held' ? `payment ${entry.paymentId} of ${entry.amount} USD held: ${entry.refusal?.clause?.ruleId ?? 'policy'}` : `payment ${entry.paymentId} of ${entry.amount} USD settled into ${entry.amount} shares`;
     case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;
     case 'override': return 'borrower override under MLA 13(c)(y)';
     case 'sanction': return entry.sanctioned ? 'designated by the sanctions oracle' : 'designation lifted';

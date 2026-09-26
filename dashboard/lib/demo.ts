@@ -2,7 +2,7 @@ import { BASE } from "./base";
 import type { Upload } from "./agreements";
 
 export const DEMO_FILES = [
-  { name: "ea026411904ex10-9.htm", label: "BUIDL base agreement", role: "source" },
+  { name: "ea026411904ex10-9.htm", label: "BUIDL base contract", role: "source" },
   { name: "nav-cashier-addendum.md", label: "Separately authored NAV demo addendum", role: "source" },
   { name: "rwa-cashier-config.json", label: "Opt-in cashier compiler configuration", role: "config" },
 ] as const;

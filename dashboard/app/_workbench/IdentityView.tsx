@@ -56,7 +56,7 @@ export function IdentityPolicy({
         <blockquote>{identity.quote}</blockquote>
       </figure>
       <p className="wb-muted">
-        Minimum sufficient for the credential condition—not the whole agreement. The issuer must justify this
+        Minimum sufficient for the credential condition—not the whole contract. The issuer must justify this
         choice against the quoted clause.
       </p>
       {onTrace && (
@@ -526,7 +526,7 @@ function DeploymentIdentity({
           {error} <button onClick={() => setRevision((n) => n + 1)}>Retry verifier connection</button>
         </Notice>
       ) : !context ? (
-        <p role="status">Loading the agreement’s verifier and gateway wallets…</p>
+        <p role="status">Loading the contract’s verifier and gateway wallets…</p>
       ) : !wallets.length ? (
         <Notice>
           The gateway returned no wallets. Configure a wallet on the gateway before demonstrating the proof
@@ -612,7 +612,7 @@ export function IdentityView({
           <section className="wb-surface">
             <h3>{constraints ? "No identity constraint on this policy" : "Identity policy not available"}</h3>
             <p>
-              World ID is not automatically required by every agreement. The issuer must choose a credential,
+              World ID is not automatically required by every contract. The issuer must choose a credential,
               protected actions and a source clause first.
             </p>
             {constraintError && <Notice error>{constraintError}</Notice>}
@@ -624,7 +624,7 @@ export function IdentityView({
           <h3>Not a “verified” sticker.</h3>
           <ol>
             <li>
-              <strong>01 · The agreement names the gate</strong>
+              <strong>01 · The contract names the gate</strong>
               <p>A require rule ties the credential fact to a verbatim clause and specific actions.</p>
             </li>
             <li>
@@ -672,7 +672,7 @@ export function IdentityView({
                 : "Wallet proof and access checks become available after this policy is deployed. A stale deployment hash is not accepted."}
           </p>
           <ol>
-            <li>Upload the bundled agreement through the gateway; inspect Analysis and the AST.</li>
+            <li>Upload the bundled contract through the gateway; inspect Analysis and the AST.</li>
             <li>Review the credential and clause, then deploy on your configured demo chain.</li>
             <li>
               Select a wallet here. Show blocked actions, run the explicitly labeled demo verifier or a

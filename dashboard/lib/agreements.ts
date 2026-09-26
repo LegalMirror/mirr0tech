@@ -131,16 +131,16 @@ export function deployBlocked(
   status: StackStatus | null,
   writable: boolean
 ): string | null {
-  if (!writable) return "Start an active demo workspace to deploy your own agreement.";
-  if (!record || record.status !== "compiled") return "Deployment requires a compiled agreement.";
+  if (!writable) return "Start an active demo workspace to deploy your own contract.";
+  if (!record || record.status !== "compiled") return "Deployment requires a compiled contract.";
   if (record.profile === "wildcat-credit")
-    return "This credit profile uses the existing stack venue; per-agreement deployment is not supported.";
+    return "This credit profile uses the existing stack venue; per-contract deployment is not supported.";
   if (!status?.chain) return "No chain signer is reported by this gateway.";
   return null;
 }
 
 export function validateUpload(upload: Upload): void {
-  if (!upload.name.trim()) throw new Error("Give this agreement a name.");
+  if (!upload.name.trim()) throw new Error("Give this contract a name.");
   if (!upload.documents.length) throw new Error("Paste a document or choose at least one text file.");
   for (const doc of upload.documents) {
     if (!/\.(txt|md|htm|html)$/i.test(doc.name))

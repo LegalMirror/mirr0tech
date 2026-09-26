@@ -13,7 +13,7 @@ import {
 } from "@/lib/session";
 import { investorSession } from "@/lib/investor/session";
 import { source } from "@/lib/adapter";
-import { ConnectionDialog } from "@/app/_workbench/Forms";
+import { SettingsDialog } from "@/app/_workbench/Forms";
 
 const active = (): GatewaySession => ({
   url: "https://demo.example",
@@ -126,8 +126,17 @@ describe("anonymous scoped demo workspaces", () => {
       /admin mutations are unavailable/
     );
     const html = renderToStaticMarkup(
-      createElement(ConnectionDialog, { session: active(), onClose: () => {} })
+      createElement(SettingsDialog, {
+        session: active(),
+        sample: false,
+        status: null,
+        statusError: "",
+        onClose: () => {},
+      })
     );
+    expect(html).toContain("Settings");
+    expect(html).toContain("ENVIRONMENT");
+    expect(html).toContain("CONNECTION");
     expect(html).toContain("Anyone can create demo contracts");
     expect(html).not.toContain('type="password"');
     expect(html).not.toContain("Operator key");

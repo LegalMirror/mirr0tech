@@ -54,7 +54,7 @@ export function InvestorDashboard() {
             <h1>
               Your identity opens a session.
               <br />
-              The agreement governs access.
+              The contract governs access.
             </h1>
             <p>
               Use World Passport, inspect your eligibility, then sign an exact-amount approval and bounded
@@ -64,7 +64,7 @@ export function InvestorDashboard() {
           <aside>
             <span className="iv-kicker">NO OPERATOR KEY REQUIRED</span>
             <p>
-              Investor sessions are wallet- and fund-scoped. They do not unlock private agreements or issuer
+              Investor sessions are wallet- and fund-scoped. They do not unlock private contracts or issuer
               controls.
             </p>
             <code>{INVESTOR_API}</code>
@@ -130,7 +130,7 @@ export function InvestorDashboard() {
         <section className="iv-selection">
           <div>
             <span className="iv-kicker">PUBLIC FUNDS</span>
-            <label htmlFor="investor-fund">Choose an agreement-backed fund</label>
+            <label htmlFor="investor-fund">Choose a contract-backed fund</label>
             <select
               id="investor-fund"
               value={state.fund?.id ?? ""}
@@ -192,7 +192,7 @@ export function InvestorDashboard() {
           <section className="iv-card iv-empty">
             <h2>No public investor fund is published yet</h2>
             <p>
-              The API can be healthy before a cashier-enabled agreement is published. Ask the issuer to
+              The API can be healthy before a cashier-enabled contract is published. Ask the issuer to
               publish the bounded cashier deployment; no operator key or arbitrary contract address is
               accepted on this page.
             </p>

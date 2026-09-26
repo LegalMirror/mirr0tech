@@ -295,7 +295,7 @@ export function AccountPanel({
               ) : (
                 <p className="iv-notice">
                   {snapshot.disabledReason ??
-                    "No bounded cashier is reported. Ask the issuer to publish a cashier-enabled agreement; this legacy fund is read-only."}
+                    "No bounded cashier is reported. Ask the issuer to publish a cashier-enabled contract; this legacy fund is read-only."}
                 </p>
               )}
               <details>

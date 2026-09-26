@@ -127,7 +127,7 @@ export async function gatewayRequest<T>(
       (path.endsWith("/deploy") && !connection.demoCapabilities?.deploy))
   )
     throw new GatewayError(
-      "This demo workspace cannot use private/admin or agreement stack operations. Use the separate investor dashboard for public fund login and wallet-signed swaps.",
+      "This demo workspace cannot use private/admin or contract stack operations. Use the separate investor dashboard for public fund login and wallet-signed swaps.",
       403,
       "DEMO_SCOPE"
     );

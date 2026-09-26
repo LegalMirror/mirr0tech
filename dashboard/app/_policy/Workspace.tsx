@@ -146,7 +146,7 @@ function TermsPanel({ policy, onSelect }: { policy: PolicyData; onSelect: (ref: 
   if (!policy.terms.length)
     return (
       <p className="muted small">
-        This agreement compiles to rules only; it carries no numeric or dated terms.
+        This contract compiles to rules only; it carries no numeric or dated terms.
       </p>
     );
   return (
@@ -249,7 +249,7 @@ export function Workspace({ policy }: { policy: PolicyData }) {
         </section>
       </div>
       <section className="card" style={{ marginTop: "var(--sp-md)" }} aria-label="More">
-        <Disclosure title="Numbers in the agreement" summary={`${policy.terms.length} values the venues use`}>
+        <Disclosure title="Numbers in the contract" summary={`${policy.terms.length} values the venues use`}>
           <TermsPanel policy={policy} onSelect={selectFromPanel} />
         </Disclosure>
         <Disclosure

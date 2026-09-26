@@ -56,7 +56,7 @@ export function verifierLabel(context: WorldIdContext | null): string {
 }
 export function contextIssue(context: WorldIdContext, expected: Credential, now = Date.now()): string | null {
   if (context.credential !== expected)
-    return "The gateway requests a different credential than this policy. Refresh the agreement; do not substitute a weaker credential.";
+    return "The gateway requests a different credential than this policy. Refresh the contract; do not substitute a weaker credential.";
   if (context.mock === true) return null;
   if (context.mock !== false || !["staging", "sandbox", "production"].includes(context.environment))
     return "The verifier mode or environment is not supported by this installed IDKit. Ask the operator to check the World configuration.";
@@ -87,7 +87,7 @@ export function identityFailure(error: unknown): { title: string; detail: string
     return {
       title: "Credential not accepted",
       detail:
-        "This agreement requires the selected credential. Another credential cannot replace it. Use the required credential, or ask the issuer to review the policy—not bypass it.",
+        "This contract requires the selected credential. Another credential cannot replace it. Use the required credential, or ask the issuer to review the policy—not bypass it.",
       cancelled: false,
     };
   if (code === "CREDENTIAL_UNAVAILABLE")

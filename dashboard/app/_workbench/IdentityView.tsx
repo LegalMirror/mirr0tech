@@ -515,51 +515,6 @@ function DeploymentIdentity({
     return () => controller.abort();
   }, [client, record.id, revision]);
   const wallet = wallets.find((wallet) => wallet.address === walletAddress);
-  return (
-    <section className="wb-identity-operation" aria-label="World ID verification and access">
-      <div className="wb-section-heading">
-        <span className="wb-eyebrow">TRY THE TRUST BOUNDARY</span>
-        <h2>Prove the credential. Recheck the policy.</h2>
-      </div>
-      {error ? (
-        <Notice error>
-          {error} <button onClick={() => setRevision((n) => n + 1)}>Retry verifier connection</button>
-        </Notice>
-      ) : !context ? (
-        <p role="status">Loading the contract’s verifier and gateway wallets…</p>
-      ) : !wallets.length ? (
-        <Notice>
-          The gateway returned no wallets. Configure a wallet on the gateway before demonstrating the proof
-          flow.
-        </Notice>
-      ) : (
-        <>
-          <label className="wb-wallet-picker">
-            Gateway wallet
-            <select value={walletAddress} onChange={(event) => setWalletAddress(event.target.value)}>
-              {wallets.map((person) => (
-                <option key={person.address} value={person.address}>
-                  {person.name} · {person.address}
-                </option>
-              ))}
-            </select>
-          </label>
-          {wallet && (
-            <WalletTrustFlow
-              key={`${record.id}:${record.policyHash}:${wallet.address}`}
-              client={client}
-              record={record}
-              policy={policy}
-              identity={identity}
-              wallet={wallet}
-              initialContext={context}
-              writable={writable}
-            />
-          )}
-        </>
-      )}
-    </section>
-  );
 }
 
 export function IdentityView({
@@ -597,13 +552,9 @@ export function IdentityView({
   return (
     <div className="wb-scroll-page wb-identity-page">
       <div className="wb-section-heading">
-        <span className="wb-eyebrow">WORLD ID / THE TRUST MOMENT</span>
         <h2>
-          The clause decides.
-          <br />
-          World ID supplies one fact.
+          World ID
         </h2>
-        <p>Bind the required credential to a wallet. Keep every other eligibility check in force.</p>
       </div>
       <div className="wb-identity-overview">
         {identity ? (
@@ -629,56 +580,6 @@ export function IdentityView({
           </Link> */}
         </Notice>
       )}
-      {identity && deployed ? (
-        <DeploymentIdentity
-          client={client}
-          record={record}
-          policy={policy}
-          identity={identity}
-          writable={writable}
-        />
-      ) : (
-        <section className="wb-surface wb-demo-path">
-          <h3>Ready-to-demo path</h3>
-          <p>
-            {demoWorkspace
-              ? "A demo workspace token never grants issuer or investor wallet privileges."
-              : sample
-                ? "This is an exported policy, not a wallet verification session."
-                : "Wallet proof and access checks become available after this policy is deployed. A stale deployment hash is not accepted."}
-          </p>
-          <ol>
-            <li>Upload the bundled contract through the gateway; inspect Analysis and the AST.</li>
-            <li>Review the credential and clause, then deploy on your configured demo chain.</li>
-            <li>
-              Select a wallet here. Show blocked actions, run the explicitly labeled demo verifier or a
-              configured World App request, then re-read remaining requirements.
-            </li>
-          </ol>
-          <div className="wb-actions">
-            <button className="wb-primary" onClick={sample ? onConnect : onConfigure}>
-              {sample ? "Connect gateway to run the demo" : "Review policy & deployment"}
-              <Icon name="arrow" size={15} />
-            </button>
-          </div>
-        </section>
-      )}
-      <details className="wb-live-checklist">
-        <summary>Live World ID readiness</summary>
-        <p>
-          A live demonstration needs a registered World app/RP, a server signing key, a matching action and
-          environment, an eligible credential in World App, an operator session, a funded chain signer and a
-          deployed matching policy. This UI cannot provision those or claim they are ready from a mock result.
-        </p>
-        <p>
-          One-time proofs and repeat verification have provider-specific replay rules. This flow does not
-          invent a session-proof integration. If an attestation expires, ask the operator to review the
-          supported re-verification path.
-        </p>
-        <a href="https://docs.world.org/world-id/idkit/integrate" target="_blank" rel="noreferrer">
-          World ID integration documentation ↗
-        </a>
-      </details>
     </div>
   );
 }

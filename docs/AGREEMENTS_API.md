@@ -135,3 +135,133 @@ OpenAI extraction writes structured `[OpenAI]` JSON events to server stdout: req
 `OPENAI_TIMEOUT_MS` controls the request and response-body deadline (default `300000`, maximum `3600000`). The entire document bundle is currently generated in one non-streaming request with up to 6,000 output tokens. Local schema/source-quote validation starts only after that response arrives; `validationMs` separates that work from the overall `elapsedMs`. A waiting heartbeat reports that the request is still pending, not model progress. Increasing the deadline permits longer generations but does not make them faster. Restart the server after changing environment settings; saved failed agreements can then be regenerated.
 
 Exact source-bound MVP compiler mappings preserve the model overview as `documentAst` and expose the executable subset as `ast`. Fund uploads use `rwa-secondary`; credit uploads require the complete MLA, lender-check policy and buyback addendum with `wildcat-credit`. Per-agreement credit deployment now creates a policy-bound role provider, mock market and buyback router on Sepolia. See [LEGAL_AST.md](LEGAL_AST.md#executable-mvp-test-mappings) for live integration-test commands and limitations.
+
+## Wallet-signed Uniswap swaps
+
+The Swap tab follows Deploy. Configure `UNISWAP_API_KEY` on the gateway (never a
+`NEXT_PUBLIC_*` variable). The gateway calls the Uniswap Trading API with v4-only
+routing and rejects any quote that is not a direct route through the persisted
+agreement pool. Token metadata and balances are read by the backend Sepolia RPC.
+The browser connects a wallet, reviews the quote, approves Permit2 for the exact
+input amount, signs any returned Permit2 message, and signs the swap.
+The gateway never signs or broadcasts these transactions.
+
+| Method | Path | Body | Result |
+| --- | --- | --- | --- |
+| POST | `/v1/agreements/:id/swap/quote` | `{ wallet, direction: "buy" \| "sell", amount, slippageBps }` | Quote ID, input/output base-unit amounts, minimum output, pool ID, spender, expiry |
+| POST | `/v1/agreements/:id/swap/approval` | `{ wallet, quoteId }` | Optional unsigned ERC-20 reset and exact-amount approval transactions |
+| POST | `/v1/agreements/:id/swap/transaction` | `{ wallet, quoteId, signature? }` | Simulated, unsigned swap transaction and expiry |
+
+`amount` is a positive integer string in the input token's base units; `buy`
+spends the paired asset and receives RWA, while `sell` spends RWA. Slippage is
+1–500 basis points. Quotes expire after two minutes and are bound to agreement,
+wallet, policy hash and pool ID. A restart requires a new quote. These endpoints
+are read/preparation operations available to viewers and to the owner of a demo
+agreement; all on-chain changes still require the user's wallet signature.
+
+`GET /v1/agreements/:id/swap/state?wallet=0x…` returns chain ID, pool ID,
+wallet, RWA/asset metadata and base-unit balances, and active liquidity.
+`GET /v1/agreements/:id/swap/receipts/:hash` returns a receipt summary or null.
+Both endpoints respect agreement ownership for demo sessions.
+
+This integration uses Universal Router 2.1.2 with standard Permit2 approvals
+(`x-permit2-disabled: false`, `permitAmount: EXACT`). Quotes return `spender`
+(Permit2), `router` (Universal Router) and optional `permitData`. Sign the exact
+returned domain/types/values and include `signature` when preparing the swap.
+The backend verifies the permit’s wallet, chain, token, amount, spender and
+expiry. Swap transactions are simulated before delivery and carry a deadline.
+No alternative pool or custom-router fallback is accepted.
+
+New deployments use `MirrorUniswapHook`, which authenticates wallets through
+Universal Router/PositionManager `msgSender()`. Old custom-router pools fail
+with `DEPRECATED_ROUTER`; regenerate and redeploy before minting and seeding.
+An initialized pool still needs liquidity and API indexing/hook support.
+
+Seeding uses the Uniswap Liquidity API (`/lp/create`, `/lp/check_approval`),
+canonical PositionManager and Permit2. Calldata is validated against the selected
+pool, backend NFT owner, full-range ticks and reviewed budgets. A signed seed
+transaction is persisted before broadcast so retries cannot create another NFT.
+
+References: [Uniswap quote API](https://developers.uniswap.org/docs/api-reference/aggregator_quote),
+[Permit2 approvals](https://developers.uniswap.org/docs/trading/swapping-api/concepts/permit2),
+[liquidity API](https://developers.uniswap.org/docs/liquidity/liquidity-provisioning-api/integration-guide).
+
+### Backend RWA issuance
+
+`POST /v1/agreements/:id/mint` accepts
+`{ "recipient": "0x…", "amount": "100.25", "requestId": "a-unique-request-id" }`.
+The amount is a positive decimal string with at most six places; request IDs are
+16–80 letters, numbers, underscores or hyphens. Requires an operator bearer or
+local workspace session. Viewer and public demo sessions cannot submit mints.
+
+Returns HTTP 202 with an operation. Poll
+`GET /v1/agreements/:id/mints/:requestId` for `status` (`pending`, `confirmed`,
+`failed`), `stage` (`mint`, `release`, `complete`), `mintTxHash`, `releaseTxHash`,
+and any `error`. The backend checks its minter/custodian role, chain, policy hash,
+and recipient eligibility before issuance, then mints into custody and releases
+to the recipient. To recover an interrupted operation, POST the **same** body and
+request ID. Reusing an ID for another recipient or amount returns 409.
+
+Optional mint field `bypassSubscription: true` enables **test subscription
+acceptance** on Sepolia (or local chain tests). The backend must hold
+`ATTESTOR_ROLE`. It merges only `subscriptionAccepted=true` into the recipient’s
+live facts, preserving their expiry with a maximum 24-hour window, and reports
+`subscriptionTxHash`. Every other mint/transfer rule still runs. The flag is part
+of the request’s identity: changing it requires a new request ID.
+
+### Pool liquidity
+
+- `GET /v1/agreements/:id/liquidity`: backend RWA/mUSDC balances and active pool liquidity.
+- `POST /v1/agreements/:id/liquidity/seeds`: operator/workspace-only,
+  `{ "requestId": "a-unique-seed-request", "rwaAmount": "100", "usdAmount": "100" }`.
+  Amounts are maximum deposit budgets, positive decimal strings with up to six
+  places. Returns HTTP 202; the backend approves bounded amounts and creates a
+  full-range position through the pool hook’s trusted router.
+- `GET /v1/agreements/:id/liquidity/seeds/:requestId`: status, stage, approval and
+  seed transaction hashes. Retry the same POST after interruption to reconcile
+  the existing transaction or uniquely salted position.
+
+Both backend balances and transfer eligibility are required. Deprecated pools
+using the old mUSDC are rejected with `LEGACY_POOL_ASSET`; seeding never creates
+or migrates a pool.
+
+The mint endpoint also accepts `simulateDeposit: true` (default **false**).
+This explicitly simulates receipt of a bank deposit on Sepolia/local test chains
+by merging `depositConfirmed=true` for the recipient and selected policy through
+the backend attestor. It returns `depositTxHash` on the mint operation. Other live
+facts and their expiry are preserved, capped at 24 hours; no actual payment is
+verified or transferred. Normal minting leaves deposit confirmation to the
+bank-payment settlement flow. The flag is bound to the request ID, so changing
+it requires a new mint request ID. Neither test flag sets KYC/AML or World ID.
+
+Additional opt-in mint field `testAttestations` accepts only these boolean keys:
+`issuerAuthorized`, `offeringCompliant`, `identityVerified`, `kycApproved`,
+`amlApproved`, and `sanctionsClear`. All default to false. For example:
+
+```json
+{
+  "recipient": "0x…",
+  "amount": "100",
+  "requestId": "unique-test-mint-request",
+  "bypassSubscription": true,
+  "simulateDeposit": true,
+  "testAttestations": {
+    "issuerAuthorized": true,
+    "offeringCompliant": true,
+    "identityVerified": true,
+    "kycApproved": true,
+    "amlApproved": true,
+    "sanctionsClear": true
+  }
+}
+```
+
+These flags simulate every current RWA mint/release requirement. The policy
+still evaluates normally. Only Sepolia and local chain 31337 accept simulations;
+identity simulation does not verify a World ID proof. Selected fact writes
+return `<fact>TxHash` fields when a transaction is needed. Existing live facts
+are reused. Sanctions clearance calls only the configured mock oracle with its
+authorized administrator and returns `sanctionsClearTxHash`. It never attempts
+to override the policy’s observable sanctions bit via the attestor. Unknown or
+non-boolean flags return `INVALID_MINT`; changed flags under an existing request
+ID return `MINT_CONFLICT`.

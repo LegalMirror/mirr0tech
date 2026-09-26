@@ -16,6 +16,8 @@ import { extractWorkspace, GENERATIONS } from './openai-extract.js';
 import { isLegalAst, legalAstGraph } from './legal/ast.js';
 import { PROFILES, exportCompiled } from '../scripts/export-ui.js';
 import { AppError, ensure } from './errors.js';
+import { mintInput, mintTestFlags } from './onchain/mint.js';
+import { seedInput, seedDeployment } from './onchain/liquidity.js';
 
 export const STATES = ['uploaded', 'extracting', 'verified', 'analyzed', 'compiled', 'deploying', 'deployed', 'failed'];
 // Why this credential is the minimum sufficient assurance, in the rule's own words.
@@ -66,10 +68,12 @@ export function astGraph({ title, rules, terms, unresolved, verification }) {
 export class Agreements {
   /// `extract` and `deployer` are injectable: the extraction client and the chain deploy.
   /// `venueFactory` builds the operator service over one deployed agreement's token, oracle and hook.
-  constructor({ path = null, uploadsPath = null, extract = extractWorkspace, deployer = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
+  constructor({ path = null, uploadsPath = null, extract = extractWorkspace, deployer = null, minter = null, seeder = null, venueFactory = null, worldIdAction = process.env.WORLD_ACTION ?? DEFAULT_ACTION, log = () => {} } = {}) {
     ensure(typeof worldIdAction === 'string' && worldIdAction.trim(), 500, 'CONFIG', 'WORLD_ACTION must not be empty');
     Object.assign(this, { path, uploadsPath, extract, deployer, venueFactory, worldIdAction, log, records: new Map(), exports: new Map(), venues: new Map(), jobs: new Map() });
     this.deployQueue = Promise.resolve();
+    this.minter = minter;
+    this.seeder = seeder;
     this.persistQueue = Promise.resolve();
   }
 
@@ -79,6 +83,11 @@ export class Agreements {
     }
     // A restart mid-job leaves no one to finish it.
     for (const record of this.records.values()) if (['uploaded', 'extracting', 'deploying'].includes(record.status)) this.transition(record, 'failed', { error: `Interrupted while ${record.status}` });
+    for (const record of this.records.values()) for (const operation of [...(record.mintOperations ?? []), ...(record.seedOperations ?? [])]) {
+      if (operation.status === 'pending') Object.assign(operation, {
+        status: 'failed', error: 'Backend restarted. Retry the same request to reconcile transactions and finish the operation.',
+      });
+    }
     return this;
   }
 
@@ -265,6 +274,89 @@ export class Agreements {
   }
 
   /// Token, oracle, hook and pool for this agreement, in the background; 409 unless compiled.
+  async liquidityState(id) {
+    ensure(this.seeder, 503, 'NO_SEEDER', 'Configure the backend signer to manage liquidity.');
+    seedDeployment(this.record(id));
+    return this.seeder.state(this.record(id));
+  }
+
+  seedOperation(id, requestId) {
+    const operation = this.record(id).seedOperations?.find(item => item.requestId === requestId);
+    ensure(operation, 404, 'NOT_FOUND', 'Seed operation not found.');
+    return { ...operation };
+  }
+
+  async seed(id, body) {
+    const input = seedInput(body);
+    const record = this.record(id);
+    const deployment = seedDeployment(record);
+    ensure(this.seeder, 503, 'NO_SEEDER', 'Configure the backend signer to manage liquidity.');
+    record.seedOperations ??= [];
+    let operation = record.seedOperations.find(item => item.requestId === input.requestId);
+    if (operation) {
+      ensure(operation.rwaAmount === input.rwaAmount && operation.usdAmount === input.usdAmount && operation.poolId === deployment.poolId, 409, 'SEED_CONFLICT', 'This request ID belongs to another seed operation.');
+      if (operation.status === 'confirmed' || this.jobs.has(id)) return { ...operation };
+    }
+    ensure(!this.jobs.has(id), 409, 'BUSY', 'Wait for the current agreement operation to finish.');
+    if (!operation) {
+      operation = { ...input, poolId: deployment.poolId, createdAt: now(), stage: 'approval' };
+      record.seedOperations.push(operation);
+    }
+    Object.assign(operation, { status: 'pending', error: null });
+    const progress = async fields => { Object.assign(operation, fields, { updatedAt: now() }); await this.persist(); };
+    const job = this.deployQueue.then(async () => {
+      try {
+        await this.persist();
+        await progress(await this.seeder.seed({ record, operation, progress }));
+      } catch (error) {
+        await progress({ status: 'failed', error: error instanceof AppError ? error.message : 'Pool seeding failed. Check the transaction hashes and retry this same request.' });
+      } finally { this.jobs.delete(id); }
+    });
+    this.jobs.set(id, job);
+    this.deployQueue = job.catch(() => {});
+    return { ...operation };
+  }
+
+  mintOperation(id, requestId) {
+    const operation = this.record(id).mintOperations?.find((item) => item.requestId === requestId);
+    ensure(operation, 404, 'NOT_FOUND', 'Mint operation not found.');
+    return { ...operation };
+  }
+
+  async mint(id, body) {
+    const input = mintInput(body);
+    const record = this.record(id);
+    ensure(this.minter, 503, 'NO_MINTER', 'This gateway has no backend mint signer configured.');
+    ensure(record.status === 'deployed' && record.deployment?.policyHash === record.policyHash, 409, 'NOT_DEPLOYED', 'Minting requires the current deployed agreement.');
+    ensure(record.profile !== 'wildcat-credit' && !record.deployment.cashier, 409, 'MINT_UNSUPPORTED', 'This tab supports RWA issuance; credit and cashier tokens use their settlement flows.');
+    record.mintOperations ??= [];
+    let operation = record.mintOperations.find((item) => item.requestId === input.requestId);
+    if (operation) {
+      ensure(operation.recipient === input.recipient && operation.units === input.units && Boolean(operation.bypassSubscription) === input.bypassSubscription && Boolean(operation.simulateDeposit) === input.simulateDeposit && JSON.stringify(mintTestFlags(operation.testAttestations)) === JSON.stringify(input.testAttestations) && operation.token === record.deployment.token, 409, 'MINT_CONFLICT', 'This request ID is already bound to another mint.');
+      if (operation.status === 'confirmed' || this.jobs.has(id)) return { ...operation };
+    }
+    ensure(!this.jobs.has(id), 409, 'BUSY', 'Wait for the current agreement operation to finish.');
+    if (!operation) {
+      operation = { ...input, token: record.deployment.token, chainId: record.deployment.chainId, createdAt: now(), stage: 'mint' };
+      record.mintOperations.push(operation);
+    }
+    Object.assign(operation, { status: 'pending', error: null });
+    const progress = async (fields) => { Object.assign(operation, fields, { updatedAt: now() }); await this.persist(); };
+    // Reserve the job synchronously before persistence so concurrent requests cannot submit twice.
+    const job = this.deployQueue.then(async () => {
+      try {
+        await this.persist();
+        const result = await this.minter({ record, policy: this.export(id), operation, progress });
+        await progress(result);
+      } catch (error) {
+        await progress({ status: 'failed', error: error instanceof AppError ? error.message : 'Backend mint or release failed. Check transaction hashes before retrying.' });
+      } finally { this.jobs.delete(id); }
+    });
+    this.jobs.set(id, job);
+    this.deployQueue = job.catch(() => {});
+    return { ...operation };
+  }
+
   deploy(id) {
     const record = this.record(id);
     ensure(this.deployer, 503, 'NO_CHAIN', 'This gateway has no signer to deploy with');

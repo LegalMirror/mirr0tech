@@ -2,9 +2,11 @@
 // canonical venue contracts are supplied. One attestor and one sanctions oracle serve both
 // policies; everything policy-bound is deployed once per compiled profile.
 import { readFile } from 'node:fs/promises';
-import { AbiCoder, Contract, ContractFactory, concat, id, keccak256 } from 'ethers';
+import { AbiCoder, Contract, ContractFactory, id, keccak256 } from 'ethers';
 import { mineHookAddress, deploymentCalldata, DETERMINISTIC_DEPLOYER, CASHIER_HOOK_FLAGS } from './hookAddress.js';
 import { cashierConstructorConfig, emitCashierTerms } from './cashier.js';
+import { UNISWAP } from './uniswap-config.js';
+import { sharedMockUsd } from './mock-usd.js';
 
 export const ANVIL_CHAIN_ID = 31337n;
 // Public anvil development key, never use for assets or a public chain.
@@ -22,9 +24,11 @@ export async function loadArtifacts(profile, names) {
 export async function deployStack(signer, { borrower, canonical = {}, log = () => {} } = {}) {
   const provider = signer.provider;
   const chainId = (await provider.getNetwork()).chainId;
+  const sharedAsset = await sharedMockUsd(provider, chainId);
+  if (chainId === 11155111n) canonical = { ...canonical, poolManager: UNISWAP.poolManager };
   const deployer = await signer.getAddress();
   borrower ??= deployer;
-  const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorLiquidityRouter', 'PoolManager']);
+  const rwa = await loadArtifacts('rwa-secondary', ['PolicyAttestor', 'PolicyOracle', 'MockSanctionsOracle', 'MockERC20', 'CompiledMirrorToken', 'MirrorPolicyHook', 'MirrorUniswapHook', 'MirrorLiquidityRouter', 'PoolManager']);
   const credit = await loadArtifacts('wildcat-credit', ['PolicyOracle', 'MirrortechRoleProvider', 'MockWildcatMarket', 'MirrortechRouter', 'Aqua']);
   const deploy = async (artifact, label, ...args) => {
     const contract = await new ContractFactory(artifact.abi, artifact.bytecode, signer).deploy(...args);
@@ -39,20 +43,26 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
   for (const role of ['ATTESTOR_ROLE', 'WATCHER_ROLE']) await (await attestor.grantRole(id(role), deployer)).wait();
   await (await attestor.grantRole(id('BORROWER_ROLE'), borrower)).wait();
   const sanctions = await deploy(rwa.artifacts.MockSanctionsOracle, 'MockSanctionsOracle', deployer);
-  const usdc = await deploy(rwa.artifacts.MockERC20, 'mUSDC', 'Mock USD Coin', 'mUSDC');
+  const usdc = sharedAsset ? at(sharedAsset, rwa.artifacts.MockERC20) : await deploy(rwa.artifacts.MockERC20, 'mUSDC', 'Mock USD Coin', 'mUSDC');
 
   // Act 1: the fund agreement → token + the hook that is its only door into Uniswap.
   const rwaOracle = await deploy(rwa.artifacts.PolicyOracle, 'PolicyOracle (fund)', await attestor.getAddress(), await sanctions.getAddress());
   const token = await deploy(rwa.artifacts.CompiledMirrorToken, 'CompiledMirrorToken', deployer, deployer);
   const poolManager = canonical.poolManager ? at(canonical.poolManager, rwa.artifacts.PoolManager) : await deploy(rwa.artifacts.PoolManager, 'PoolManager', deployer);
-  const v4Router = await deploy(rwa.artifacts.MirrorLiquidityRouter, 'MirrorLiquidityRouter', await poolManager.getAddress());
-  const initCode = concat([rwa.artifacts.MirrorPolicyHook.bytecode, AbiCoder.defaultAbiCoder().encode(
-    ['address', 'address', 'address', 'address'], [await poolManager.getAddress(), await rwaOracle.getAddress(), await v4Router.getAddress(), await token.getAddress()])]);
+  // Public deployments use the canonical periphery; the local demonstration has an isolated fixture.
+  const standard = chainId === 11155111n;
+  if (standard && (await poolManager.getAddress()).toLowerCase() !== UNISWAP.poolManager.toLowerCase()) throw new Error('Sepolia requires the canonical PoolManager');
+  const v4Router = standard ? new Contract(UNISWAP.router, ['function execute(bytes,bytes[],uint256)'], signer)
+    : await deploy(rwa.artifacts.MirrorLiquidityRouter, 'MirrorLiquidityRouter (local fixture)', await poolManager.getAddress());
+  const hookArtifact = standard ? rwa.artifacts.MirrorUniswapHook : rwa.artifacts.MirrorPolicyHook;
+  const initCode = (await new ContractFactory(hookArtifact.abi, hookArtifact.bytecode, signer).getDeployTransaction(
+    await poolManager.getAddress(), await rwaOracle.getAddress(), await v4Router.getAddress(), await token.getAddress(),
+    ...(standard ? [UNISWAP.positionManager, UNISWAP.quoter] : []))).data;
   const mined = mineHookAddress(initCode);
   if (await provider.getCode(mined.address) === '0x') {
     await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait();
   }
-  const hook = at(mined.address, rwa.artifacts.MirrorPolicyHook);
+  const hook = at(mined.address, hookArtifact);
   log(`${'MirrorPolicyHook'.padEnd(24)} ${mined.address} (salt ${mined.salt.slice(0, 10)}…, ${mined.attempts} tries)`);
   await (await token.configureSecondary(await rwaOracle.getAddress(), mined.address)).wait();
 
@@ -67,11 +77,13 @@ export async function deployStack(signer, { borrower, canonical = {}, log = () =
   if (borrower === deployer) await (await market.setVenue(await swapRouter.getAddress(), true)).wait();
 
   const record = {
+    uniswap: standard ? UNISWAP : { poolManager: await poolManager.getAddress(), router: await v4Router.getAddress(), positionManager: await v4Router.getAddress(), quoter: await usdc.getAddress() },
     chainId: Number(chainId), deployer, borrower, deterministicDeployer: DETERMINISTIC_DEPLOYER,
     attestor: await attestor.getAddress(), sanctions: await sanctions.getAddress(), usdc: await usdc.getAddress(),
     rwa: {
       policyHash: rwa.policy.hash, clauseTableHash: rwa.clauseTable.clauseTableHash,
       oracle: await rwaOracle.getAddress(), token: await token.getAddress(), poolManager: await poolManager.getAddress(),
+      ...(standard ? { routing: 'uniswap-api', positionManager: UNISWAP.positionManager, permit2: UNISWAP.permit2, quoter: UNISWAP.quoter } : {}),
       router: await v4Router.getAddress(), hook: mined.address, hookSalt: mined.salt,
     },
     credit: {
@@ -112,12 +124,15 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
   if (cashier && (!sources.cashier || !sources.cashierTerms || sources.cashierTerms.trim() !== emitCashierTerms(sources.cashier).trim())) {
     throw new Error('Cashier deployment requires compiler-authorized sources.cashier metadata and matching sources.cashierTerms');
   }
+  const sharedAsset = await sharedMockUsd(signer.provider, record.chainId);
   const parameters = cashier ? cashierConstructorConfig(sources.cashier) : null;
   const overrides = { 'generated/CompiledPolicy.sol': sources.compiledPolicy, 'generated/CompiledMirrorToken.sol': sources.token,
     ...(cashier ? { 'generated/CompiledCashierTerms.sol': sources.cashierTerms } : {}) };
   const core = await compileBundle('core', [['contracts/PolicyOracle.sol', 'PolicyOracle'], ['generated/CompiledMirrorToken.sol', 'CompiledMirrorToken'],
-    ...(cashier ? [['contracts/test/MockUSD.sol', 'MockUSD']] : [])], { overrides });
-  const hookName = cashier ? 'MirrorCashierHook' : 'MirrorPolicyHook';
+    ...(cashier && !sharedAsset ? [['contracts/test/MockUSD.sol', 'MockUSD']] : [])], { overrides });
+  const hookName = cashier ? 'MirrorCashierHook' : 'MirrorUniswapHook';
+  const periphery = Number(record.chainId) === 11155111 ? UNISWAP : record.uniswap ?? UNISWAP;
+  if (!cashier && record.rwa.poolManager.toLowerCase() !== periphery.poolManager.toLowerCase()) throw new Error('Configure canonical Uniswap periphery for this chain before deploying a fund.');
   const v4 = await compileBundle('uniswap-v4', [[`contracts/${hookName}.sol`, hookName],
     ...(cashier ? [['contracts/MirrorCashierRouter.sol', 'MirrorCashierRouter']] : [])], { overrides });
   const deployer = await signer.getAddress();
@@ -132,10 +147,10 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
   const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
   const token = await deploy(core.CompiledMirrorToken, 'token', deployer, deployer);
   const [oracleAddress, tokenAddress] = await Promise.all([oracle.getAddress(), token.getAddress()]);
-  // The legacy stack mock reports 18 decimals. Cashier settlement uses its own explicit six-decimal faucet token.
-  const asset = cashier ? await (await deploy(core.MockUSD, 'mockUSD')).getAddress() : record.usdc;
-  const router = cashier ? await (await deploy(v4.MirrorCashierRouter, 'router', record.rwa.poolManager, parameters)).getAddress() : record.rwa.router;
-  const args = [record.rwa.poolManager, oracleAddress, router, tokenAddress, ...(cashier ? [asset, parameters] : [])];
+  // Sepolia pools share the Settings faucet; local fixtures preserve their isolated test assets.
+  const asset = sharedAsset ?? (cashier ? await (await deploy(core.MockUSD, 'mockUSD')).getAddress() : record.usdc);
+  const router = cashier ? await (await deploy(v4.MirrorCashierRouter, 'router', record.rwa.poolManager, parameters)).getAddress() : periphery.router;
+  const args = [record.rwa.poolManager, oracleAddress, router, tokenAddress, ...(cashier ? [asset, parameters] : [periphery.positionManager, periphery.quoter])];
   const initCode = (await new ContractFactory(v4[hookName].abi, v4[hookName].bytecode, signer).getDeployTransaction(...args)).data;
   const mined = mineHookAddress(initCode, cashier ? CASHIER_HOOK_FLAGS : undefined);
   txs.hook = (await (await signer.sendTransaction({ to: DETERMINISTIC_DEPLOYER, data: deploymentCalldata(mined.salt, initCode) })).wait()).hash;
@@ -148,7 +163,8 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
   const poolManager = new Contract(record.rwa.poolManager, POOL_MANAGER_ABI, signer);
   txs.pool = (await (await poolManager.initialize(poolKey, initialSqrtPriceX96)).wait()).hash;
   const poolId = keccak256(AbiCoder.defaultAbiCoder().encode(['tuple(address,address,uint24,int24,address)'], [[currency0, currency1, poolSettings.fee, poolSettings.tickSpacing, mined.address]]));
-  return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, router,
+  return { chainId: record.chainId, policyHash: await token.policyHash(), oracle: oracleAddress, token: tokenAddress, asset, router,
+    ...(!cashier ? { routing: 'uniswap-api', positionManager: periphery.positionManager, permit2: periphery.permit2, quoter: periphery.quoter } : {}),
     ...(cashier ? { cashier: { ...sources.cashier, enabled: true, asset, initialSqrtPriceX96: initialSqrtPriceX96.toString(),
       hookAbi: v4[hookName].abi, routerAbi: v4.MirrorCashierRouter.abi } } : {}), hook: mined.address, hookSalt: mined.salt, poolManager: record.rwa.poolManager, poolKey, poolId, txs, deployedAt: new Date().toISOString() };
 }
@@ -156,6 +172,7 @@ export async function deployFund(signer, { record, sources, log = () => {} }) {
 /// A separate MVP credit market per uploaded, explicitly mapped bundle. Reuses only shared
 /// testnet infrastructure; its policy oracle, role provider and SwapVM guard bind the new hash.
 export async function deployCredit(signer, { record, sources, log = () => {} }) {
+  const sharedAsset = await sharedMockUsd(signer.provider, record.chainId);
   const { compileBundle } = await import('./solc.js');
   const { verifyPolicy } = await import('../policy/compile.js');
   const { buildOnchainPolicy, emitCompiledPolicy } = await import('./policy.js');
@@ -185,8 +202,7 @@ export async function deployCredit(signer, { record, sources, log = () => {} }) 
   const oracle = await deploy(core.PolicyOracle, 'oracle', record.attestor, record.sanctions);
   if (await oracle.policyHash() !== policy.hash) throw new Error('Generated Solidity does not match the credit policy');
   const roleProvider = await deploy(core.MirrortechRoleProvider, 'roleProvider', await oracle.getAddress());
-  const asset = await deploy(core.MockUSD, 'mockUSD');
-  const assetAddress = await asset.getAddress();
+  const assetAddress = sharedAsset ?? await (await deploy(core.MockUSD, 'mockUSD')).getAddress();
   const market = await deploy(core.MockWildcatMarket, 'market', assetAddress, await roleProvider.getAddress(), borrower);
   txs.bindMarket = (await (await oracle.bindMarket(await market.getAddress())).wait()).hash;
   const router = await deploy(swap.MirrortechRouter, 'router', record.credit.aqua, record.credit.weth, borrower, await oracle.getAddress());

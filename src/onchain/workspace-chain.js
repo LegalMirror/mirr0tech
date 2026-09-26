@@ -2,6 +2,8 @@ import { deploymentPrivateKey } from './signer.js';
 import { readFile } from 'node:fs/promises';
 import { JsonRpcProvider, Wallet, FetchRequest } from 'ethers';
 import { deployFund, deployCredit } from './deploy.js';
+import { createRwaMinter } from './mint.js';
+import { createPoolSeeder } from './liquidity.js';
 
 export const WORKSPACE_CHAIN_ID = 11155111;
 // Reuse Sepolia infrastructure; startup never starts Anvil or deploys a stack.
@@ -28,6 +30,8 @@ export async function workspaceChain(env = process.env) {
           throw new Error('RPC chain changed; refusing deployment.');
         return profile === 'wildcat-credit' ? deployCredit(signer, { record, sources }) : deployFund(signer, { record, sources });
       } : null,
+      seeder: signer ? createPoolSeeder(signer) : null,
+      minter: signer ? createRwaMinter(signer, { mockSanctionsAddress: record.sanctions, sanctionsAdmin: env.PRIVATE_KEY ? new Wallet(env.PRIVATE_KEY.trim(), provider) : signer }) : null,
       close: () => provider.destroy(),
     };
   } catch (error) { provider.destroy(); throw error; }
@@ -53,6 +57,23 @@ export function lazyWorkspaceChain(connect = () => workspaceChain()) {
       const value = await get();
       if (!value.deployer) throw new Error('Configure a Sepolia RPC and DEPLOYER_PRIVATE_KEY or PRIVATE_KEY to deploy.');
       return value.deployer(input);
+    },
+    async minter(input) {
+      const value = await get();
+      if (!value.minter) throw new Error('Configure the backend deployment signer to mint.');
+      return value.minter(input);
+    },
+    seeder: {
+      async state(record) {
+        const value = await get();
+        if (!value.seeder) throw new Error('Configure the backend signer to seed pools.');
+        return value.seeder.state(record);
+      },
+      async seed(input) {
+        const value = await get();
+        if (!value.seeder) throw new Error('Configure the backend signer to seed pools.');
+        return value.seeder.seed(input);
+      },
     },
     close() { closed = true; connection?.close(); },
   };

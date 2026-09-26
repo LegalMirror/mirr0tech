@@ -10,7 +10,7 @@ const directory = resolve(process.env.WORKSPACE_DIR || '.data/workspace');
 const chain = lazyWorkspaceChain();
 const agreements = await new Agreements({
   path: resolve(directory, 'agreements.json'), uploadsPath: resolve(directory, 'uploads'),
-  extract: extractWorkspace, deployer: chain.deployer, log: console.log,
+  extract: extractWorkspace, deployer: chain.deployer, minter: chain.minter, seeder: chain.seeder, log: console.log,
 }).init();
 const worldLogin = await WorldLogin.open();
 const port = Number(process.env.PORT || 3000);

@@ -1668,3 +1668,28 @@
 .wb-legal-document p { line-height: 1.9; white-space: pre-wrap; overflow-wrap: anywhere; }
 .wb-legal-document mark { background: #e2ce6b; color: #182024; }
 .wb-state-analyzed { background: var(--wb-cyan, #44b6b0); }
+
+.wb-swap-form > label {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0;
+}
+.wb-swap-form .wb-swap-quote {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 1px solid #303d49;
+}
+.wb-swap-form p,
+.wb-swap-quote dd {
+  overflow-wrap: anywhere;
+}
+
+.wb-faucet {
+  border-bottom: 1px solid #303d49;
+  padding-bottom: 24px;
+  overflow-wrap: anywhere;
+}
+.wb-faucet form {
+  display: grid;
+  gap: 10px;
+}

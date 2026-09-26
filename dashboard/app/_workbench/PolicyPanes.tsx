@@ -76,11 +76,8 @@ export function SourceCards({
         </span>
       </header>
       <div className="wb-source-intro">
-        <span className="wb-eyebrow">HUMAN LANGUAGE → EXECUTABLE POLICY</span>
         <p>
-          Every rule starts with a sentence.
-          <br />
-          <span className="wb-muted">Select a clause to trace its logic.</span>
+          Select a clause to trace its logic.
         </p>
       </div>
       <div className="wb-clause-list" ref={ref}>

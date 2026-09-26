@@ -53,11 +53,18 @@ export const canMutateAgreements = (value: GatewaySession) =>
 export function demoPathAllowed(method: string, path: string): boolean {
   if (method === "GET")
     return (
-      path === "/v1/status" || /^\/v1\/agreements(?:\/[a-zA-Z0-9_-]+(?:\/(?:ast|constraints))?)?$/.test(path)
+      path === "/v1/status" ||
+      /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/swap\/(?:state(?:\?wallet=0x[a-fA-F0-9]{40})?|receipts\/0x[a-fA-F0-9]{64})$/.test(
+        path
+      ) ||
+      /^\/v1\/agreements(?:\/[a-zA-Z0-9_-]+(?:\/(?:ast|constraints))?)?$/.test(path)
     );
   if (method === "POST")
     return (
-      path === "/v1/agreements" || /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:regenerate|deploy)$/.test(path)
+      path === "/v1/agreements" ||
+      /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/(?:regenerate|deploy|swap\/(?:quote|approval|transaction))$/.test(
+        path
+      )
     );
   return method === "PUT" && /^\/v1\/agreements\/[a-zA-Z0-9_-]+\/constraints$/.test(path);
 }
@@ -113,7 +120,9 @@ export async function gatewayRequest<T>(
   init: RequestInit = {}
 ): Promise<T> {
   const method = init.method ?? "GET";
-  const write = !["GET", "HEAD"].includes(method);
+  const write =
+    !["GET", "HEAD"].includes(method) &&
+    !(method === "POST" && /^\/v1\/agreements\/[^/]+\/swap\/(?:quote|approval|transaction)$/.test(path));
   if (!connection.url) throw new Error("Connect a gateway first. Samples are read-only.");
   const demo = !!connection.demoToken && !hasInternalSession(connection);
   if (demo && !hasDemoSession(connection)) {

@@ -19,6 +19,8 @@ interface IERC20Minimal {
 /// router is relying on that substitution being impossible.
 contract MirrorLiquidityRouter is IUnlockCallback {
     IPoolManager public immutable poolManager;
+    address private currentSubject;
+    function msgSender() external view returns (address) { return currentSubject; }
 
     error NotPoolManager();
 
@@ -49,6 +51,7 @@ contract MirrorLiquidityRouter is IUnlockCallback {
     function unlockCallback(bytes calldata raw) external returns (bytes memory) {
         if (msg.sender != address(poolManager)) revert NotPoolManager();
         CallbackData memory data = abi.decode(raw, (CallbackData));
+        currentSubject = data.subject;
         bytes memory hookData = abi.encode(data.subject);
         BalanceDelta delta;
         if (data.op == Op.ModifyLiquidity) {
@@ -58,6 +61,7 @@ contract MirrorLiquidityRouter is IUnlockCallback {
         }
         _settle(data.key.currency0, data.subject, delta.amount0());
         _settle(data.key.currency1, data.subject, delta.amount1());
+        currentSubject = address(0);
         return "";
     }
 

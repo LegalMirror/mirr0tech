@@ -285,3 +285,168 @@ This reuses the existing contracts and doesn't redeploy. Hosted deployment (Cool
 First-party code is released under the [MIT License](LICENSE), including the Solidity the compiler generates.
 
 Third-party code is not covered: dependencies, sources fetched into `vendor/` (git-ignored, via `npm run vendor`) and reproduced interfaces keep their original licenses and notices, as stated in each file's header.
+
+
+## Shared Sepolia mUSDC faucet
+
+**Project instruction: use this shared MockUSD deployment as the paired test asset
+for all future Sepolia RWA/Uniswap pools and credit swaps. Do not deploy a fresh
+mock USD token per agreement.** Existing pools and markets keep their original
+assets; deploying this faucet does not migrate them.
+
+- Network: **Sepolia (11155111)**
+- Token: **Mock USD Coin (`mUSDC`)**, **6 decimals**
+- Contract: [`0xfa6738D1b4Cd4Cd212909B5c5C555F464219f0AB`](https://sepolia.etherscan.io/address/0xfa6738D1b4Cd4Cd212909B5c5C555F464219f0AB)
+- Deployment transaction: [`0x0bd09c7128cec1ed9a00fc63d19004e8bc1e74efed841e5b71fee28684b117ec`](https://sepolia.etherscan.io/tx/0x0bd09c7128cec1ed9a00fc63d19004e8bc1e74efed841e5b71fee28684b117ec)
+- Source of truth: [`deployments/sepolia-mockusd.json`](deployments/sepolia-mockusd.json)
+- Solidity source: [verified on Etherscan](https://sepolia.etherscan.io/address/0xfa6738D1b4Cd4Cd212909B5c5C555F464219f0AB#code), with exact creation/runtime bytecode matches.
+
+Open **Settings → Test-token faucet → Connect wallet to mint**, connect a browser
+wallet on Sepolia, enter an amount, and select **Mint mUSDC**. The tokens go to
+the connected wallet. The UI shows its balance and the mint transaction link.
+Only Sepolia ETH for gas is needed; no gateway operator or minter role is needed.
+
+`contracts/test/MockUSD.sol` deliberately exposes unrestricted
+`mint(address to, uint256 amount)`. Any caller may mint repeatedly to any recipient;
+there is no supply cap, role check, cooldown, or faucet quota. Amounts use six
+decimal base units: **1 mUSDC = 1,000,000 units**. This is a test token with no USD
+backing, not Circle USDC.
+
+`pnpm deploy:mockusd` uses `RPC_URL` and `DEPLOYER_PRIVATE_KEY` (or `PRIVATE_KEY`)
+to deploy on Sepolia and save its receipt. It reuses the saved deployment when
+run again. The dashboard and future deployment code read the same saved address.
+Local Anvil fixtures continue using isolated test assets. Restart the gateway
+after updating deployment code; rebuild a static dashboard to include the faucet.
+`pnpm verify:mockusd` verifies or checks this deployment using `ETHERSCAN_V2_KEY`
+and the matching compiler. The complete Solidity input is saved in
+[`deployments/sepolia-mockusd.sources.json`](deployments/sepolia-mockusd.sources.json).
+Minting this token does not add pool liquidity or change the existing Uniswap
+hook/router compatibility requirements.
+
+## Mint an agreement’s RWA token
+
+Select a deployed agreement and open **Liquidity management**, above **Swap**. Enter the recipient
+address and amount, then review and confirm. The backend deployment signer
+(`DEPLOYER_PRIVATE_KEY`, or `PRIVATE_KEY`) signs and pays gas; it must hold the
+token’s minter role and be its custodian. Tokens are minted into backend custody
+and released to the recipient. The tab displays both transaction hashes with
+Sepolia Etherscan links. No connected browser wallet is required.
+
+Recipient policy eligibility and the contract’s supply cap still apply. This
+flow requires a local workspace or operator session and does not support credit
+or cashier settlement tokens. If issuance is interrupted, use **Retry same
+request**: persisted request IDs and on-chain operation IDs prevent another mint
+while allowing the release to resume. The Settings faucet remains the place to
+mint shared mUSDC. Existing test pools are unchanged; no replacement pools are
+required for RWA issuance.
+
+Under the mint card, **Advanced settings → Bypass subscription acceptance** is
+an explicit Sepolia test option. On the next mint, the backend records only
+`subscriptionAccepted=true` for the selected policy and recipient using its
+`ATTESTOR_ROLE`. It preserves other live facts and does not extend their expiry;
+the test acceptance lasts at most 24 hours. World ID, deposit confirmation,
+issuer authorization, KYC/AML and sanctions checks still apply. Unchecking the
+box does not revoke an attestation already written on chain.
+
+**Seed Uniswap pool** adds a full-range position to the selected agreement’s
+existing pool using the backend wallet’s RWA and shared mUSDC balances. Mint RWA
+to that wallet and fund it with shared mUSDC first. Enter maximum amounts for
+both tokens, review, and confirm; the backend pays gas for approvals and seeding.
+The pool price determines actual deposits, bounded by those approvals. The card
+shows liquidity status and transaction links. Retry the same seed request after
+an interruption; signed transaction bytes and their hash are persisted before broadcast,
+so retries reuse the same transaction rather than minting a second position NFT.
+Deprecated pools using old mUSDC or the custom router are disabled. Seeding adds
+liquidity to the selected pool; it does not create a replacement pool.
+
+### Uniswap API routing
+
+All new Sepolia fund deployments use `MirrorUniswapHook` with canonical
+Universal Router 2.1.2 for swaps and PositionManager for liquidity. Configure
+`UNISWAP_API_KEY` on the backend for both the Trading API and Liquidity API.
+There is no custom-router fallback in the liquidity or swap tabs.
+
+- Seeding uses `/lp/create` and `/lp/check_approval`. The backend checks the pool
+  key, full-range ticks, position owner, deadlines, actions and both maximum
+  token budgets before signing. The backend owns the resulting position NFT.
+- Swaps use `/quote`, `/check_approval` and `/swap`, with exact-amount Permit2
+  authorization. The connected wallet approves Permit2, signs any returned
+  typed-data permit and sends the Universal Router transaction. The API must
+  return this agreement’s exact pool; other routes are rejected.
+- Metadata, balances, pool liquidity and receipts come from backend `RPC_URL`;
+  the browser wallet supplies identity and transaction/permit signatures.
+- The hook obtains the initiating wallet from the trusted periphery’s
+  `msgSender()`. Recipient attestations remain required for execution. Quoter
+  simulation cannot authorize token settlement.
+
+Existing hooks and token venue bindings are immutable. Regenerate and redeploy
+old agreements to create a compatible token, hook and pool, then mint and seed
+again. Existing deployments are not migrated automatically. Uniswap must index
+and support the new pool/hook before its API can return a swap quote.
+
+Canonical addresses are in `src/onchain/uniswap-config.js`. See the official
+[deployment registry](https://developers.uniswap.org/docs/protocols/v4/deployments),
+[liquidity API guide](https://developers.uniswap.org/docs/liquidity/liquidity-provisioning-api/integration-guide)
+and [Permit2 flow](https://developers.uniswap.org/docs/trading/swapping-api/concepts/permit2).
+Run `TEST_UNISWAP_FORK=1 node --test test/chain/liquidity.test.js` with a Sepolia
+`RPC_URL` to exercise the canonical contracts on an isolated Anvil fork. The
+API responses are modeled for the fork-only pool; this test sends no Sepolia transactions.
+
+### Backend mint permissions
+
+The configured backend (`DEPLOYER_PRIVATE_KEY`, falling back to `PRIVATE_KEY`)
+must be the token’s immutable custodian and hold `MINTER_ROLE`. Test subscription
+acceptance additionally requires `ATTESTOR_ROLE` on the attestor referenced by
+the agreement’s oracle. New agreement deployments grant the backend token roles,
+but a reused stack’s attestor may still be administered by the original deployer.
+
+Run `node scripts/setup-backend-permissions.js` to inspect the Sepolia setup.
+Add `--apply` to grant missing mint/attestor roles through a configured account
+that already administers the corresponding contract. This script checks both
+configured keys, never exposes them, and records confirmed grants in
+`deployments/sepolia-backend-permissions.json`. It does not grant blanket admin
+rights or alter recipient eligibility facts. Recheck permissions after changing
+the backend signer or shared stack.
+
+**Advanced settings → Simulate bank deposit (testnet only)** is off by default.
+With this flag enabled, minting uses the backend’s attestor role to record
+`depositConfirmed=true` for the recipient and the selected policy before
+checking mint eligibility. It preserves other live facts and does not extend
+their validity; the simulation is valid for at most 24 hours. The UI shows the
+deposit attestation transaction. No bank payment or mUSDC transfer occurs.
+Without this flag, minting requires an existing deposit confirmation from the
+actual bank-payment settlement flow. Other policy checks still apply. Turning
+the flag off does not revoke a previously recorded test deposit attestation.
+
+### Test flags for all RWA mint and release clauses
+
+Under **Liquidity management → Advanced settings**, the following explicit
+simulations cover the current RWA policy. Every checkbox defaults to off.
+
+| Test option | Fact/source | Clauses |
+| --- | --- | --- |
+| Issuer authorization | `issuerAuthorized` | Mint 1 |
+| Offering compliance | `offeringCompliant` | Mint 1 |
+| Subscription acceptance | `subscriptionAccepted` | Mint 2 |
+| Bank deposit | `depositConfirmed` | Mint 3 |
+| World ID verification | `identityVerified` | Mint 5, transfer 6 |
+| KYC approval | `kycApproved` | Mint 9, transfer 7 |
+| AML approval | `amlApproved` | Mint 9, transfer 7 |
+| Sanctions clearance | Configured mock sanctions oracle | Mint 10, transfer 8 |
+
+Enable the required simulations and submit a **new mint request**. The review
+lists the simulations; resulting transactions are shown in the operation card.
+The backend merges selected facts for the recipient and policy, preserving
+other live facts and limiting validity to at most 24 hours. Simulated World ID
+requires no proof and must not be presented as real identity verification.
+Normal issuance still needs actual verification and settlement attestations.
+All simulations are rejected outside Sepolia and the local test chain.
+
+Sanctions cannot be overridden through attestation bits: the policy reads the
+oracle directly. This option clears only the recipient on the configured test
+stack’s mock oracle. It uses the configured `PRIVATE_KEY` administrator when
+present (otherwise the backend signer), checks its on-chain authority, and
+records the clearance transaction. Clearance affects other agreements sharing
+that oracle and remains until changed. Disabling flags does not revoke state
+already written. Changing flags requires a new request ID; retrying the same
+request reconciles prior transactions without duplicate issuance.

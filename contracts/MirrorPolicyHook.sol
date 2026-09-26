@@ -60,7 +60,7 @@ contract MirrorPolicyHook is IHooks {
 
     /// @dev Transient slot holding the subject the hook approved in this transaction. The token
     /// reads it on any transfer to or from the pool manager: no approval, no door.
-    bytes32 private constant APPROVED_SUBJECT_SLOT = keccak256("mirrortech.hook.approvedSubject");
+    bytes32 internal constant APPROVED_SUBJECT_SLOT = keccak256("mirrortech.hook.approvedSubject");
 
     /// @dev beforeAddLiquidity | beforeRemoveLiquidity | beforeSwap.
     uint160 internal constant REQUIRED_FLAGS =
@@ -137,7 +137,7 @@ contract MirrorPolicyHook is IHooks {
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, 0);
     }
 
-    function _enforce(address sender, PoolKey calldata key, bytes calldata hookData) private {
+    function _enforce(address sender, PoolKey calldata key, bytes calldata hookData) internal virtual {
         if (sender != router) revert NotRouter(sender);
         if (hookData.length < 32) revert MissingSubject();
         address subject = abi.decode(hookData, (address));

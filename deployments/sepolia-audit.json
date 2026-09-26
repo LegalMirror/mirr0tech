@@ -302,5 +302,125 @@
       "policyHash": "0x580dd10756ba0162388e5b72e489e51035152e4e80e49fb1963f5159ae5908e3"
     },
     "message": "execution reverted (unknown custom error)"
+  },
+  {
+    "id": "0x5960fb0d9d1898f3",
+    "at": "2026-09-26T04:45:09.546Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "kycApproved": true,
+      "amlApproved": true,
+      "sanctionsClear": true,
+      "identityVerified": true
+    },
+    "status": "ok",
+    "txHash": "0xaa50b6c64e5d0153180f78e6fb195411e959d6b27db6173bcfed0fd17f1f5573"
+  },
+  {
+    "id": "0x531bbfeb8b7d7603",
+    "at": "2026-09-26T05:23:27.335Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "issuerAuthorized": true,
+      "offeringCompliant": true,
+      "subscriptionAccepted": true,
+      "kycApproved": true,
+      "amlApproved": true,
+      "sanctionsClear": true,
+      "identityVerified": true
+    },
+    "status": "ok",
+    "txHash": "0x75082ac065914d9486a21ab44749e9e8ab13e0782041bdfd3e47487deed1c761"
+  },
+  {
+    "id": "0x32f60d6ba6badae8",
+    "at": "2026-09-26T05:23:36.825Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Stranger",
+    "facts": {
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0x422067ed02fdd49d247be2a69b9fbffbe8652d4872859f74e7333372c8232387"
+  },
+  {
+    "id": "0x759deb2755e066c6",
+    "at": "2026-09-26T05:23:49.536Z",
+    "type": "payment.settle",
+    "policy": "rwa",
+    "paymentId": "evt_sepolia_stranger",
+    "reference": "pi_evt_sepolia_stranger",
+    "wallet": "Stranger",
+    "amount": "50.00",
+    "status": "held",
+    "refusal": {
+      "name": "PolicyRefused",
+      "clause": {
+        "clauseId": 2,
+        "ruleId": "subscription-documents",
+        "action": "mint",
+        "effect": "require",
+        "clause": "2.2",
+        "quote": "completed Subscription Documents determined to be in good form"
+      },
+      "subject": "Stranger"
+    }
+  },
+  {
+    "id": "0xfdc4783be5245c75",
+    "at": "2026-09-26T05:23:49.732Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0x16e7b7c8bd430d5ed8539006400ed12c7512c8bd1017bdd19a706a1c9a068558"
+  },
+  {
+    "id": "0xab11a1deaa693e0e",
+    "at": "2026-09-26T05:24:01.702Z",
+    "type": "rwa.mint",
+    "policy": "rwa",
+    "amount": "125.50",
+    "status": "refused",
+    "refusal": {
+      "name": "unknown",
+      "data": "0xf58f733a",
+      "subject": null
+    },
+    "message": "execution reverted (unknown custom error)"
+  },
+  {
+    "id": "0x4b6f572a6a408f4d",
+    "at": "2026-09-26T05:24:02.044Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0x0f23764b6d72e0ee18c6396fce0673f66e9d50d0e000cf672226e2bb5d010c28"
+  },
+  {
+    "id": "0x738e7e02effb2952",
+    "at": "2026-09-26T05:24:26.099Z",
+    "type": "rwa.mint",
+    "policy": "rwa",
+    "amount": "125.50",
+    "status": "refused",
+    "refusal": {
+      "name": "unknown",
+      "data": "0xf58f733a",
+      "subject": null
+    },
+    "message": "execution reverted (unknown custom error)"
   }
 ]

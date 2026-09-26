@@ -182,10 +182,17 @@ export class VenueService {
   }
 
   // ---- facts -----------------------------------------------------------------------------------
+  /// Replaces the wallet's facts, except `identityVerified`: only a World ID proof sets it, so a
+  /// plain attestation that does not mention it keeps it.
   async attest(kind, wallet, facts, days = 30) {
     const address = this.address(wallet);
-    const { known, value } = this.pack(kind, facts);
     const { policy } = this.policy(kind);
+    if (!('identityVerified' in facts) && policy.factOrder.includes('identityVerified')) {
+      const [wasKnown, wasValue] = await this.c.attestor.factsOf(address, policy.hash);
+      const bit = 1n << BigInt(policy.factOrder.indexOf('identityVerified'));
+      if (wasKnown & bit & wasValue) facts = { ...facts, identityVerified: true };
+    }
+    const { known, value } = this.pack(kind, facts);
     const now = (await this.provider.getBlock('latest')).timestamp;
     return this.run('attest', { policy: kind, wallet: this.name(address), facts }, () => this.c.attestor.attest(address, policy.hash, known, value, now, now + days * 86400));
   }
@@ -253,20 +260,27 @@ export class VenueService {
     return { wallet: this.name(address), funded: amount };
   }
   /// A settled payment from the rail: the funds fact is attested, then the policy decides the mint.
-  /// The same payment id settles once; a refusal holds the money and records the sentence.
+  /// The same payment id settles once (`ok` or `held`); a refusal holds the money and records the
+  /// sentence; a chain error is `failed` and the rail's retry tries again.
   async settlePayment({ id: paymentId, wallet, amount, reference = null }) {
-    const seen = this.audit.find((entry) => entry.type === 'payment.settle' && entry.paymentId === paymentId);
+    const seen = this.audit.find((entry) => entry.type === 'payment.settle' && entry.paymentId === paymentId && entry.status !== 'failed');
     if (seen) return { ...seen, replay: true };
     const address = this.address(wallet);
     await this.attestMerged('rwa', address, { depositConfirmed: true });
     const decision = await this.explain('rwa', address, 'mint');
-    const entry = { id: id(`payment:${paymentId}`).slice(0, 18), at: new Date().toISOString(), type: 'payment.settle', policy: 'rwa', paymentId, reference, wallet: this.name(address), amount };
+    const entry = { id: id(`payment:${paymentId}:${Date.now()}`).slice(0, 18), at: new Date().toISOString(), type: 'payment.settle', policy: 'rwa', paymentId, reference, wallet: this.name(address), amount };
     if (!decision.allowed) {
       Object.assign(entry, { status: 'held', refusal: { name: 'PolicyRefused', clause: decision.clause, subject: this.name(address) } });
     } else {
-      const minted = await this.mint(amount);
-      const released = await this.release(address, amount);
-      Object.assign(entry, { status: 'ok', txHash: released.txHash, mintTxHash: minted.txHash });
+      try {
+        const minted = await this.mint(amount);
+        const released = await this.release(address, amount);
+        Object.assign(entry, { status: 'ok', txHash: released.txHash, mintTxHash: minted.txHash });
+      } catch (error) {
+        const refusal = error.details?.refusal;
+        if (refusal?.clause) Object.assign(entry, { status: 'held', refusal });
+        else Object.assign(entry, { status: 'failed', message: error.message });
+      }
     }
     this.audit.push(entry);
     await this.persist();

@@ -1,0 +1,201 @@
+[
+  {
+    "id": "0x753a68fd9da560b6",
+    "at": "2026-09-26T05:17:13.516Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "kycApproved": true,
+      "amlApproved": true,
+      "sanctionsClear": true
+    },
+    "status": "ok",
+    "txHash": "0x0630a7ab7ef59ce2d5c67f1ef1758f173f913b36b8e1ed8f696f133d8e8f8381"
+  },
+  {
+    "id": "0xc00aeec823644533",
+    "at": "2026-09-26T05:17:26.016Z",
+    "type": "worldid.verify",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "nullifier": "0xf527da0f…",
+    "facts": {
+      "identityVerified": true
+    },
+    "status": "ok",
+    "txHash": "0xdf388b7126c413370e3598a7282712278775e6c86f87bc9fbece5c3ce5f092fa"
+  },
+  {
+    "id": "0x2d57f5048418ec05",
+    "at": "2026-09-26T05:19:48.786Z",
+    "type": "rwa.mint",
+    "policy": "rwa",
+    "amount": "10000",
+    "status": "ok",
+    "txHash": "0x028a8574017c3b65a95c6da7099eaf50d98ea5225b673864e1a51e05aaab00b1"
+  },
+  {
+    "id": "0x0232178f9ed947e0",
+    "at": "2026-09-26T05:20:01.477Z",
+    "type": "rwa.release",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "amount": "5000",
+    "status": "ok",
+    "txHash": "0x8cbca868a253007f4dc0ce01890c3aacecca431a7988749e636297c3210f6c6f"
+  },
+  {
+    "id": "0x1eaa02f1022769bf",
+    "at": "2026-09-26T05:20:24.553Z",
+    "type": "rwa.pool.addLiquidity",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "hooked": true,
+    "status": "ok",
+    "txHash": "0xa2417ada901ed5fdfefca1d9606f9c80026cb3c1e8332bb5267b1f4f24d1c854"
+  },
+  {
+    "id": "0x999786ed7e7d0b03",
+    "at": "2026-09-26T05:20:37.661Z",
+    "type": "rwa.pool.swap",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "hooked": true,
+    "status": "ok",
+    "txHash": "0x7a8a5f04961153ff52e309e05110fd03996867d10ea192128d8f9ea28717b17e"
+  },
+  {
+    "id": "0x827a7d69712c61ab",
+    "at": "2026-09-26T05:21:01.560Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Stranger",
+    "facts": {
+      "sanctionsClear": true
+    },
+    "status": "ok",
+    "txHash": "0xeb1d994d9aa5006f81f81644142f040780d649fe98ced03e951b02a7beed673a"
+  },
+  {
+    "id": "0x53d03efbd602a489",
+    "at": "2026-09-26T05:22:48.626Z",
+    "type": "rwa.pool.swap",
+    "policy": "rwa",
+    "wallet": "Stranger",
+    "hooked": true,
+    "status": "refused",
+    "refusal": {
+      "name": "LegalClauseViolation",
+      "clauseId": 12,
+      "clause": {
+        "clauseId": 12,
+        "ruleId": "transfer-identity-verified",
+        "action": "transfer",
+        "effect": "require",
+        "clause": "Exhibit A — Investor Onboarding",
+        "quote": "perform Know-your-customer (KYC), Know-your-business (KYB), Anti-Money Laundering (AML), and sanctions checks during onboarding of investors"
+      },
+      "subject": null,
+      "policyHash": "0xf16e378c3b6fd49c5f6e077713fb87a1bb5417d5c17a5ada44cb7f1c60fc2bfb"
+    },
+    "message": "execution reverted (unknown custom error)"
+  },
+  {
+    "id": "0x6323909ccca61688",
+    "at": "2026-09-26T05:28:02.334Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "issuerAuthorized": true,
+      "offeringCompliant": true,
+      "subscriptionAccepted": true,
+      "kycApproved": true,
+      "amlApproved": true,
+      "sanctionsClear": true,
+      "identityVerified": true
+    },
+    "status": "ok",
+    "txHash": "0x640844206e7dfa2e9d4d4110c5f0779340095dee5bb3a6ed194c2e6419315d43"
+  },
+  {
+    "id": "0x115b7c08961b64bd",
+    "at": "2026-09-26T05:28:13.286Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Stranger",
+    "facts": {
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0x422422ecae42f968c502a4aaf43cee0dcf40063d8a0b28ef0ff4594ae97f55de"
+  },
+  {
+    "id": "0xa64ee100c9986381",
+    "at": "2026-09-26T05:28:25.891Z",
+    "type": "payment.settle",
+    "policy": "rwa",
+    "paymentId": "evt_sepolia_stranger_1",
+    "reference": "pi_evt_sepolia_stranger_1",
+    "wallet": "Stranger",
+    "amount": "50.00",
+    "status": "held",
+    "refusal": {
+      "name": "PolicyRefused",
+      "clause": {
+        "clauseId": 2,
+        "ruleId": "subscription-documents",
+        "action": "mint",
+        "effect": "require",
+        "clause": "2.2",
+        "quote": "completed Subscription Documents determined to be in good form"
+      },
+      "subject": "Stranger"
+    }
+  },
+  {
+    "id": "0x2427c46774313a65",
+    "at": "2026-09-26T05:28:26.085Z",
+    "type": "attest",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "facts": {
+      "depositConfirmed": true
+    },
+    "status": "ok",
+    "txHash": "0xc801b975d33d3ea3be418c04bd63eae8ae3606bee1200ae9c3855e2f43f5d29b"
+  },
+  {
+    "id": "0x2efc4d3592038754",
+    "at": "2026-09-26T05:28:37.828Z",
+    "type": "rwa.mint",
+    "policy": "rwa",
+    "amount": "125.50",
+    "status": "ok",
+    "txHash": "0x515fe4165d9570985482d98f6f4244821dd47e1cf61afb6e6a24736dcab88a4f"
+  },
+  {
+    "id": "0x8fb36921548cbf68",
+    "at": "2026-09-26T05:28:48.377Z",
+    "type": "rwa.release",
+    "policy": "rwa",
+    "wallet": "Investor",
+    "amount": "125.50",
+    "status": "ok",
+    "txHash": "0x42c6907716445d9c4893cae4456f5704cb58366acb3f6f9a7c3afb2790a93099"
+  },
+  {
+    "id": "0x744b5c6919bb86a7",
+    "at": "2026-09-26T05:28:37.828Z",
+    "type": "payment.settle",
+    "policy": "rwa",
+    "paymentId": "evt_sepolia_investor_1",
+    "reference": "pi_evt_sepolia_investor_1",
+    "wallet": "Investor",
+    "amount": "125.50",
+    "status": "ok",
+    "txHash": "0x42c6907716445d9c4893cae4456f5704cb58366acb3f6f9a7c3afb2790a93099",
+    "mintTxHash": "0x515fe4165d9570985482d98f6f4244821dd47e1cf61afb6e6a24736dcab88a4f"
+  }
+]

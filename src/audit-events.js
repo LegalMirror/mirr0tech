@@ -19,7 +19,7 @@ export function auditEvents(entries, profile, chainId) {
       summary: refused ? `${entry.refusal?.name ?? 'refused'}${entry.refusal?.clause ? ` — ${entry.refusal.clause.clause}: “${entry.refusal.clause.quote}”` : ''}` : summaryOf(entry),
       facts: entry.facts ?? {}, txHash: entry.txHash ?? null, venue: VENUE[entry.policy ?? kind] ?? 'attestor',
       // What the chain decided; the browser shows this instead of replaying partial facts.
-      outcome: refused ? 'refused' : 'ok', clauseId: entry.refusal?.clause?.clauseId ?? entry.refusal?.clauseId ?? null,
+      outcome: refused ? 'refused' : ['held', 'failed'].includes(entry.status) ? entry.status : 'ok', clauseId: entry.refusal?.clause?.clauseId ?? entry.refusal?.clauseId ?? null,
       explorer: entry.txHash && EXPLORER[chainId] ? `${EXPLORER[chainId]}/tx/${entry.txHash}` : null,
     };
   }).reverse();
@@ -37,7 +37,8 @@ function summaryOf(entry) {
     case 'attest': return `attested ${Object.keys(entry.facts ?? {}).join(', ')}`;
     case 'worldid.verify': return `identity verified with a World ID document (nullifier ${entry.nullifier})`;
     case 'signing.handover': return `operator roles handed to ${entry.to}`;
-    case 'payment.settle': return entry.status === 'held' ? `payment ${entry.paymentId} of ${entry.amount} USD held: ${entry.refusal?.clause?.ruleId ?? 'policy'}` : `payment ${entry.paymentId} of ${entry.amount} USD settled into ${entry.amount} shares`;
+    case 'payment.settle': return entry.status === 'held' ? `payment ${entry.paymentId} of ${entry.amount} USD held: ${entry.refusal?.clause?.ruleId ?? 'policy'}`
+      : entry.status === 'failed' ? `payment ${entry.paymentId} of ${entry.amount} USD failed: ${entry.message}` : `payment ${entry.paymentId} of ${entry.amount} USD settled into ${entry.amount} shares`;
     case 'revoke': return `revoked ${(entry.facts ?? []).join(', ')}`;
     case 'override': return 'borrower override under MLA 13(c)(y)';
     case 'sanction': return entry.sanctioned ? 'designated by the sanctions oracle' : 'designation lifted';

@@ -268,3 +268,19 @@ test('v3 blocks races, replayed proofs and provider rejection without blocking r
     assert.equal(rejected.db.prepare('SELECT count(*) AS n FROM world_sessions').get().n, 0);
   }
 });
+
+test('login and the wallet document check are configured independently: neither reads the other\'s variable', async (t) => {
+  const { WorldIdVerifier } = await import('../src/worldid.js');
+  const saved = { WORLD_ENVIRONMENT: process.env.WORLD_ENVIRONMENT, WORLD_LOGIN_MODE: process.env.WORLD_LOGIN_MODE };
+  t.after(() => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } });
+  for (const environment of ['staging', 'sandbox', 'production']) {
+    process.env.WORLD_ENVIRONMENT = environment;
+    for (const mode of ['mock', 'sandbox', 'v3']) {
+      process.env.WORLD_LOGIN_MODE = mode;
+      const login = await opened(t, { mode: undefined, action: 'login' });
+      assert.equal(login.config().mode, mode);
+      assert.equal(login.config().environment, { mock: 'mock', sandbox: 'sandbox', v3: 'staging' }[mode], `login ${mode} under WORLD_ENVIRONMENT=${environment}`);
+      assert.equal(new WorldIdVerifier({ mock: false, rpId: 'rp_test', appId: 'app_test', signingKeyHex: '12'.repeat(32) }).environment, environment, `verifier under WORLD_LOGIN_MODE=${mode}`);
+    }
+  }
+});
